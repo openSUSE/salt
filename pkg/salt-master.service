@@ -4,8 +4,7 @@ After=network.target
 
 [Service]
 LimitNOFILE=16384
-Type=notify
-NotifyAccess=all
+Type=simple
 ExecStart=/usr/bin/salt-master
 KillMode=process
 
