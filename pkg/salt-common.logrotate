@@ -1,4 +1,5 @@
 /var/log/salt/master {
+	su salt salt
 	weekly
 	missingok
 	rotate 7
@@ -7,6 +8,7 @@
 }
 
 /var/log/salt/minion {
+	su salt salt
 	weekly
 	missingok
 	rotate 7
@@ -15,6 +17,7 @@
 }
 
 /var/log/salt/key {
+	su salt salt
 	weekly
 	missingok
 	rotate 7
