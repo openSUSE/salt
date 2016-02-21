@@ -85,7 +85,7 @@ def list_upgrades(refresh=True):
 
         salt '*' pkg.list_upgrades
     '''
-    if salt.utils.is_true(refresh):
+    if refresh:
         refresh_db()
     ret = {}
     call = __salt__['cmd.run_all'](
@@ -200,7 +200,7 @@ def info_available(*names, **kwargs):
         names = sorted(list(set(names)))
 
     # Refresh db before extracting the latest package
-    if salt.utils.is_true(kwargs.pop('refresh', True)):
+    if kwargs.pop('refresh', True):
         refresh_db()
 
     pkg_info = []
@@ -781,7 +781,7 @@ def install(name=None,
         {'<package>': {'old': '<old-version>',
                        'new': '<new-version>'}}
     '''
-    if salt.utils.is_true(refresh):
+    if refresh:
         refresh_db()
 
     try:
@@ -885,7 +885,7 @@ def upgrade(refresh=True):
            'comment': '',
     }
 
-    if salt.utils.is_true(refresh):
+    if refresh:
         refresh_db()
     old = list_pkgs()
     cmd = _zypper('update', '--auto-agree-with-licenses')
@@ -1260,7 +1260,7 @@ def list_patterns(refresh=False):
 
         salt '*' pkg.list_patterns
     '''
-    if salt.utils.is_true(refresh):
+    if refresh:
         refresh_db()
 
     return _get_patterns()
@@ -1294,7 +1294,7 @@ def search(criteria, refresh=False):
 
         salt '*' pkg.search <criteria>
     '''
-    if salt.utils.is_true(refresh):
+    if refresh:
         refresh_db()
 
     doc = dom.parseString(__salt__['cmd.run'](_zypper('--xmlout', 'se', criteria),
@@ -1349,7 +1349,7 @@ def list_products(all=False, refresh=False):
         salt '*' pkg.list_products
         salt '*' pkg.list_products all=True
     '''
-    if salt.utils.is_true(refresh):
+    if refresh:
         refresh_db()
 
     ret = list()
@@ -1400,7 +1400,7 @@ def download(refresh=False, *packages):
     if not packages:
         raise CommandExecutionError("No packages has been specified.")
 
-    if salt.utils.is_true(refresh):
+    if refresh:
         refresh_db()
 
     doc = dom.parseString(__salt__['cmd.run'](
