@@ -2875,3 +2875,15 @@ def invalid_kwargs(invalid_kwargs, raise_exc=True):
         raise SaltInvocationError(msg)
     else:
         return msg
+
+
+def split_input(val):
+    '''
+    Take an input value and split it into a list, returning the resulting list
+    '''
+    if isinstance(val, list):
+        return val
+    try:
+        return [x.strip() for x in val.split(',')]
+    except AttributeError:
+        return [x.strip() for x in str(val).split(',')]
