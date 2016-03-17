@@ -480,7 +480,7 @@ syndic_user: salt
 #
 # Prior to changing this value, the master should be stopped and all Salt 
 # caches should be cleared.
-#hash_type: md5
+hash_type: sha256
 
 # The buffer size in the file server can be adjusted here:
 #file_buffer_size: 1048576
