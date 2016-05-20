@@ -3,71 +3,57 @@
 # Copyright (c) 2016 SUSE Linux LLC
 # All Rights Reserved.
 #
-# This software is licensed to you under the GNU General Public License,
-# version 2 (GPLv2). There is NO WARRANTY for this software, express or
-# implied, including the implied warranties of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. You should have received a copy of GPLv2
-# along with this software; if not, see
-# http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt.
-#
 # Author: Bo Maryniuk <bo@suse.de>
 
 import sys
 import os
-
-import salt.client
-import salt.utils
+import hashlib
 
 from zypp_plugin import Plugin
 
 
-class SpacewalkDriftDetector(Plugin):
+class DriftDetector(Plugin):
     """
     Return diff of the installed packages outside the Salt.
     """
     def __init__(self):
         Plugin.__init__(self)
-        self.salt = salt.client.Caller().sminion.functions
+        self.ck_path = "/var/cache/salt/minion/rpmdb.cookie"
+        self.rpm_path = "/var/lib/rpm/Packages"
 
-    def _within_salt(self):
-        """
-        Return true, if Zypper is running from within the SaltStack.
-        """
-        return 'SALT_RUNNING' in os.environ
+    def _get_mtime(self):
+        '''
+        Get the modified time of the RPM Database.
+        Returns:
+            Unix ticks
+        '''
+        return os.path.exists(self.rpm_path) and int(os.path.getmtime(self.rpm_path)) or 0
 
-    def _get_packages(self):
-        """
-        Get the list of the packages at the current time.
-        """
-        ret = dict()
-        cmd = "rpm -qa --queryformat '%{NAME}_|-%{VERSION}_|-%{RELEASE}_|-%|EPOCH?{%{EPOCH}}:{}|\\n'"
-        for line in os.popen(cmd).read().split("\n"):
-            if not line:
-                continue
-            name, pkgver, rel, epoch = line.split('_|-')
-            if epoch:
-                pkgver = '{0}:{1}'.format(epoch, pkgver)
-            if rel:
-                pkgver += '-{0}'.format(rel)
-            ret[name] = pkgver
+    def _get_checksum(self):
+        '''
+        Get the checksum of the RPM Database.
+        Returns:
+            hexdigest
+        '''
+        digest = hashlib.md5()
+        with open(self.rpm_path, "rb") as rpm_db_fh:
+            while True:
+                buff = rpm_db_fh.read(0x1000)
+                if not buff:
+                    break
+                digest.update(buff)
 
-        return ret
-
-    def PLUGINBEGIN(self, headers, body):
-        """
-        Hook when plugin begins Zypper's transaction.
-        """
-        if not self._within_salt():
-            self._pkg_before = self._get_packages()
-            self.ack()
+        return digest.hexdigest()
 
     def PLUGINEND(self, headers, body):
         """
         Hook when plugin closes Zypper's transaction.        
         """
-        if not self._within_salt():
-            self.salt['event.send']('zypper/pkgset/changed', salt.utils.compare_dicts(self._pkg_before, self._get_packages()))
-            self.ack()
+        if 'SALT_RUNNING' not in os.environ:
+            with open(self.ck_path, 'w') as ck_fh:
+                ck_fh.write('{chksum} {mtime}\n'.format(chksum=self._get_checksum(), mtime=self._get_mtime()))
+
+        self.ack()
 
 
-SpacewalkDriftDetector().main()
+DriftDetector().main()
