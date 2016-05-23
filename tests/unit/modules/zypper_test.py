@@ -500,8 +500,17 @@ class ZypperTestCase(TestCase):
             'salt.modules.zypper', **self.zypper_patcher_config)
 
         with zypper_patcher:
-            self.assertEqual(zypper.mod_repo(name, **{'url': url}),
-                             {'comment': 'Specified arguments did not result in modification of repo'})
+            with self.assertRaisesRegexp(
+                Exception,
+                'Specified arguments did not result in modification of repo'
+            ):
+                zypper.mod_repo(name, **{'url': url})
+            with self.assertRaisesRegexp(
+                Exception,
+                'Specified arguments did not result in modification of repo'
+            ):
+                zypper.mod_repo(name, **{'url': url, 'gpgautoimport': 'a'})
+
             zypper.__zypper__.xml.call.assert_not_called()
             zypper.__zypper__.refreshable.xml.call.assert_not_called()
 

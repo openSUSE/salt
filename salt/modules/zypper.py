@@ -833,6 +833,7 @@ def mod_repo(repo, **kwargs):
         __zypper__.refreshable.xml.call(*cmd_opt)
 
     comment = None
+
     if call_refresh:
         # when used with "zypper ar --refresh" or "zypper mr --refresh"
         # --gpg-auto-import-keys is not doing anything
