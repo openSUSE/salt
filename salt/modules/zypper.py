@@ -1585,11 +1585,10 @@ def download(*packages, **kwargs):
         pkg_info = {
             'repository-name': repo.getAttribute('name'),
             'repository-alias': repo.getAttribute('alias'),
+            'path': repo.getAttribute("path"),
         }
-        key = _get_first_aggregate_text(
-            dld_result.getElementsByTagName('name')
-        )
-        pkg_ret[key] = pkg_info
+        if __salt__['lowpkg.checksum'](pkg_info['path']):
+            pkg_ret[_get_first_aggregate_text(dld_result.getElementsByTagName("name"))] = pkg_info
 
     if pkg_ret:
         failed = [pkg for pkg in packages if pkg not in pkg_ret]
