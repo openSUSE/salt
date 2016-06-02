@@ -13,7 +13,6 @@ import logging
 import os
 import shutil
 import tempfile
-from contextlib import contextmanager
 
 # Import Salt Testing libs
 from salttesting import TestCase
@@ -64,38 +63,6 @@ def _unhandled_mock_read(filename):
     Raise an error because we should not be calling salt.utils.fopen()
     '''
     raise CommandExecutionError('Unhandled mock read for {0}'.format(filename))
-
-
-@contextmanager
-def _fopen_side_effect_etc_hostname(filename):
-    '''
-    Mock reading from /etc/hostname
-    '''
-    log.debug('Mock-reading {0}'.format(filename))
-    if filename == '/etc/hostname':
-        mock_open = MagicMock()
-        mock_open.read.return_value = MOCK_ETC_HOSTNAME
-        yield mock_open
-    elif filename == '/etc/hosts':
-        raise IOError(2, "No such file or directory: '{0}'".format(filename))
-    else:
-        _unhandled_mock_read(filename)
-
-
-@contextmanager
-def _fopen_side_effect_etc_hosts(filename):
-    '''
-    Mock /etc/hostname not existing, and falling back to reading /etc/hosts
-    '''
-    log.debug('Mock-reading {0}'.format(filename))
-    if filename == '/etc/hostname':
-        raise IOError(2, "No such file or directory: '{0}'".format(filename))
-    elif filename == '/etc/hosts':
-        mock_open = MagicMock()
-        mock_open.__iter__.return_value = MOCK_ETC_HOSTS.splitlines()
-        yield mock_open
-    else:
-        _unhandled_mock_read(filename)
 
 
 class ConfigTestCase(TestCase, integration.AdaptedConfigurationTestCaseMixIn):
@@ -372,6 +339,34 @@ class ConfigTestCase(TestCase, integration.AdaptedConfigurationTestCaseMixIn):
         # are not merged with syndic ones
         self.assertEqual(syndic_opts['_master_conf_file'], minion_conf_path)
         self.assertEqual(syndic_opts['_minion_conf_file'], syndic_conf_path)
+
+    def test_issue_6714_parsing_errors_logged(self):
+        try:
+            tempdir = tempfile.mkdtemp(dir=integration.SYS_TMP_DIR)
+            test_config = os.path.join(tempdir, 'config')
+
+            # Let's populate a master configuration file with some basic
+            # settings
+            salt.utils.fopen(test_config, 'w').write(
+                'root_dir: {0}\n'
+                'log_file: {0}/foo.log\n'.format(tempdir) +
+                '\n\n\n'
+                'blah:false\n'
+            )
+
+            with TestsLoggingHandler() as handler:
+                # Let's load the configuration
+                config = sconfig.master_config(test_config)
+                for message in handler.messages:
+                    if message.startswith('ERROR:Error parsing configuration'):
+                        break
+                else:
+                    raise AssertionError(
+                        'No parsing error message was logged'
+                    )
+        finally:
+            if os.path.isdir(tempdir):
+                shutil.rmtree(tempdir)
 
     @patch('salt.utils.network.get_fqhostname', MagicMock(return_value='localhost'))
     def test_get_id_etc_hostname(self):
