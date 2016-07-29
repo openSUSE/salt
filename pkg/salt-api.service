@@ -3,7 +3,8 @@ Description=The Salt API
 After=network.target
 
 [Service]
-Type=notify
+User=salt
+Type=simple
 LimitNOFILE=8192
 ExecStart=/usr/bin/salt-api
 TimeoutStopSec=3
