@@ -4,8 +4,8 @@ Documentation=man:salt-api(1) file:///usr/share/doc/salt/html/contents.html http
 After=network.target
 
 [Service]
-Type=notify
-NotifyAccess=all
+User=salt
+Type=simple
 LimitNOFILE=8192
 ExecStart=/usr/bin/salt-api
 TimeoutStopSec=3
