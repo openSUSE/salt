@@ -100,6 +100,18 @@ class _Zypper(object):
         self.__no_lock = False
         self.__no_raise = False
         self.__refresh = False
+        self.__ignore_repo_failure = False
+
+    def __call__(self, *args, **kwargs):
+        '''
+        :param args:
+        :param kwargs:
+        :return:
+        '''
+        # Ignore exit code for 106 (repo is not available)
+        if 'no_repo_failure' in kwargs:
+            self.__ignore_repo_failure = kwargs['no_repo_failure']
+        return self
 
     def __getattr__(self, item):
         '''
@@ -275,7 +287,7 @@ class _Zypper(object):
             __salt__['event.fire_master']({'success': not len(self.error_msg),
                                            'info': self.error_msg or 'Zypper has been released'},
                                           self.TAG_RELEASED)
-        if self.error_msg and not self.__no_raise:
+        if self.error_msg and not self.__no_raise and not self.__ignore_repo_failure:
             raise CommandExecutionError('Zypper command failure: {0}'.format(self.error_msg))
 
         return self._is_xml_mode() and dom.parseString(self.__call_result['stdout']) or self.__call_result['stdout']
@@ -863,6 +875,7 @@ def install(name=None,
             downloadonly=None,
             skip_verify=False,
             version=None,
+            ignore_repo_failure=False,
             **kwargs):
     '''
     Install the passed package(s), add refresh=True to force a 'zypper refresh'
@@ -928,6 +941,10 @@ def install(name=None,
         .. code-block:: bash
 
             salt '*' pkg.install sources='[{"foo": "salt://foo.rpm"},{"bar": "salt://bar.rpm"}]'
+
+    ignore_repo_failure
+        Zypper returns error code 106 if one of the repositories are not available for various reasons.
+        In case to set strict check, this parameter needs to be set to True. Default: False.
 
 
     Returns a dict containing the new package names and versions::
@@ -1000,7 +1017,7 @@ def install(name=None,
     while targets:
         cmd = cmd_install + targets[:500]
         targets = targets[500:]
-        for line in __zypper__.call(*cmd).splitlines():
+        for line in __zypper__(no_repo_failure=ignore_repo_failure).call(*cmd).splitlines():
             match = re.match(r"^The selected package '([^']+)'.+has lower version", line)
             if match:
                 downgrades.append(match.group(1))
@@ -1008,7 +1025,7 @@ def install(name=None,
     while downgrades:
         cmd = cmd_install + ['--force'] + downgrades[:500]
         downgrades = downgrades[500:]
-        __zypper__.call(*cmd)
+        __zypper__(no_repo_failure=ignore_repo_failure).call(*cmd)
 
     __context__.pop('pkg.list_pkgs', None)
     new = list_pkgs()
