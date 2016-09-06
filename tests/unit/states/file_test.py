@@ -923,6 +923,7 @@ class FileTestCase(TestCase):
 
     # 'comment' function tests: 1
 
+    @patch.object(os.path, 'exists', MagicMock(return_value=True))
     def test_comment(self):
         '''
         Test to comment out specified lines in a file.
@@ -979,6 +980,7 @@ class FileTestCase(TestCase):
 
     # 'uncomment' function tests: 1
 
+    @patch.object(os.path, 'exists', MagicMock(return_value=True))
     def test_uncomment(self):
         '''
         Test to uncomment specified commented lines in a file
@@ -1392,26 +1394,6 @@ class FileTestCase(TestCase):
                                 comt = ('The target directory /tmp is'
                                         ' not present')
                                 ret.update({'comment': comt, 'result': False})
-                                self.assertDictEqual(filestate.copy
-                                                     (name, source,
-                                                      preserve=True), ret)
-
-                    with patch.object(os.path, 'isdir', mock_t):
-                        with patch.dict(filestate.__opts__, {'test': False}):
-                            with patch.object(shutil, 'copy',
-                                              MagicMock(side_effect=[IOError,
-                                                                     True])):
-                                comt = ('Failed to copy "{0}" to "{1}"'
-                                        .format(source, name))
-                                ret.update({'comment': comt, 'result': False})
-                                self.assertDictEqual(filestate.copy
-                                                     (name, source,
-                                                      preserve=True), ret)
-
-                                comt = ('Copied "{0}" to "{1}"'.format(source,
-                                                                       name))
-                                ret.update({'comment': comt, 'result': True,
-                                            'changes': {name: source}})
                                 self.assertDictEqual(filestate.copy
                                                      (name, source,
                                                       preserve=True), ret)
