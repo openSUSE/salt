@@ -1146,7 +1146,7 @@ def upgrade(refresh=True,
         if dryrun:
             # Creates a solver test case for debugging.
             log.info('Executing debugsolver and performing a dry-run dist-upgrade')
-            __zypper__.noraise.call(*cmd_update + ['--debug-solver'])
+            __zypper__(systemd_scope=_systemd_scope()).noraise.call(*cmd_update + ['--debug-solver'])
 
         if fromrepo:
             for repo in fromrepo:
@@ -1167,6 +1167,7 @@ def upgrade(refresh=True,
     old = list_pkgs()
 
     __zypper__(systemd_scope=_systemd_scope()).noraise.call(*cmd_update)
+
     if __zypper__.exit_code not in __zypper__.SUCCESS_EXIT_CODES:
         ret['result'] = False
     else:
