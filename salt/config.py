@@ -766,6 +766,9 @@ VALID_OPTS = {
 
     # Delay in seconds before executing bootstrap (salt cloud)
     'bootstrap_delay': int,
+
+    # Extra modules for Salt Thin
+    'thin_extra_mods': str,
 }
 
 # default configurations
@@ -1206,6 +1209,7 @@ DEFAULT_MASTER_OPTS = {
     'dummy_pub': False,
     'http_request_timeout': 1 * 60 * 60.0,  # 1 hour
     'http_max_body': 100 * 1024 * 1024 * 1024,  # 100GB
+    'thin_extra_mods': '',
 }
 
 
