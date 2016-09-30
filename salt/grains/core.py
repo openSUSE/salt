@@ -1048,6 +1048,7 @@ _OS_NAME_MAP = {
     'sles': 'SUSE',
     'slesexpand': 'RES',
     'void': 'Void',
+    'slesexpand': 'RES',
     'linuxmint': 'Mint',
 }
 
