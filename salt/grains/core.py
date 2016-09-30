@@ -1047,7 +1047,7 @@ _OS_NAME_MAP = {
     'manjaro': 'Manjaro',
     'antergos': 'Antergos',
     'sles': 'SUSE',
-    'void': 'Void',
+    'slesexpand': 'RES',
     'linuxmint': 'Mint',
 }
 
@@ -1070,6 +1070,7 @@ _OS_FAMILY_MAP = {
     'OEL': 'RedHat',
     'XCP': 'RedHat',
     'XenServer': 'RedHat',
+    'RES': 'RedHat',
     'Mandrake': 'Mandriva',
     'ESXi': 'VMware',
     'Mint': 'Debian',
