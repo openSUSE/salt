@@ -933,6 +933,7 @@ _OS_NAME_MAP = {
     'synology': 'Synology',
     'manjaro': 'Manjaro',
     'sles': 'SUSE',
+    'slesexpand': 'RES'
 }
 
 # Map the 'os' grain to the 'os_family' grain
@@ -951,6 +952,7 @@ _OS_FAMILY_MAP = {
     'OEL': 'RedHat',
     'XCP': 'RedHat',
     'XenServer': 'RedHat',
+    'RES': 'RedHat',
     'Mandrake': 'Mandriva',
     'ESXi': 'VMWare',
     'Mint': 'Debian',
