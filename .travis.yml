@@ -1,0 +1,26 @@
+language: python
+
+python:
+ - 2.7
+
+services:
+ - docker
+
+env:
+    global:
+        - VERSION=leap42sp1 FLAVOR=devel NOPULL=true SALT_REPO=..
+    matrix:
+        - TARGET=suse.tests PYTEST_CFG=./configs/$TARGET/$VERSION/$FLAVOR.cfg
+        - TARGET=saltstack.unit PYTEST_CFG=./configs/$TARGET/$VERSION/default.cfg
+        - TARGET=saltstack.integration PYTEST_CFG=./configs/$TARGET/$VERSION/default.cfg
+
+before_install:
+- git clone --depth 1 https://github.com/openSUSE/salt-toaster.git
+- cd salt-toaster
+- echo "*" > .gitignore
+- tar xfz sandbox.tar.gz
+- sandbox/bin/pip install -r requirements.txt --exists-action w --upgrade
+- VERSION=leap42sp1 FLAVOR=default NOPULL=true make build_image
+- make build_image
+
+script: make $TARGET PYTEST_CFG=$PYTEST_CFG
