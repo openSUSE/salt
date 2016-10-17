@@ -1,3 +1,8 @@
+|Build status|_
+
+.. |Build Status| image:: https://api.travis-ci.org/openSUSE/salt.svg?branch=master
+.. _Build status: https://travis-ci.org/openSUSE/salt
+
 ==================
 What is SaltStack?
 ==================
