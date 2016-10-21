@@ -1631,7 +1631,7 @@ def latest(
     targets = {}
     problems = []
     for pkg in desired_pkgs:
-        if not avail[pkg]:
+        if not avail.get(pkg):
             if not cur[pkg]:
                 msg = 'No information found for \'{0}\'.'.format(pkg)
                 log.error(msg)
