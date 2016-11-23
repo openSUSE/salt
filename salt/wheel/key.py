@@ -11,6 +11,8 @@ import hashlib
 # Import salt libs
 import salt.key
 import salt.crypt
+from salt.utils.sanitizers import clean
+
 
 __func_alias__ = {
     'list_': 'list'
@@ -117,6 +119,8 @@ def gen(id_=None, keysize=2048):
     '''
     if id_ is None:
         id_ = hashlib.sha512(os.urandom(32)).hexdigest()
+    else:
+        id_ = clean.id(id_)
     ret = {'priv': '',
            'pub': ''}
     priv = salt.crypt.gen_keys(__opts__['pki_dir'], id_, keysize)
@@ -135,6 +139,7 @@ def gen_accept(id_, keysize=2048, force=False):
     Generate a key pair then accept the public key. This function returns the
     key pair in a dict, only the public key is preserved on the master.
     '''
+    id_ = clean.id(id_)
     ret = gen(id_, keysize)
     acc_path = os.path.join(__opts__['pki_dir'], 'minions', id_)
     if os.path.isfile(acc_path) and not force:
