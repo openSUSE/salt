@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 User=salt
-Type=notify
+Type=simple
 LimitNOFILE=8192
 ExecStart=/usr/bin/salt-api
 TimeoutStopSec=3
