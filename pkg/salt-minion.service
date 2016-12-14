@@ -3,7 +3,7 @@ Description=The Salt Minion
 After=network.target
 
 [Service]
-Type=notify
+Type=simple
 LimitNOFILE=8192
 ExecStart=/usr/bin/salt-minion
 
