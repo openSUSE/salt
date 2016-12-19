@@ -60,7 +60,8 @@ class Shell(object):
             mods=None,
             identities_only=False,
             sudo_user=None,
-            remote_port_forwards=None):
+            remote_port_forwards=None,
+            ssh_options=None):
         self.opts = opts
         self.host = host
         self.user = user
@@ -73,6 +74,7 @@ class Shell(object):
         self.mods = mods
         self.identities_only = identities_only
         self.remote_port_forwards = remote_port_forwards
+        self.ssh_options = ssh_options
 
     def get_error(self, errstr):
         '''
@@ -158,6 +160,12 @@ class Shell(object):
             ret.append('-o {0} '.format(option))
         return ''.join(ret)
 
+    def _ssh_opts(self):
+        if self.ssh_options:
+            return ' '.join(['-o {0}'.format(opt)
+                            for opt in self.ssh_options])
+        return ''
+
     def _copy_id_str_old(self):
         '''
         Return the string to execute ssh-copy-id
@@ -165,11 +173,12 @@ class Shell(object):
         if self.passwd:
             # Using single quotes prevents shell expansion and
             # passwords containing '$'
-            return "{0} {1} '{2} -p {3} {4}@{5}'".format(
+            return "{0} {1} '{2} -p {3} {4} {5}@{6}'".format(
                     'ssh-copy-id',
                     '-i {0}.pub'.format(self.priv),
                     self._passwd_opts(),
                     self.port,
+                    self._ssh_opts(),
                     self.user,
                     self.host)
         return None
@@ -182,11 +191,12 @@ class Shell(object):
         if self.passwd:
             # Using single quotes prevents shell expansion and
             # passwords containing '$'
-            return "{0} {1} {2} -p {3} {4}@{5}".format(
+            return "{0} {1} {2} -p {3} {4} {5}@{6}".format(
                     'ssh-copy-id',
                     '-i {0}.pub'.format(self.priv),
                     self._passwd_opts(),
                     self.port,
+                    self._ssh_opts(),
                     self.user,
                     self.host)
         return None
@@ -222,12 +232,13 @@ class Shell(object):
             port_forwards = self.remote_port_forwards.split(',')
             ports = ' '.join(map(lambda x: '-R {0}'.format(x), port_forwards))
 
-        return "{0} {1} {2} {3} {4} {5}".format(
+        return "{0} {1} {2} {3} {4} {5} {6}".format(
                 ssh,
                 '' if ssh == 'scp' else self.host,
                 '-t -t' if tty else '',
                 opts,
                 '' if ssh == 'scp' else ports,
+                self._ssh_opts() if self.ssh_options else '',
                 cmd)
 
     def _old_run_cmd(self, cmd):

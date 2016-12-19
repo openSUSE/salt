@@ -246,6 +246,9 @@ class SSH(object):
             'remote_port_forwards': self.opts.get(
                 'ssh_remote_port_forwards'
             ),
+            'ssh_options': self.opts.get(
+                'ssh_options'
+            )
         }
         if self.opts.get('rand_thin_dir'):
             self.defaults['thin_dir'] = os.path.join(
@@ -625,6 +628,7 @@ class Single(object):
             identities_only=False,
             sudo_user=None,
             remote_port_forwards=None,
+            ssh_options=None,
             **kwargs):
         # Get mine setting and mine_functions if defined in kwargs (from roster)
         self.mine = mine
@@ -674,7 +678,8 @@ class Single(object):
                 'mods': self.mods,
                 'identities_only': identities_only,
                 'sudo_user': sudo_user,
-                'remote_port_forwards': remote_port_forwards}
+                'remote_port_forwards': remote_port_forwards,
+                'ssh_options': ssh_options}
         self.minion_opts = opts.get('ssh_minion_opts', {})
         if minion_opts is not None:
             self.minion_opts.update(minion_opts)
