@@ -28,13 +28,13 @@ to replace references to ``dockerng`` with ``docker``.
 Installation Prerequisites
 --------------------------
 
-This execution module requires at least version 1.4.0 of both docker-py_ and
-Docker_. docker-py can easily be installed using :py:func:`pip.install
-<salt.modules.pip.install>`:
+This execution module requires at least version 1.6.0 of docker-py_ and
+version 1.9.0 of Docker_. docker-py can easily be installed using
+:py:func:`pip.install <salt.modules.pip.install>`:
 
 .. code-block:: bash
 
-    salt myminion pip.install docker-py>=1.4.0
+    salt myminion pip.install docker-py>=1.6.0
 
 .. _docker-py: https://pypi.python.org/pypi/docker-py
 .. _Docker: https://www.docker.com/
@@ -268,8 +268,8 @@ __func_alias__ = {
 }
 
 # Minimum supported versions
-MIN_DOCKER = (1, 6, 0)
-MIN_DOCKER_PY = (1, 4, 0)
+MIN_DOCKER = (1, 9, 0)
+MIN_DOCKER_PY = (1, 6, 0)
 
 VERSION_RE = r'([\d.]+)'
 
@@ -3486,7 +3486,8 @@ def build(path=None,
           rm=True,
           api_response=False,
           fileobj=None,
-          dockerfile=None):
+          dockerfile=None,
+          buildargs=None):
     '''
     Builds a docker image from a Dockerfile or a URL
 
@@ -3519,6 +3520,10 @@ def build(path=None,
         Dockefile is relative to the build path for the Docker container.
 
         .. versionadded:: develop
+
+    buildargs
+        A dictionary of build arguments provided to the docker build process.
+
 
     **RETURN DATA**
 
@@ -3566,7 +3571,8 @@ def build(path=None,
                                fileobj=fileobj,
                                rm=rm,
                                nocache=not cache,
-                               dockerfile=dockerfile)
+                               dockerfile=dockerfile,
+                               buildargs=buildargs)
     ret = {'Time_Elapsed': time.time() - time_started}
     _clear_context()
 
@@ -5664,7 +5670,9 @@ def call(name, function, *args, **kwargs):
         raise CommandExecutionError('Missing function parameter')
 
     # move salt into the container
-    thin_path = salt.utils.thin.gen_thin(__opts__['cachedir'])
+    thin_path = salt.utils.thin.gen_thin(__opts__['cachedir'],
+                                         extra_mods=__salt__['config.option']("thin_extra_mods", ''),
+                                         so_mods=__salt__['config.option']("thin_so_mods", ''))
     with io.open(thin_path, 'rb') as file:
         _client_wrapper('put_archive', name, thin_dest_path, file)
     try:
@@ -5781,7 +5789,7 @@ def sls(name, mods=None, saltenv='base', **kwargs):
 
 
 def sls_build(name, base='opensuse/python', mods=None, saltenv='base',
-              **kwargs):
+              dryrun=False, **kwargs):
     '''
     Build a Docker image using the specified SLS modules on top of base image
 
@@ -5802,6 +5810,24 @@ def sls_build(name, base='opensuse/python', mods=None, saltenv='base',
     saltenv : base
         Specify the environment from which to retrieve the SLS indicated by the
         `mods` parameter.
+
+    base
+        the base image
+
+    mods
+        the state modules to execute during build
+
+    saltenv
+        the salt environment to use
+
+    dryrun: False
+        when set to True the container will not be commited at the end of
+        the build. The dryrun succeed also when the state contains errors.
+
+    **RETURN DATA**
+
+    A dictionary with the ID of the new container. In case of a dryrun,
+    the state result is returned and the container gets removed.
 
     CLI Example:
 
@@ -5829,11 +5855,14 @@ def sls_build(name, base='opensuse/python', mods=None, saltenv='base',
         # Now execute the state into the container
         ret = __salt__['dockerng.sls'](id_, mods, saltenv, **kwargs)
         # fail if the state was not successful
-        if not salt.utils.check_state_result(ret):
+        if not dryrun and not salt.utils.check_state_result(ret):
             raise CommandExecutionError(ret)
     finally:
         __salt__['dockerng.stop'](id_)
 
+    if dryrun:
+        __salt__['dockerng.rm'](id_)
+        return ret
     return __salt__['dockerng.commit'](id_, name)
 
 
