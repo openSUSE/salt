@@ -2484,6 +2484,7 @@ class FileTest(integration.ModuleCase, integration.SaltReturnAssertsMixIn):
 PORT = 9999
 FILE_SOURCE = 'http://localhost:{0}/grail/scene33'.format(PORT)
 FILE_HASH = 'd2feb3beb323c79fc7a0f44f1408b4a3'
+STATE_DIR = os.path.join(integration.FILES, 'file', 'base')
 
 
 class RemoteFileTest(integration.ModuleCase, integration.SaltReturnAssertsMixIn):
