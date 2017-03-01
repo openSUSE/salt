@@ -38,6 +38,10 @@ class ModuleStateTest(TestCase):
                     varargs=None,
                     keywords=None,
                     defaults=False)
+    bspec = ArgSpec(args=[],
+                    varargs='names',
+                    keywords='kwargs',
+                    defaults=None)
 
     def test_module_run_module_not_available(self):
         '''
@@ -67,6 +71,16 @@ class ModuleStateTest(TestCase):
         '''
         ret = module.run(CMD)
         comment = 'The following arguments are missing: world hello'
+        self.assertEqual(ret['comment'], comment)
+
+    @patch('salt.utils.args.get_function_argspec', MagicMock(return_value=bspec))
+    def test_module_run_hidden_varargs(self):
+        '''
+        Tests the return of module.run state when hidden varargs are used with
+        wrong type.
+        '''
+        ret = module.run(CMD, m_names = 'anyname')
+        comment = "'names' must be a list."
         self.assertEqual(ret['comment'], comment)
 
 
