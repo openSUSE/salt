@@ -277,6 +277,7 @@ def _find_install_targets(name=None,
                           version=None,
                           pkgs=None,
                           sources=None,
+                          patches=None,
                           skip_suggestions=False,
                           pkg_verify=False,
                           normalize=True,
@@ -286,11 +287,11 @@ def _find_install_targets(name=None,
     Inspect the arguments to pkg.installed and discover what packages need to
     be installed. Return a dict of desired packages
     '''
-    if all((pkgs, sources)):
+    if len([True for x in [pkgs, sources, patches] if x]) > 1:
         return {'name': name,
                 'changes': {},
                 'result': False,
-                'comment': 'Only one of "pkgs" and "sources" is permitted.'}
+                'comment': 'Only one of "pkgs", "sources" or "patches" is permitted.'}
 
     # dict for packages that fail pkg.verify and their altered files
     altered_files = {}
@@ -317,7 +318,7 @@ def _find_install_targets(name=None,
                 'result': False,
                 'comment': exc.strerror}
 
-    if any((pkgs, sources)):
+    if any((pkgs, sources, patches)):
         if pkgs:
             desired = _repack_pkgs(pkgs)
         elif sources:
@@ -325,6 +326,8 @@ def _find_install_targets(name=None,
                 sources,
                 normalize=normalize,
             )
+        elif patches:
+            desired = _repack_pkgs(patches)
 
         if not desired:
             # Badly-formatted SLS
@@ -383,7 +386,7 @@ def _find_install_targets(name=None,
                                    'installed'.format(name)}
 
     version_spec = False
-    if not sources:
+    if not sources and not patches:
         # Check for alternate package names if strict processing is not
         # enforced. Takes extra time. Disable for improved performance
         if not skip_suggestions:
@@ -614,6 +617,7 @@ def installed(
         pkg_verify=False,
         normalize=True,
         ignore_epoch=False,
+        downloadonly=False,
         **kwargs):
     '''
     Ensure that the package is installed, and that it is the correct version
@@ -1024,6 +1028,33 @@ def installed(
             If this parameter is set to True and the package is not already
             installed, the state will fail.
 
+    :param bool downloadonly:
+        Ensures package is only downloaded without actually installing it.
+
+        Example:
+
+        .. code-block:: yaml
+
+            vim-enhanced:
+              pkg.installed:
+                - fromrepo: mycustomrepo
+                - skip_verify: True
+                - refresh: True
+                - downloadonly: True
+
+    :param list patches:
+        A list of patches/erratas to install.
+        CLI commands.
+
+        .. code-block:: yaml
+
+            my-suse-patches:
+              pkg.installed:
+                - patches:
+                  - SUSE-SLE-SERVER-12-SP1-2016-942
+                  - SUSE-SLE-SERVER-12-SP1-2016-1048
+                  - SUSE-SLE-SERVER-12-SP1-2016-1853
+
     :return:
         A dictionary containing the state of the software installation
     :rtype dict:
@@ -1099,6 +1130,8 @@ def installed(
                         'comment': exc.strerror}
 
     kwargs['allow_updates'] = allow_updates
+    patches = kwargs.get('patches', None)
+    downloadonly = kwargs.get('downloadonly', False)
 
     # if windows and a refresh
     # is required, we will have to do a refresh when _find_install_targets
@@ -1204,8 +1237,10 @@ def installed(
             else:
                 summary = ', '.join([_get_desired_pkg(x, targets)
                                      for x in targets])
-            comment.append('The following packages are set to be '
-                           'installed/updated: {0}'.format(summary))
+            comment.append('The following {0} would be {1}: {2}'.format(
+                           'patches' if patches else 'packages',
+                           'downloaded' if downloadonly else 'installed/updated',
+                           summary))
         if to_unpurge:
             comment.append(
                 'The following packages will have their selection status '
@@ -1250,6 +1285,8 @@ def installed(
                                               pkgs=pkgs,
                                               sources=sources,
                                               reinstall=reinstall,
+                                              patches=patches,
+                                              downloadonly=downloadonly,
                                               normalize=normalize,
                                               **kwargs)
         except CommandExecutionError as exc:
@@ -1394,7 +1431,7 @@ def installed(
 
     result = True
 
-    if failed:
+    if failed and not downloadonly and not patches:
         if sources:
             summary = ', '.join(failed)
         else:
@@ -1404,7 +1441,7 @@ def installed(
                           'install/update: {0}'.format(summary))
         result = False
 
-    if failed_hold:
+    if failed_hold and not downloadonly:
         for i in failed_hold:
             comment.append(i['comment'])
         result = False
@@ -1446,7 +1483,7 @@ def installed(
             )
             comment.append(_nested_output(altered_files[modified_pkg]))
 
-    if failed:
+    if failed and not downloadonly:
         # Add a comment for each package in failed with its pkg.verify output
         for failed_pkg in failed:
             if sources:
@@ -1467,6 +1504,28 @@ def installed(
     if warnings:
         ret['comment'] += '\n' + '. '.join(warnings) + '.'
     return ret
+
+
+def downloaded(**kwargs):
+    '''
+    Ensure that the package is downloaded.
+
+    Functionally identical to :mod:`installed <salt.states.pkg.installed>` but
+    forcing `downloadonly=True`.
+
+    CLI Example:
+
+    .. code-block:: yaml
+
+        zsh:
+          pkg.downloaded:
+            - fromrepo: "myrepository"
+    '''
+    # It doesn't make sense here to received 'downloadonly' as kwargs
+    # as we're explicitely using 'downloadonly=True'
+    if 'downloadonly' in kwargs:
+        del kwargs['downloadonly']
+    return installed(downloadonly=True, **kwargs)
 
 
 def latest(
