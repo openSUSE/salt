@@ -884,6 +884,7 @@ def install(name=None,
             fromrepo=None,
             pkgs=None,
             sources=None,
+            patches=None,
             downloadonly=None,
             version=None,
             ignore_repo_failure=False,
@@ -978,7 +979,7 @@ def install(name=None,
         refresh_db()
 
     try:
-        pkg_params, pkg_type = __salt__['pkg_resource.parse_targets'](name, pkgs, sources, **kwargs)
+        pkg_params, pkg_type = __salt__['pkg_resource.parse_targets'](name, pkgs, sources, patches, **kwargs)
     except MinionError as exc:
         raise CommandExecutionError(exc)
 
@@ -1027,6 +1028,10 @@ def install(name=None,
         cmd_install.append('--download-only')
     if fromrepo:
         cmd_install.extend(fromrepoopt)
+
+    if patches:
+        targets = ["patch:{0}".format(t) for t in targets]
+
     # Split the targets into batches of 500 packages each, so that
     # the maximal length of the command line is not broken
     systemd_scope = _systemd_scope()
