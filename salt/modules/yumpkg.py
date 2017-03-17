@@ -1099,6 +1099,7 @@ def install(name=None,
             skip_verify=False,
             pkgs=None,
             sources=None,
+            downloadonly=False,
             reinstall=False,
             normalize=True,
             **kwargs):
@@ -1155,6 +1156,9 @@ def install(name=None,
 
     skip_verify
         Skip the GPG verification check (e.g., ``--nogpgcheck``)
+
+    downloadonly
+        Only download the packages, do not install.
 
     version
         Install a specific version of the package, e.g. 1.2.3-4.el5. Ignored
@@ -1386,6 +1390,8 @@ def install(name=None,
                 cmd.extend(args)
         if skip_verify:
             cmd.append('--nogpgcheck')
+        if downloadonly:
+            cmd.append('--downloadonly')
 
     if targets:
         cmd = []
