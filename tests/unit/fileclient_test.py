@@ -10,22 +10,12 @@ from __future__ import absolute_import
 from salttesting import TestCase
 from salttesting.helpers import ensure_in_syspath
 from salttesting.mock import patch
+from mock import Mock
 import errno
 
 ensure_in_syspath('../')
 
 from salt.fileclient import Client
-
-
-class Makedir(object):
-    def __init__(self, exists=False, errno=None):
-        self._exists = exists
-        self._errno = errno
-
-    def __call__(self, path, mode=0o0777):
-        if self._errno or self._exists:
-            raise OSError(self._errno or errno.EEXIST,
-                          'Errno {0}'.format(self._errno))
 
 
 class FileclientTestCase(TestCase):
@@ -37,13 +27,18 @@ class FileclientTestCase(TestCase):
         'cachedir': '/__test__',
     }
 
+    def _fake_makedir(self, num=errno.EEXIST):
+        def _side_effect(*args, **kwargs):
+            raise OSError(num, 'Errno {0}'.format(num))
+        return Mock(side_effect=_side_effect)
+
     def test_cache_skips_makedirs_on_race_condition(self):
         '''
         If cache contains already a directory, do not raise an exception.
         '''
         with patch('os.path.isfile', lambda prm: False):
             for exists in range(2):
-                with patch('os.makedirs', Makedir(exists=bool(exists))):
+                with patch('os.makedirs', self._fake_makedir()):
                     with Client(self.opts)._cache_loc('testfile') as c_ref_itr:
                         assert c_ref_itr == '/__test__/files/base/testfile'
 
@@ -52,7 +47,7 @@ class FileclientTestCase(TestCase):
         If makedirs raises other than EEXIST errno, an exception should be raised.
         '''
         with patch('os.path.isfile', lambda prm: False):
-            with patch('os.makedirs', Makedir(errno=errno.EREMOTEIO)):
+            with patch('os.makedirs', self._fake_makedir(num=errno.EREMOTEIO)):
                 with self.assertRaises(OSError):
                     with Client(self.opts)._cache_loc('testfile') as c_ref_itr:
                         assert c_ref_itr == '/__test__/files/base/testfile'
