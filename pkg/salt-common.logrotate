@@ -8,7 +8,6 @@
 }
 
 /var/log/salt/minion {
-	su salt salt
 	weekly
 	missingok
 	rotate 7
