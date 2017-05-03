@@ -66,7 +66,7 @@ class BeaconsTest(integration.ModuleCase):
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.isfile(cls.beacons_config_file_path):
+        if cls.beacons_config_file_path and os.path.isfile(cls.beacons_config_file_path):
             os.unlink(cls.beacons_config_file_path)
 
     def setUp(self):
