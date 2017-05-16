@@ -244,7 +244,7 @@ class PkgModuleTest(integration.ModuleCase,
             keys = ret.keys()
             self.assertIn('rpm', keys)
             self.assertIn('bash', keys)
-        elif os_family == 'SUSE':
+        elif os_family == 'Suse':
             ret = self.run_function(func, ['less', 'zypper'])
             keys = ret.keys()
             self.assertIn('less', keys)
