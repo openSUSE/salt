@@ -135,8 +135,6 @@ def get_locale():
         return params.get('LANG', '')
     elif 'RedHat' in __grains__['os_family']:
         cmd = 'grep "^LANG=" /etc/sysconfig/i18n'
-    elif 'Suse' in __grains__['os_family']:
-        cmd = 'grep "^RC_LANG" /etc/sysconfig/language'
     elif 'Debian' in __grains__['os_family']:
         # this block only applies to Debian without systemd
         cmd = 'grep "^LANG=" /etc/default/locale'
@@ -183,15 +181,6 @@ def set_locale(locale):
             '/etc/sysconfig/i18n',
             '^LANG=.*',
             'LANG="{0}"'.format(locale),
-            append_if_not_found=True
-        )
-    elif 'Suse' in __grains__['os_family']:
-        if not __salt__['file.file_exists']('/etc/sysconfig/language'):
-            __salt__['file.touch']('/etc/sysconfig/language')
-        __salt__['file.replace'](
-            '/etc/sysconfig/language',
-            '^RC_LANG=.*',
-            'RC_LANG="{0}"'.format(locale),
             append_if_not_found=True
         )
     elif 'Debian' in __grains__['os_family']:
