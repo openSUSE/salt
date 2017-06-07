@@ -1141,12 +1141,12 @@ ARGS = {10}\n'''.format(self.minion_config,
                     if not self.tty:
                         # If RSTR is not seen in both stdout and stderr then there
                         # was a thin deployment problem.
-                        log.error('ERROR: Failure deploying thin, retrying: {0}\n{1}'.format(stdout, stderr), stderr, retcode)
+                        log.error('ERROR: Failure deploying thin, retrying: {0}\n{1}'.format(stdout, stderr))
                         return self.cmd_block()
                     elif not re.search(RSTR_RE, stdout):
                         # If RSTR is not seen in stdout with tty, then there
                         # was a thin deployment problem.
-                        log.error('ERROR: Failure deploying thin, retrying: {0}\n{1}'.format(stdout, stderr), stderr, retcode)
+                        log.error('ERROR: Failure deploying thin, retrying: {0}\n{1}'.format(stdout, stderr))
                 while re.search(RSTR_RE, stdout):
                     stdout = re.split(RSTR_RE, stdout, 1)[1].strip()
                 if self.tty:
