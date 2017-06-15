@@ -74,7 +74,6 @@ class RunnerClient(mixins.SyncClientMixin, mixins.AsyncClientMixin, object):
 
         eauth_creds = dict([(i, low.pop(i)) for i in [
             'username', 'password', 'eauth', 'token', 'client', 'user', 'key',
-            '__current_eauth_groups', '__current_eauth_user',
         ] if i in low])
 
         # Separate the new-style args/kwargs.
