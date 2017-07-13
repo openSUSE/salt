@@ -22,6 +22,7 @@ from salttesting.mock import (
 ensure_in_syspath('../../')
 
 # Import Salt libs
+import salt.modules.pkg_resource as pkg_resource
 from salt.exceptions import CommandExecutionError
 from salt.ext.six.moves import configparser
 import salt.ext.six as six
@@ -364,7 +365,7 @@ class ZypperTestCase(TestCase):
 
             with patch('salt.modules.zypper.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1,1.2"}])):
                 ret = zypper.upgrade()
-                self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
+                self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.1,1.2"}})
                 zypper_mock.assert_any_call('update', '--auto-agree-with-licenses')
 
             with patch('salt.modules.zypper.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
@@ -402,7 +403,7 @@ class ZypperTestCase(TestCase):
                 with patch('salt.modules.zypper.list_pkgs', MagicMock(side_effect=[
                     {"kernel-default": "3.12.49-11.1"}, {"kernel-default": "3.12.49-11.1,3.12.51-60.20.2"}])):
                     ret = zypper.install('kernel-default', '--auto-agree-with-licenses')
-                    self.assertDictEqual(ret, {"kernel-default": {"old": "3.12.49-11.1", "new": "3.12.51-60.20.2"}})
+                    self.assertDictEqual(ret, {"kernel-default": {"old": "3.12.49-11.1", "new": "3.12.49-11.1,3.12.51-60.20.2"}})
 
     @patch('salt.modules.zypper.refresh_db', MagicMock(return_value=True))
     @patch('salt.modules.zypper._systemd_scope', MagicMock(return_value=False))
@@ -462,30 +463,92 @@ Repository 'DUMMY' not found by its alias, number, or URI.
         :return:
         '''
         def _add_data(data, key, value):
-            data[key] = value
+            data.setdefault(key, []).append(value)
 
         rpm_out = [
-            'protobuf-java_|-2.6.1_|-3.1.develHead_|-',
-            'yast2-ftp-server_|-3.1.8_|-8.1_|-',
-            'jose4j_|-0.4.4_|-2.1.develHead_|-',
-            'apache-commons-cli_|-1.2_|-1.233_|-',
-            'jakarta-commons-discovery_|-0.4_|-129.686_|-',
-            'susemanager-build-keys-web_|-12.0_|-5.1.develHead_|-',
+            'protobuf-java_|-2.6.1_|-3.1.develHead_|-noarch_|-_|-1499257756',
+            'yast2-ftp-server_|-3.1.8_|-8.1_|-x86_64_|-_|-1499257798',
+            'jose4j_|-0.4.4_|-2.1.develHead_|-noarch_|-_|-1499257756',
+            'apache-commons-cli_|-1.2_|-1.233_|-noarch_|-_|-1498636510',
+            'jakarta-commons-discovery_|-0.4_|-129.686_|-noarch_|-_|-1498636511',
+            'susemanager-build-keys-web_|-12.0_|-5.1.develHead_|-noarch_|-_|-1498636510',
         ]
-        with patch.dict(zypper.__salt__, {'cmd.run': MagicMock(return_value=os.linesep.join(rpm_out))}):
-            with patch.dict(zypper.__salt__, {'pkg_resource.add_pkg': _add_data}):
-                with patch.dict(zypper.__salt__, {'pkg_resource.sort_pkglist': MagicMock()}):
-                    with patch.dict(zypper.__salt__, {'pkg_resource.stringify': MagicMock()}):
-                        pkgs = zypper.list_pkgs()
-                        for pkg_name, pkg_version in {
-                            'jakarta-commons-discovery': '0.4-129.686',
-                            'yast2-ftp-server': '3.1.8-8.1',
-                            'protobuf-java': '2.6.1-3.1.develHead',
-                            'susemanager-build-keys-web': '12.0-5.1.develHead',
-                            'apache-commons-cli': '1.2-1.233',
-                            'jose4j': '0.4.4-2.1.develHead'}.items():
-                            self.assertTrue(pkgs.get(pkg_name))
-                            self.assertEqual(pkgs[pkg_name], pkg_version)
+        with patch.dict(zypper.__salt__, {'cmd.run': MagicMock(return_value=os.linesep.join(rpm_out))}), \
+             patch.dict(zypper.__salt__, {'pkg_resource.add_pkg': _add_data}), \
+             patch.dict(zypper.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
+             patch.dict(zypper.__salt__, {'pkg_resource.stringify': MagicMock()}):
+            pkgs = zypper.list_pkgs(versions_as_list=True)
+            for pkg_name, pkg_version in {
+                'jakarta-commons-discovery': '0.4-129.686',
+                'yast2-ftp-server': '3.1.8-8.1',
+                'protobuf-java': '2.6.1-3.1.develHead',
+                'susemanager-build-keys-web': '12.0-5.1.develHead',
+                'apache-commons-cli': '1.2-1.233',
+                'jose4j': '0.4.4-2.1.develHead'}.items():
+                self.assertTrue(pkgs.get(pkg_name))
+                self.assertEqual(pkgs[pkg_name], [pkg_version])
+
+    def test_list_pkgs_with_attr(self):
+        '''
+        Test packages listing with the attr parameter
+
+        :return:
+        '''
+        def _add_data(data, key, value):
+            data.setdefault(key, []).append(value)
+
+        rpm_out = [
+            'protobuf-java_|-2.6.1_|-3.1.develHead_|-noarch_|-_|-1499257756',
+            'yast2-ftp-server_|-3.1.8_|-8.1_|-x86_64_|-_|-1499257798',
+            'jose4j_|-0.4.4_|-2.1.develHead_|-noarch_|-_|-1499257756',
+            'apache-commons-cli_|-1.2_|-1.233_|-noarch_|-_|-1498636510',
+            'jakarta-commons-discovery_|-0.4_|-129.686_|-noarch_|-_|-1498636511',
+            'susemanager-build-keys-web_|-12.0_|-5.1.develHead_|-noarch_|-_|-1498636510',
+        ]
+        with patch.dict(zypper.__salt__, {'cmd.run': MagicMock(return_value=os.linesep.join(rpm_out))}), \
+             patch.dict(zypper.__salt__, {'pkg_resource.add_pkg': _add_data}), \
+             patch.dict(zypper.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
+             patch.dict(zypper.__salt__, {'pkg_resource.stringify': MagicMock()}):
+            pkgs = zypper.list_pkgs(attr=['epoch', 'release', 'arch', 'install_date_time_t'])
+            for pkg_name, pkg_attr in {
+                'jakarta-commons-discovery': {
+                    'version': '0.4',
+                    'release': '129.686',
+                    'arch': 'noarch',
+                    'install_date_time_t': 1498636511,
+                },
+                'yast2-ftp-server': {
+                    'version': '3.1.8',
+                    'release': '8.1',
+                    'arch': 'x86_64',
+                    'install_date_time_t': 1499257798,
+                },
+                'protobuf-java': {
+                    'version': '2.6.1',
+                    'release': '3.1.develHead',
+                    'install_date_time_t': 1499257756,
+                    'arch': 'noarch',
+                },
+                'susemanager-build-keys-web': {
+                    'version': '12.0',
+                    'release': '5.1.develHead',
+                    'arch': 'noarch',
+                    'install_date_time_t': 1498636510,
+                },
+                'apache-commons-cli': {
+                    'version': '1.2',
+                    'release': '1.233',
+                    'arch': 'noarch',
+                    'install_date_time_t': 1498636510,
+                },
+                'jose4j': {
+                    'arch': 'noarch',
+                    'version': '0.4.4',
+                    'release': '2.1.develHead',
+                    'install_date_time_t': 1499257756,
+                }}.items():
+                self.assertTrue(pkgs.get(pkg_name))
+                self.assertEqual(pkgs[pkg_name], [pkg_attr])
 
     def test_list_patches(self):
         '''

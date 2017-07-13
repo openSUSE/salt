@@ -14,7 +14,6 @@ Package support for openSUSE via the zypper package manager
 
 # Import python libs
 from __future__ import absolute_import
-import copy
 import fnmatch
 import logging
 import re
@@ -587,8 +586,8 @@ def version_cmp(ver1, ver2, ignore_epoch=False):
 
 def list_pkgs(versions_as_list=False, **kwargs):
     '''
-    List the packages currently installed as a dict with versions
-    as a comma separated string::
+    List the packages currently installed as a dict. By default, the dict
+    contains versions as a comma separated string::
 
         {'<package_name>': '<version>[,<version>...]'}
 
@@ -596,6 +595,19 @@ def list_pkgs(versions_as_list=False, **kwargs):
         If set to true, the versions are provided as a list
 
         {'<package_name>': ['<version>', '<version>']}
+
+    attr:
+        If a list of package attributes is specified, returned value will
+        contain them in addition to version, eg.::
+
+        {'<package_name>': [{'version' : 'version', 'arch' : 'arch'}]}
+
+        Valid attributes are: ``epoch``, ``version``, ``release``, ``arch``,
+        ``install_date``, ``install_date_time_t``.
+
+        If ``all`` is specified, all valid attributes will be returned.
+
+            .. versionadded:: Oxygen
 
     removed:
         not supported
@@ -608,6 +620,7 @@ def list_pkgs(versions_as_list=False, **kwargs):
     .. code-block:: bash
 
         salt '*' pkg.list_pkgs
+        salt '*' pkg.list_pkgs attr='["version", "arch"]'
     '''
     versions_as_list = salt.utils.is_true(versions_as_list)
     # not yet implemented or not applicable
@@ -615,30 +628,30 @@ def list_pkgs(versions_as_list=False, **kwargs):
             for x in ('removed', 'purge_desired')]):
         return {}
 
+    attr = kwargs.get("attr")
     if 'pkg.list_pkgs' in __context__:
-        if versions_as_list:
-            return __context__['pkg.list_pkgs']
-        else:
-            ret = copy.deepcopy(__context__['pkg.list_pkgs'])
-            __salt__['pkg_resource.stringify'](ret)
-            return ret
+        cached = __context__['pkg.list_pkgs']
+        return __salt__['pkg_resource.format_pkg_list'](cached, versions_as_list, attr)
 
-    cmd = ['rpm', '-qa', '--queryformat', '%{NAME}_|-%{VERSION}_|-%{RELEASE}_|-%|EPOCH?{%{EPOCH}}:{}|\\n']
+    cmd = ['rpm', '-qa', '--queryformat', (
+        "%{NAME}_|-%{VERSION}_|-%{RELEASE}_|-%{ARCH}_|-"
+        "%|EPOCH?{%{EPOCH}}:{}|_|-%{INSTALLTIME}\\n")]
     ret = {}
     for line in __salt__['cmd.run'](cmd, output_loglevel='trace', python_shell=False).splitlines():
-        name, pkgver, rel, epoch = line.split('_|-')
-        if epoch:
-            pkgver = '{0}:{1}'.format(epoch, pkgver)
-        if rel:
-            pkgver += '-{0}'.format(rel)
-        __salt__['pkg_resource.add_pkg'](ret, name, pkgver)
+        name, pkgver, rel, arch, epoch, install_time = line.split('_|-')
+        install_date = datetime.datetime.utcfromtimestamp(int(install_time)).isoformat() + "Z"
+        install_date_time_t = int(install_time)
 
-    __salt__['pkg_resource.sort_pkglist'](ret)
-    __context__['pkg.list_pkgs'] = copy.deepcopy(ret)
-    if not versions_as_list:
-        __salt__['pkg_resource.stringify'](ret)
+        all_attr = {'epoch': epoch, 'version': pkgver, 'release': rel, 'arch': arch,
+                    'install_date': install_date, 'install_date_time_t': install_date_time_t}
+        __salt__['pkg_resource.add_pkg'](ret, name, all_attr)
 
-    return ret
+    for pkgname in ret:
+        ret[pkgname] = sorted(ret[pkgname], key=lambda d: d['version'])
+
+    __context__['pkg.list_pkgs'] = ret
+
+    return __salt__['pkg_resource.format_pkg_list'](ret, versions_as_list, attr)
 
 
 def _get_configured_repos():
@@ -989,11 +1002,43 @@ def install(name=None,
         Zypper returns error code 106 if one of the repositories are not available for various reasons.
         In case to set strict check, this parameter needs to be set to True. Default: False.
 
+    diff_attr:
+        If a list of package attributes is specified, returned value will
+        contain them, eg.::
+
+            {'<package>': {
+                'old': {
+                    'version': '<old-version>',
+                    'arch': '<old-arch>'},
+
+                'new': {
+                    'version': '<new-version>',
+                    'arch': '<new-arch>'}}}
+
+        Valid attributes are: ``epoch``, ``version``, ``release``, ``arch``,
+        ``install_date``, ``install_date_time_t``.
+
+        If ``all`` is specified, all valid attributes will be returned.
+
+        .. versionadded:: Oxygen
+
 
     Returns a dict containing the new package names and versions::
 
         {'<package>': {'old': '<old-version>',
                        'new': '<new-version>'}}
+
+    If an attribute list is specified in ``diff_attr``, the dict will also contain
+    any specified attribute, eg.::
+
+        {'<package>': {
+            'old': {
+                'version': '<old-version>',
+                'arch': '<old-arch>'},
+
+            'new': {
+                'version': '<new-version>',
+                'arch': '<new-arch>'}}}
     '''
     if refresh:
         refresh_db()
@@ -1036,7 +1081,8 @@ def install(name=None,
     else:
         targets = pkg_params
 
-    old = list_pkgs() if not downloadonly else list_downloaded()
+    diff_attr = kwargs.get("diff_attr")
+    old = list_pkgs(attr=diff_attr) if not downloadonly else list_downloaded()
     downgrades = []
     if fromrepo:
         fromrepoopt = ['--force', '--force-resolution', '--from', fromrepo]
@@ -1074,13 +1120,7 @@ def install(name=None,
         __zypper__(no_repo_failure=ignore_repo_failure).call(*cmd)
 
     __context__.pop('pkg.list_pkgs', None)
-    new = list_pkgs() if not downloadonly else list_downloaded()
-
-    # Handle packages which report multiple new versions
-    # (affects only kernel packages at this point)
-    for pkg in new:
-        new[pkg] = new[pkg].split(',')[-1]
-
+    new = list_pkgs(attr=diff_attr) if not downloadonly else list_downloaded()
     ret = salt.utils.compare_dicts(old, new)
 
     if errors:
@@ -1188,11 +1228,6 @@ def upgrade(refresh=True,
     __zypper__(systemd_scope=_systemd_scope()).noraise.call(*cmd_update)
     __context__.pop('pkg.list_pkgs', None)
     new = list_pkgs()
-
-    # Handle packages which report multiple new versions
-    # (affects only kernel packages at this point)
-    for pkg in new:
-        new[pkg] = new[pkg].split(',')[-1]
     ret = salt.utils.compare_dicts(old, new)
 
     if __zypper__.exit_code not in __zypper__.SUCCESS_EXIT_CODES:
