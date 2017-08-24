@@ -14,7 +14,6 @@ Package support for openSUSE via the zypper package manager
 
 # Import python libs
 from __future__ import absolute_import
-import copy
 import fnmatch
 import logging
 import re
@@ -598,12 +597,8 @@ def list_pkgs(versions_as_list=False, **kwargs):
         return {}
 
     if 'pkg.list_pkgs' in __context__:
-        if versions_as_list:
-            return __context__['pkg.list_pkgs']
-        else:
-            ret = copy.deepcopy(__context__['pkg.list_pkgs'])
-            __salt__['pkg_resource.stringify'](ret)
-            return ret
+        cached = __context__['pkg.list_pkgs']
+        return __salt__['pkg_resource.format_pkg_list'](cached, versions_as_list, attr)
 
     cmd = ['rpm', '-qa', '--queryformat', '%{NAME}_|-%{VERSION}_|-%{RELEASE}_|-%|EPOCH?{%{EPOCH}}:{}|\\n']
     ret = {}
@@ -615,12 +610,7 @@ def list_pkgs(versions_as_list=False, **kwargs):
             pkgver += '-{0}'.format(rel)
         __salt__['pkg_resource.add_pkg'](ret, name, pkgver)
 
-    __salt__['pkg_resource.sort_pkglist'](ret)
-    __context__['pkg.list_pkgs'] = copy.deepcopy(ret)
-    if not versions_as_list:
-        __salt__['pkg_resource.stringify'](ret)
-
-    return ret
+    return __salt__['pkg_resource.format_pkg_list'](ret, versions_as_list, attr)
 
 
 def _get_configured_repos():
