@@ -5,7 +5,8 @@ After=network.target
 
 [Service]
 LimitNOFILE=16384
-Type=simple
+Type=notify
+NotifyAccess=all
 ExecStart=/usr/bin/salt-master
 TasksMax=infinity
 
