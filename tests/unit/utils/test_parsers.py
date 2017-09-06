@@ -5,6 +5,7 @@
 
 # Import python libs
 from __future__ import absolute_import
+import logging
 
 # Import Salt Testing Libs
 from tests.support.unit import skipIf, TestCase
@@ -21,6 +22,7 @@ import salt.utils.parsers
 import salt.log.setup as log
 import salt.config
 import salt.syspaths
+from salt.utils.parsers import DaemonMixIn
 
 
 class ErrorMock(object):  # pylint: disable=too-few-public-methods
@@ -958,5 +960,57 @@ class SaltAPIParserTestCase(LogSettingsParserTests):
         self.addCleanup(delattr, self, 'parser')
 
 
+@skipIf(NO_MOCK, NO_MOCK_REASON)
+class DaemonMixInTestCase(TestCase):
+    '''
+    Tests the PIDfile deletion in the DaemonMixIn.
+    '''
+
+    def setUp(self):
+        '''
+        Setting up
+        '''
+        # Set PID
+        self.pid = '/some/fake.pid'
+
+        # Setup mixin
+        self.mixin = salt.utils.parsers.DaemonMixIn()
+        self.mixin.config = {}
+        self.mixin.config['pidfile'] = self.pid
+
+        # logger
+        self.logger = logging.getLogger('salt.utils.parsers')
+
+    def test_pid_file_deletion(self):
+        '''
+        PIDfile deletion without exception.
+        '''
+        with patch('os.unlink', MagicMock()) as os_unlink:
+            with patch('os.path.isfile', MagicMock(return_value=True)):
+                with patch.object(self.logger, 'info') as mock_logger:
+                    self.mixin._mixin_before_exit()
+                    assert mock_logger.call_count == 0
+                    assert os_unlink.call_count == 1
+
+
 # Hide the class from unittest framework when it searches for TestCase classes in the module
 del LogSettingsParserTests
+
+
+if __name__ == '__main__':
+    from integration import run_tests  # pylint: disable=import-error,wrong-import-position
+    run_tests(MasterOptionParserTestCase,
+              MinionOptionParserTestCase,
+              ProxyMinionOptionParserTestCase,
+              SyndicOptionParserTestCase,
+              SaltCMDOptionParserTestCase,
+              SaltCPOptionParserTestCase,
+              SaltKeyOptionParserTestCase,
+              SaltCallOptionParserTestCase,
+              SaltRunOptionParserTestCase,
+              SaltSSHOptionParserTestCase,
+              SaltCloudParserTestCase,
+              SPMParserTestCase,
+              SaltAPIParserTestCase,
+              DaemonMixInTestCase,
+              needs_daemon=False)

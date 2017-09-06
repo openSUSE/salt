@@ -966,7 +966,13 @@ class DaemonMixIn(six.with_metaclass(MixInMeta, object)):
             # We've loaded and merged options into the configuration, it's safe
             # to query about the pidfile
             if self.check_pidfile():
-                os.unlink(self.config['pidfile'])
+                try:
+                    os.unlink(self.config['pidfile'])
+                except OSError as err:
+                    # This happens when running salt-master as a non-root user
+                    # and can be ignored, since salt-master is able to
+                    # overwrite the PIDfile on the next start.
+                    pass
 
     def set_pidfile(self):
         from salt.utils.process import set_pidfile
