@@ -22,6 +22,7 @@ import salt.utils.parsers
 import salt.log.setup as log
 import salt.config
 import salt.syspaths
+from salt.utils.parsers import DaemonMixIn
 
 ensure_in_syspath('../../')
 
