@@ -5,6 +5,7 @@
 
 # Import python libs
 from __future__ import absolute_import
+import os
 
 # Import Salt Testing Libs
 from salttesting import skipIf, TestCase
@@ -21,6 +22,7 @@ import salt.utils.parsers
 import salt.log.setup as log
 import salt.config
 import salt.syspaths
+from salt.utils.parsers import DaemonMixIn
 
 ensure_in_syspath('../../')
 
@@ -926,6 +928,33 @@ class SaltAPIParserTestCase(LogSettingsParserTests):
         self.parser = salt.utils.parsers.SaltAPIParser
 
 
+@skipIf(NO_MOCK, NO_MOCK_REASON)
+class DaemonMixInTestCase(TestCase):
+    '''
+    Tests the PIDfile deletion in the DaemonMixIn.
+    '''
+
+    def setUp(self):
+        '''
+        Setting up
+        '''
+        # Set PID
+        self.pid = '/some/fake.pid'
+
+        # Setup mixin
+        self.mixin = salt.utils.parsers.DaemonMixIn()
+        self.mixin.config = {}
+        self.mixin.config['pidfile'] = self.pid
+
+    def test_pid_file_deletion(self):
+        '''
+        PIDfile deletion without exception.
+        '''
+        with patch('os.unlink', MagicMock()) as os_unlink:
+            with patch('os.path.isfile', MagicMock(return_value=True)):
+                self.mixin._mixin_before_exit()
+                assert os_unlink.call_count == 1
+
 # Hide the class from unittest framework when it searches for TestCase classes in the module
 del LogSettingsParserTests
 
@@ -944,4 +973,5 @@ if __name__ == '__main__':
               SaltCloudParserTestCase,
               SPMParserTestCase,
               SaltAPIParserTestCase,
+              DaemonMixInTestCase,
               needs_daemon=False)
