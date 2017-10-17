@@ -1,0 +1,29 @@
+From 566f3422f28663e53c7cc3fe04c4e3d035ed4c1a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pablo=20Su=C3=A1rez=20Hern=C3=A1ndez?=
+ <psuarezhernandez@suse.com>
+Date: Mon, 11 Sep 2017 19:57:28 +0200
+Subject: [PATCH] Use $HOME to get the user home directory instead using
+ '~' char
+
+---
+ pkg/salt.bash | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/pkg/salt.bash b/pkg/salt.bash
+index 480361fe23..00174c072f 100644
+--- a/pkg/salt.bash
++++ b/pkg/salt.bash
+@@ -35,7 +35,8 @@ _salt_get_keys(){
+ }
+ 
+ _salt(){
+-    local _salt_cache_functions=${SALT_COMP_CACHE_FUNCTIONS:='~/.cache/salt-comp-cache_functions'}
++    CACHE_DIR="$HOME/.cache/salt-comp-cache_functions"
++    local _salt_cache_functions=${SALT_COMP_CACHE_FUNCTIONS:=$CACHE_DIR}
+     local _salt_cache_timeout=${SALT_COMP_CACHE_TIMEOUT:='last hour'}
+ 
+     if [ ! -d "$(dirname ${_salt_cache_functions})" ]; then
+-- 
+2.12.2
+
+

@@ -1,0 +1,116 @@
+From a0523ac82a1dcca7a7c77f9b3816f237f211b94e Mon Sep 17 00:00:00 2001
+From: Bo Maryniuk <bo@suse.de>
+Date: Thu, 29 Sep 2016 17:00:14 +0200
+Subject: [PATCH] Add YUM plugin
+
+* Add plugin for Yum-Salt integration
+* Add configuration for the yumnotify plugin
+* Fixes wrong 'enabled' opts for yumnotify plugin
+---
+ scripts/yum/plugins/README.md      | 20 ++++++++++++++
+ scripts/yum/plugins/yumnotify.conf |  2 ++
+ scripts/yum/plugins/yumnotify.py   | 55 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 77 insertions(+)
+ create mode 100644 scripts/yum/plugins/README.md
+ create mode 100644 scripts/yum/plugins/yumnotify.conf
+ create mode 100644 scripts/yum/plugins/yumnotify.py
+
+diff --git a/scripts/yum/plugins/README.md b/scripts/yum/plugins/README.md
+new file mode 100644
+index 0000000000..cb3abd2260
+--- /dev/null
++++ b/scripts/yum/plugins/README.md
+@@ -0,0 +1,20 @@
++## What it is
++
++Plugin which provides a notification mechanism to Salt, if Yum is
++used outside of it.
++
++## Installation
++
++Configuration files are going to:
++
++	`/etc/yum/pluginconf.d/[name].conf`
++
++Plugin itself goes to:
++
++	`/usr/share/yum-plugins/[name].conf`
++
++## Permissions
++
++User:  root
++Group: root
++Mode:  644
+diff --git a/scripts/yum/plugins/yumnotify.conf b/scripts/yum/plugins/yumnotify.conf
+new file mode 100644
+index 0000000000..8e4d76c728
+--- /dev/null
++++ b/scripts/yum/plugins/yumnotify.conf
+@@ -0,0 +1,2 @@
++[main]
++enabled=1
+diff --git a/scripts/yum/plugins/yumnotify.py b/scripts/yum/plugins/yumnotify.py
+new file mode 100644
+index 0000000000..268e1e9531
+--- /dev/null
++++ b/scripts/yum/plugins/yumnotify.py
+@@ -0,0 +1,55 @@
++# Copyright (c) 2016 SUSE Linux LLC
++# All Rights Reserved.
++#
++# Author: Bo Maryniuk <bo@suse.de>
++
++from yum.plugins import TYPE_CORE
++from yum import config
++import os
++import hashlib
++
++CK_PATH = "/var/cache/salt/minion/rpmdb.cookie"
++RPM_PATH = "/var/lib/rpm/Packages"
++
++requires_api_version = '2.5'
++plugin_type = TYPE_CORE
++
++
++def _get_mtime():
++    """
++    Get the modified time of the RPM Database.
++
++    Returns:
++        Unix ticks
++    """
++    return os.path.exists(RPM_PATH) and int(os.path.getmtime(RPM_PATH)) or 0
++
++
++def _get_checksum():
++    """
++    Get the checksum of the RPM Database.
++
++    Returns:
++        hexdigest
++    """
++    digest = hashlib.md5()
++    with open(RPM_PATH, "rb") as rpm_db_fh:
++        while True:
++            buff = rpm_db_fh.read(0x1000)
++            if not buff:
++                break
++            digest.update(buff)
++    return digest.hexdigest()
++
++
++def posttrans_hook(conduit):
++    """
++    Hook after the package installation transaction.
++
++    :param conduit:
++    :return:
++    """
++    # Integrate Yum with Salt
++    if 'SALT_RUNNING' not in os.environ:
++        with open(CK_PATH, 'w') as ck_fh:
++            ck_fh.write('{chksum} {mtime}\n'.format(chksum=_get_checksum(), mtime=_get_mtime()))
+-- 
+2.11.0
+
+

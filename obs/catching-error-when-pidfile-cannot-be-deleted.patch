@@ -1,0 +1,119 @@
+From 8eff25611cebb7ebc51c3e0596b462bde538eebe Mon Sep 17 00:00:00 2001
+From: Jochen Breuer <jbreuer@suse.de>
+Date: Wed, 6 Sep 2017 10:16:51 +0200
+Subject: [PATCH] Catching error when PIDfile cannot be deleted
+
+Usually the PIDfile is locate in /run. If Salt is not started with root
+permissions, it is not able to delete the PIDfile in /run. It should
+be safe to just log and ignore this error, since Salt overwrites the
+PIDfile on the next start.
+---
+ salt/utils/parsers.py            |  9 ++++++-
+ tests/unit/utils/parsers_test.py | 58 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+), 1 deletion(-)
+
+diff --git a/salt/utils/parsers.py b/salt/utils/parsers.py
+index c38506f3c5..d348dd1346 100644
+--- a/salt/utils/parsers.py
++++ b/salt/utils/parsers.py
+@@ -881,7 +881,14 @@ class DaemonMixIn(six.with_metaclass(MixInMeta, object)):
+             # We've loaded and merged options into the configuration, it's safe
+             # to query about the pidfile
+             if self.check_pidfile():
+-                os.unlink(self.config['pidfile'])
++                try:
++                    os.unlink(self.config['pidfile'])
++                except OSError as err:
++                    self.info(
++                        'PIDfile could not be deleted: {0}'.format(
++                            self.config['pidfile']
++                        )
++                    )
+ 
+     def set_pidfile(self):
+         from salt.utils.process import set_pidfile
+diff --git a/tests/unit/utils/parsers_test.py b/tests/unit/utils/parsers_test.py
+index 3968898c88..1eb9855487 100644
+--- a/tests/unit/utils/parsers_test.py
++++ b/tests/unit/utils/parsers_test.py
+@@ -21,6 +21,7 @@ import salt.utils.parsers
+ import salt.log.setup as log
+ import salt.config
+ import salt.syspaths
++from salt.utils.parsers import DaemonMixIn
+ 
+ ensure_in_syspath('../../')
+ 
+@@ -804,6 +805,62 @@ class SaltRunOptionParserTestCase(LogSettingsParserTests):
+ 
+ 
+ @skipIf(NO_MOCK, NO_MOCK_REASON)
++class DaemonMixInTestCase(LogSettingsParserTests):
++    '''
++    Tests parsing Salt Master options
++    '''
++    def setUp(self):
++        '''
++        Setting up
++        '''
++        # Set defaults
++        self.default_config = salt.config.DEFAULT_MASTER_OPTS
++
++        # Log file
++        self.log_file = '/tmp/salt_run_parser_test'
++        # Function to patch
++        self.config_func = 'salt.config.master_config'
++
++        # Mock log setup
++        self.setup_log()
++
++        # Assign parser
++        self.parser = salt.utils.parsers.SaltRunOptionParser
++
++        # Set PID
++        self.pid = '/some/fake.pid'
++
++        # Setup mixin
++        self.mixin = DaemonMixIn()
++        self.mixin.info = None
++        self.mixin.config = {}
++        self.mixin.config['pidfile'] = self.pid
++
++    def test_pid_file_deletion(self):
++        '''
++        PIDfile deletion without exception.
++        '''
++        with patch('os.unlink', MagicMock()) as os_unlink:
++            with patch('os.path.isfile', MagicMock(return_value=True)):
++	        with patch.object(self.mixin, 'info', MagicMock()):
++		    self.mixin._mixin_before_exit()
++	            assert self.mixin.info.call_count == 0
++	            assert os_unlink.call_count == 1
++
++    def test_pid_file_deletion_with_oserror(self):
++        '''
++        PIDfile deletion with exception
++        '''
++        with patch('os.unlink', MagicMock(side_effect=OSError())) as os_unlink:
++            with patch('os.path.isfile', MagicMock(return_value=True)):
++	        with patch.object(self.mixin, 'info', MagicMock()):
++		    self.mixin._mixin_before_exit()
++	            assert os_unlink.call_count == 1
++	            self.mixin.info.assert_called_with(
++                       'PIDfile could not be deleted: {}'.format(self.pid))
++
++
++@skipIf(NO_MOCK, NO_MOCK_REASON)
+ class SaltSSHOptionParserTestCase(LogSettingsParserTests):
+     '''
+     Tests parsing Salt Master options
+@@ -944,4 +1001,5 @@ if __name__ == '__main__':
+               SaltCloudParserTestCase,
+               SPMParserTestCase,
+               SaltAPIParserTestCase,
++              DaemonMixInTestCase,
+               needs_daemon=False)
+-- 
+2.13.6
+
+

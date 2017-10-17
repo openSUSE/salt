@@ -1,0 +1,30 @@
+From 54fa5d2b6d47d242e98e9a7f4cc597e03084d4d2 Mon Sep 17 00:00:00 2001
+From: Michael Calmer <mc@suse.de>
+Date: Tue, 21 Jun 2016 13:12:48 +0200
+Subject: fix salt --summary to count not responding minions
+ correctly (bsc#972311)
+
+In case a minion is not responding a dict is returned instead of a string.
+---
+ salt/cli/salt.py | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/salt/cli/salt.py b/salt/cli/salt.py
+index 1fc9a83508..88ac65e7c2 100644
+--- a/salt/cli/salt.py
++++ b/salt/cli/salt.py
+@@ -281,7 +281,9 @@ class SaltCMD(parsers.SaltCMDOptionParser):
+         not_connected_minions = []
+         failed_minions = []
+         for each_minion in ret:
+-            minion_ret = ret[each_minion].get('ret')
++            minion_ret = ret[each_minion]
++            if (isinstance(minion_ret, dict) and 'ret' in minion_ret):
++                minion_ret = ret[each_minion].get('ret')
+             if (
+                     isinstance(minion_ret, string_types)
+                     and minion_ret.startswith("Minion did not return")
+-- 
+2.11.0
+
+

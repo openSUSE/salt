@@ -1,0 +1,26 @@
+From 1d5e0e1c9d2ca8bb01cfe781289b4b03e0ce4c1e Mon Sep 17 00:00:00 2001
+From: Michael Calmer <mc@suse.de>
+Date: Fri, 19 May 2017 14:07:08 +0200
+Subject: [PATCH] Fix os_family case in unittest
+
+---
+ tests/unit/modules/inspect_collector_test.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/unit/modules/inspect_collector_test.py b/tests/unit/modules/inspect_collector_test.py
+index 9105670526..293de1ad51 100644
+--- a/tests/unit/modules/inspect_collector_test.py
++++ b/tests/unit/modules/inspect_collector_test.py
+@@ -127,7 +127,7 @@ gcc-6-base:i386
+                 inspector.grains_core.os_data = MagicMock()
+                 inspector.grains_core.os_data().get = MagicMock(return_value='Debian')
+                 self.assertEqual(inspector._get_cfg_pkgs(), 'dpkg')
+-                inspector.grains_core.os_data().get = MagicMock(return_value='SUSE')
++                inspector.grains_core.os_data().get = MagicMock(return_value='Suse')
+                 self.assertEqual(inspector._get_cfg_pkgs(), 'rpm')
+                 inspector.grains_core.os_data().get = MagicMock(return_value='redhat')
+                 self.assertEqual(inspector._get_cfg_pkgs(), 'rpm')
+-- 
+2.12.0
+
+

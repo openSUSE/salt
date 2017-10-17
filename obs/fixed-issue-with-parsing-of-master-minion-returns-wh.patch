@@ -1,0 +1,41 @@
+From 36ab0b6a6f8830404e4cd1a9db1918d6703ed270 Mon Sep 17 00:00:00 2001
+From: Graham Hayes <graham@hayes.ie>
+Date: Mon, 22 May 2017 09:22:36 -0400
+Subject: [PATCH] Fixed issue with parsing of master minion returns when
+ batching is enabled. (#30)
+
+---
+ salt/states/saltmod.py | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/salt/states/saltmod.py b/salt/states/saltmod.py
+index a9d1f6be93..35cd01fb4e 100644
+--- a/salt/states/saltmod.py
++++ b/salt/states/saltmod.py
+@@ -300,7 +300,7 @@ def state(
+             except KeyError:
+                 m_state = False
+             if m_state:
+-                m_state = salt.utils.check_state_result(m_ret)
++                m_state = salt.utils.check_state_result(m_ret, recurse=True)
+ 
+         if not m_state:
+             if minion not in fail_minions:
+@@ -309,9 +309,10 @@ def state(
+             continue
+         try:
+             for state_item in six.itervalues(m_ret):
+-                if 'changes' in state_item and state_item['changes']:
+-                    changes[minion] = m_ret
+-                    break
++                if isinstance(state_item, dict):
++                    if 'changes' in state_item and state_item['changes']:
++                        changes[minion] = m_ret
++                        break
+             else:
+                 no_change.add(minion)
+         except AttributeError:
+-- 
+2.13.0
+
+

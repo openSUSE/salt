@@ -1,0 +1,48 @@
+From b31ffb25f292a109b3c30afa9ae7e07d9e8c1f5c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pablo=20Su=C3=A1rez=20Hern=C3=A1ndez?=
+ <psuarezhernandez@suse.com>
+Date: Thu, 8 Jun 2017 16:22:53 +0100
+Subject: [PATCH] Adding salt-minion watchdog for sysV systems (rhel6 and
+ sles11)
+
+---
+ scripts/watchdog/salt-daemon-watcher | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100755 scripts/watchdog/salt-daemon-watcher
+
+diff --git a/scripts/watchdog/salt-daemon-watcher b/scripts/watchdog/salt-daemon-watcher
+new file mode 100755
+index 0000000..1025b20
+--- /dev/null
++++ b/scripts/watchdog/salt-daemon-watcher
+@@ -0,0 +1,26 @@
++#!/bin/bash
++#
++# Author: Bo Maryniuk <bo@suse.de>
++# Requires: yum install propcps
++#
++# Runs every minute from crontab,
++# checks salt-minion every 10 seconds.
++#
++# Use this with a following crontab:
++# * * * * * /path/to/this/script
++
++if [ "$1" != "--with-init" ]; then
++    echo "This command is not used directly."
++    exit 1;
++fi
++
++SHELL=/bin/sh
++PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
++
++for iter in {1..5}; do
++    if [[ $(pgrep salt-minion) == "" ]]; then
++        service salt-minion restart
++    fi
++    sleep 10;
++done
++true
+-- 
+2.10.1
+
+

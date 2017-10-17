@@ -1,0 +1,163 @@
+From c4c6610bf7314cc4c6ecf656bef341e2d1ca1587 Mon Sep 17 00:00:00 2001
+From: Matei Albu <malbu@suse.de>
+Date: Mon, 19 Dec 2016 16:54:52 +0100
+Subject: [PATCH] Add --ssh-option to salt-ssh
+
+--ssh-option can be used to pass -o options to the ssh client.
+(cherry picked from commit 16f21e5)
+
+Add spaces around =
+
+Fix salt-ssh err when -ssh-option is missing
+---
+ salt/client/ssh/__init__.py |  7 ++++++-
+ salt/client/ssh/shell.py    | 19 ++++++++++++++++---
+ salt/utils/parsers.py       | 18 +++++++++++++-----
+ 3 files changed, 35 insertions(+), 9 deletions(-)
+
+diff --git a/salt/client/ssh/__init__.py b/salt/client/ssh/__init__.py
+index 23ec948fe0..bbef9d8de1 100644
+--- a/salt/client/ssh/__init__.py
++++ b/salt/client/ssh/__init__.py
+@@ -295,6 +295,9 @@ class SSH(object):
+             'remote_port_forwards': self.opts.get(
+                 'ssh_remote_port_forwards'
+             ),
++            'ssh_options': self.opts.get(
++                'ssh_options'
++            )
+         }
+         if self.opts.get('rand_thin_dir'):
+             self.defaults['thin_dir'] = os.path.join(
+@@ -693,6 +696,7 @@ class Single(object):
+             identities_only=False,
+             sudo_user=None,
+             remote_port_forwards=None,
++            ssh_options=None,
+             **kwargs):
+         # Get mine setting and mine_functions if defined in kwargs (from roster)
+         self.mine = mine
+@@ -749,7 +753,8 @@ class Single(object):
+                 'mods': self.mods,
+                 'identities_only': identities_only,
+                 'sudo_user': sudo_user,
+-                'remote_port_forwards': remote_port_forwards}
++                'remote_port_forwards': remote_port_forwards,
++                'ssh_options': ssh_options}
+         # Pre apply changeable defaults
+         self.minion_opts = {
+                     'grains_cache': True,
+diff --git a/salt/client/ssh/shell.py b/salt/client/ssh/shell.py
+index f78cb623e1..613660fe34 100644
+--- a/salt/client/ssh/shell.py
++++ b/salt/client/ssh/shell.py
+@@ -64,7 +64,8 @@ class Shell(object):
+             mods=None,
+             identities_only=False,
+             sudo_user=None,
+-            remote_port_forwards=None):
++            remote_port_forwards=None,
++            ssh_options=None):
+         self.opts = opts
+         # ssh <ipv6>, but scp [<ipv6]:/path
+         self.host = host.strip('[]')
+@@ -78,6 +79,7 @@ class Shell(object):
+         self.mods = mods
+         self.identities_only = identities_only
+         self.remote_port_forwards = remote_port_forwards
++        self.ssh_options = ssh_options
+ 
+     def get_error(self, errstr):
+         '''
+@@ -169,6 +171,12 @@ class Shell(object):
+             ret.append('-o {0} '.format(option))
+         return ''.join(ret)
+ 
++    def _ssh_opts(self):
++        if self.ssh_options:
++            return ' '.join(['-o {0}'.format(opt)
++                            for opt in self.ssh_options])
++        return ''
++
+     def _copy_id_str_old(self):
+         '''
+         Return the string to execute ssh-copy-id
+@@ -176,11 +184,12 @@ class Shell(object):
+         if self.passwd:
+             # Using single quotes prevents shell expansion and
+             # passwords containing '$'
+-            return "{0} {1} '{2} -p {3} {4}@{5}'".format(
++            return "{0} {1} '{2} -p {3} {4} {5}@{6}'".format(
+                     'ssh-copy-id',
+                     '-i {0}.pub'.format(self.priv),
+                     self._passwd_opts(),
+                     self.port,
++                    self._ssh_opts(),
+                     self.user,
+                     self.host)
+         return None
+@@ -193,11 +202,12 @@ class Shell(object):
+         if self.passwd:
+             # Using single quotes prevents shell expansion and
+             # passwords containing '$'
+-            return "{0} {1} {2} -p {3} {4}@{5}".format(
++            return "{0} {1} {2} -p {3} {4} {5}@{6}".format(
+                     'ssh-copy-id',
+                     '-i {0}.pub'.format(self.priv),
+                     self._passwd_opts(),
+                     self.port,
++                    self._ssh_opts(),
+                     self.user,
+                     self.host)
+         return None
+@@ -229,6 +239,9 @@ class Shell(object):
+         if ssh != 'scp' and self.remote_port_forwards:
+             command.append(' '.join(['-R {0}'.format(item)
+                                      for item in self.remote_port_forwards.split(',')]))
++        if self.ssh_options:
++            command.append(self._ssh_opts())
++
+         command.append(cmd)
+ 
+         return ' '.join(command)
+diff --git a/salt/utils/parsers.py b/salt/utils/parsers.py
+index 6330ed6596..c38506f3c5 100644
+--- a/salt/utils/parsers.py
++++ b/salt/utils/parsers.py
+@@ -2828,11 +2828,11 @@ class SaltSSHOptionParser(six.with_metaclass(OptionParserMeta,
+             help='Pass a JID to be used instead of generating one.'
+         )
+ 
+-        ports_group = optparse.OptionGroup(
+-            self, 'Port Forwarding Options',
+-            'Parameters for setting up SSH port forwarding.'
++        ssh_group = optparse.OptionGroup(
++            self, 'SSH Options',
++            'Parameters for the SSH client.'
+         )
+-        ports_group.add_option(
++        ssh_group.add_option(
+             '--remote-port-forwards',
+             dest='ssh_remote_port_forwards',
+             help='Setup remote port forwarding using the same syntax as with '
+@@ -2840,7 +2840,15 @@ class SaltSSHOptionParser(six.with_metaclass(OptionParserMeta,
+                  'forwarding definitions will be translated into multiple '
+                  '-R parameters.'
+         )
+-        self.add_option_group(ports_group)
++        ssh_group.add_option(
++            '--ssh-option',
++            dest='ssh_options',
++            action='append',
++            help='Equivalent to the -o ssh command option. Passes options to '
++                 'the SSH client in the format used in the client configuration file. '
++                 'Can be used multiple times.'
++        )
++        self.add_option_group(ssh_group)
+ 
+         auth_group = optparse.OptionGroup(
+             self, 'Authentication Options',
+-- 
+2.11.0
+
+

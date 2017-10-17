@@ -1,0 +1,72 @@
+From 79f9f4c06813d70cd03ad32c6c8ef8fec1656e88 Mon Sep 17 00:00:00 2001
+From: Mihai Dinca <mdinca@suse.de>
+Date: Fri, 14 Oct 2016 09:04:47 +0200
+Subject: Change travis configuration file to use salt-toaster
+
+---
+ .travis.yml | 47 +++++++++++++++++++----------------------------
+ 1 file changed, 19 insertions(+), 28 deletions(-)
+
+diff --git a/.travis.yml b/.travis.yml
+index 7b4c8ce0e5..3101efb372 100644
+--- a/.travis.yml
++++ b/.travis.yml
+@@ -1,35 +1,26 @@
+ language: python
+ 
+ python:
+-  - '2.6'
+-  - '2.7'
++ - 2.7
+ 
+-before_install:
+-  - sudo apt-get update
+-  - sudo apt-get install --fix-broken --ignore-missing -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" swig rabbitmq-server ruby python-apt mysql-server libmysqlclient-dev
+-  - (git describe && git fetch --tags) || (git remote add upstream git://github.com/saltstack/salt.git && git fetch --tags upstream)
+-  - pip install mock
+-  - pip install --allow-external http://dl.dropbox.com/u/174789/m2crypto-0.20.1.tar.gz
+-  - pip install --upgrade pep8 'pylint<=1.2.0'
+-  - pip install --upgrade coveralls
+-  - "if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then pip install unittest2 ordereddict; fi"
+-  - pip install git+https://github.com/saltstack/salt-testing.git#egg=SaltTesting
+-
+-install:
+-  - pip install -r requirements/zeromq.txt -r requirements/cloud.txt
+-  - pip install --allow-all-external -r requirements/opt.txt
++services:
++ - docker
+ 
+-before_script:
+-  - "/home/travis/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/pylint --rcfile=.testing.pylintrc salt/ && echo 'Finished Pylint Check Cleanly' || echo 'Finished Pylint Check With Errors'"
+-  - "/home/travis/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/pep8 --ignore=E501,E12 salt/ && echo 'Finished PEP-8 Check Cleanly' || echo 'Finished PEP-8 Check With Errors'"
++env:
++    global:
++        - VERSION=leap42sp1 FLAVOR=devel NOPULL=true SALT_REPO=..
++    matrix:
++        - TARGET=suse.tests PYTEST_CFG=./configs/$TARGET/$VERSION/$FLAVOR.cfg
++        - TARGET=saltstack.unit PYTEST_CFG=./configs/$TARGET/$VERSION/default.cfg
++        - TARGET=saltstack.integration PYTEST_CFG=./configs/$TARGET/$VERSION/default.cfg
+ 
+-script: "sudo -E /home/travis/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/python setup.py test --runtests-opts='--run-destructive --sysinfo -v --coverage'"
+-
+-after_success:
+-  - coveralls
++before_install:
++- git clone --depth 1 https://github.com/openSUSE/salt-toaster.git
++- cd salt-toaster
++- echo "*" > .gitignore
++- tar xfz sandbox.tar.gz
++- sandbox/bin/pip install -r requirements.txt --exists-action w --upgrade
++- VERSION=leap42sp1 FLAVOR=default NOPULL=true make build_image
++- make build_image
+ 
+-notifications:
+-  irc:
+-    channels: "irc.freenode.org#salt-devel"
+-    on_success: change
+-    on_failure: change
++script: make $TARGET PYTEST_CFG=$PYTEST_CFG
+-- 
+2.11.0
+
+

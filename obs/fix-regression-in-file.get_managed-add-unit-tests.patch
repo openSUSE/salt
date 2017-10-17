@@ -1,0 +1,31 @@
+From 4b59b328de2653310f845352c099efc25c2cafdf Mon Sep 17 00:00:00 2001
+From: Erik Johnson <palehose@gmail.com>
+Date: Wed, 1 Mar 2017 10:19:33 -0600
+Subject: [PATCH] Fix regression in file.get_managed, add unit tests
+
+This is no longer needed since we're invoking the state module directly
+and not via the state compiler.
+
+* Fix regression in file.get_managed when skip_verify=True
+* Add integration tests for remote file sources
+* Remove next(iter()) extraction
+---
+ tests/integration/states/file.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tests/integration/states/file.py b/tests/integration/states/file.py
+index aad7fac441..54e6196c80 100644
+--- a/tests/integration/states/file.py
++++ b/tests/integration/states/file.py
+@@ -2404,6 +2404,7 @@ class FileTest(integration.ModuleCase, integration.SaltReturnAssertsMixIn):
+ PORT = 9999
+ FILE_SOURCE = 'http://localhost:{0}/grail/scene33'.format(PORT)
+ FILE_HASH = 'd2feb3beb323c79fc7a0f44f1408b4a3'
++STATE_DIR = os.path.join(integration.FILES, 'file', 'base')
+ 
+ 
+ class RemoteFileTest(integration.ModuleCase, integration.SaltReturnAssertsMixIn):
+-- 
+2.12.2
+
+

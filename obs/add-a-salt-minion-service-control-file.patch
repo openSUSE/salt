@@ -1,0 +1,35 @@
+From ed86f0ce930cddf2fc6613057cab102e17865f0d Mon Sep 17 00:00:00 2001
+From: Bo Maryniuk <bo@suse.de>
+Date: Wed, 18 Jan 2017 15:38:53 +0100
+Subject: Add a salt-minion service control file
+
+---
+ pkg/suse/salt-minion.service | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 pkg/suse/salt-minion.service
+
+diff --git a/pkg/suse/salt-minion.service b/pkg/suse/salt-minion.service
+new file mode 100644
+index 0000000000..1dbaa77755
+--- /dev/null
++++ b/pkg/suse/salt-minion.service
+@@ -0,0 +1,15 @@
++[Unit]
++Description=The Salt Minion
++After=network.target
++
++[Service]
++Type=notify
++NotifyAccess=all
++LimitNOFILE=8192
++ExecStart=/usr/bin/salt-minion
++KillMode=process
++Restart=on-failure
++RestartSec=15
++
++[Install]
++WantedBy=multi-user.target
+-- 
+2.11.0
+
+

@@ -1,0 +1,121 @@
+From 2bc2078d8549c277ba40836de4e36953af9efc78 Mon Sep 17 00:00:00 2001
+From: Michael Calmer <mc@suse.de>
+Date: Thu, 18 May 2017 19:46:50 +0200
+Subject: [PATCH] fix setting language on SUSE systems
+
+---
+ salt/modules/localemod.py            | 28 +++++++++++++++-------------
+ tests/unit/modules/localemod_test.py | 32 +++++++++++++++++---------------
+ 2 files changed, 32 insertions(+), 28 deletions(-)
+
+diff --git a/salt/modules/localemod.py b/salt/modules/localemod.py
+index b805cd429f..272aff4cc2 100644
+--- a/salt/modules/localemod.py
++++ b/salt/modules/localemod.py
+@@ -127,13 +127,14 @@ def get_locale():
+         salt '*' locale.get_locale
+     '''
+     cmd = ''
+-    if salt.utils.systemd.booted(__context__):
++    if 'Suse' in __grains__['os_family']:
++        # this block applies to all SUSE systems - also with systemd
++        cmd = 'grep "^RC_LANG" /etc/sysconfig/language'
++    elif salt.utils.systemd.booted(__context__):
+         params = _parse_dbus_locale() if HAS_DBUS else _parse_localectl()
+         return params.get('LANG', '')
+     elif 'RedHat' in __grains__['os_family']:
+         cmd = 'grep "^LANG=" /etc/sysconfig/i18n'
+-    elif 'Suse' in __grains__['os_family']:
+-        cmd = 'grep "^RC_LANG" /etc/sysconfig/language'
+     elif 'Debian' in __grains__['os_family']:
+         # this block only applies to Debian without systemd
+         cmd = 'grep "^LANG=" /etc/default/locale'
+@@ -161,7 +162,17 @@ def set_locale(locale):
+ 
+         salt '*' locale.set_locale 'en_US.UTF-8'
+     '''
+-    if salt.utils.systemd.booted(__context__):
++    if 'Suse' in __grains__['os_family']:
++        # this block applies to all SUSE systems - also with systemd
++        if not __salt__['file.file_exists']('/etc/sysconfig/language'):
++            __salt__['file.touch']('/etc/sysconfig/language')
++        __salt__['file.replace'](
++            '/etc/sysconfig/language',
++            '^RC_LANG=.*',
++            'RC_LANG="{0}"'.format(locale),
++            append_if_not_found=True
++        )
++    elif salt.utils.systemd.booted(__context__):
+         return _localectl_set(locale)
+     elif 'RedHat' in __grains__['os_family']:
+         if not __salt__['file.file_exists']('/etc/sysconfig/i18n'):
+@@ -172,15 +183,6 @@ def set_locale(locale):
+             'LANG="{0}"'.format(locale),
+             append_if_not_found=True
+         )
+-    elif 'Suse' in __grains__['os_family']:
+-        if not __salt__['file.file_exists']('/etc/sysconfig/language'):
+-            __salt__['file.touch']('/etc/sysconfig/language')
+-        __salt__['file.replace'](
+-            '/etc/sysconfig/language',
+-            '^RC_LANG=.*',
+-            'RC_LANG="{0}"'.format(locale),
+-            append_if_not_found=True
+-        )
+     elif 'Debian' in __grains__['os_family']:
+         # this block only applies to Debian without systemd
+         update_locale = salt.utils.which('update-locale')
+diff --git a/tests/unit/modules/localemod_test.py b/tests/unit/modules/localemod_test.py
+index b5cedfd8a6..069a3c6503 100644
+--- a/tests/unit/modules/localemod_test.py
++++ b/tests/unit/modules/localemod_test.py
+@@ -44,19 +44,20 @@ class LocalemodTestCase(TestCase):
+         Test for Get the current system locale
+         '''
+         with patch.dict(localemod.__context__, {'salt.utils.systemd.booted': True}):
+-            localemod.HAS_DBUS = True
+-            with patch.object(localemod,
+-                              '_parse_dbus_locale',
+-                              return_value={'LANG': 'A'}):
+-                self.assertEqual('A', localemod.get_locale())
+-                localemod._parse_dbus_locale.assert_called_once_with()
+-
+-            localemod.HAS_DBUS = False
+-            with patch.object(localemod,
+-                              '_parse_localectl',
+-                              return_value={'LANG': 'A'}):
+-                self.assertEqual('A', localemod.get_locale())
+-                localemod._parse_localectl.assert_called_once_with()
++            with patch.dict(localemod.__grains__, {'os_family': ['Unknown']}):
++                localemod.HAS_DBUS = True
++                with patch.object(localemod,
++                                  '_parse_dbus_locale',
++                                  return_value={'LANG': 'A'}):
++                    self.assertEqual('A', localemod.get_locale())
++                    localemod._parse_dbus_locale.assert_called_once_with()
++
++                localemod.HAS_DBUS = False
++                with patch.object(localemod,
++                                  '_parse_localectl',
++                                  return_value={'LANG': 'A'}):
++                    self.assertEqual('A', localemod.get_locale())
++                    localemod._parse_localectl.assert_called_once_with()
+ 
+         with patch.dict(localemod.__context__, {'salt.utils.systemd.booted': False}):
+             with patch.dict(localemod.__grains__, {'os_family': ['Gentoo']}):
+@@ -82,8 +83,9 @@ class LocalemodTestCase(TestCase):
+         Test for Sets the current system locale
+         '''
+         with patch.dict(localemod.__context__, {'salt.utils.systemd.booted': True}):
+-            with patch.object(localemod, '_localectl_set', return_value=True):
+-                self.assertTrue(localemod.set_locale('l'))
++            with patch.dict(localemod.__grains__, {'os_family': ['Unknown']}):
++                with patch.object(localemod, '_localectl_set', return_value=True):
++                    self.assertTrue(localemod.set_locale('l'))
+ 
+         with patch.dict(localemod.__context__, {'salt.utils.systemd.booted': False}):
+             with patch.dict(localemod.__grains__, {'os_family': ['Gentoo']}):
+-- 
+2.12.0
+
+

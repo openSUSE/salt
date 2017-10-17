@@ -1,0 +1,99 @@
+From 2368db6ee6c499fd9fc7234df7fa5747bf1a1af2 Mon Sep 17 00:00:00 2001
+From: "Peter V. Saveliev" <peter@svinota.eu>
+Date: Mon, 29 May 2017 16:30:49 +0200
+Subject: [PATCH] clean up `change` attribute from interface dict
+
+The attribute is hidden in IPDB from the high-level logics since
+pyroute2 version 0.4.2.
+
+Bug-Url: https://github.com/saltstack/salt/issues/41461
+
+unit tests: add pyroute2 interface dict test
+
+Bug-Url: https://github.com/saltstack/salt/pull/41487
+Bug-Url: https://github.com/saltstack/salt/issues/41461
+
+unit tests: fix absolute imports in test_pyroute2
+
+Bug-Url: https://github.com/saltstack/salt/pull/41533
+
+unit tests: add encoding clause into test_pyroute2
+
+Bug-Url: https://github.com/saltstack/salt/pull/41533
+
+unit tests: test_pyroute2 -- add skipIf
+
+... and comments
+
+Bug-Url: https://github.com/saltstack/salt/pull/41533
+
+Update new pyroute2 unit test to conform with 2016.11 branch standards
+---
+ salt/beacons/network_settings.py    |  2 +-
+ tests/unit/modules/pyroute2_test.py | 40 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 1 deletion(-)
+ create mode 100644 tests/unit/modules/pyroute2_test.py
+
+diff --git a/salt/beacons/network_settings.py b/salt/beacons/network_settings.py
+index 5af71a0804..78c387b2f2 100644
+--- a/salt/beacons/network_settings.py
++++ b/salt/beacons/network_settings.py
+@@ -25,7 +25,7 @@ __virtual_name__ = 'network_settings'
+ ATTRS = ['family', 'txqlen', 'ipdb_scope', 'index', 'operstate', 'group',
+          'carrier_changes', 'ipaddr', 'neighbours', 'ifname', 'promiscuity',
+          'linkmode', 'broadcast', 'address', 'num_tx_queues', 'ipdb_priority',
+-         'change', 'kind', 'qdisc', 'mtu', 'num_rx_queues', 'carrier', 'flags',
++         'kind', 'qdisc', 'mtu', 'num_rx_queues', 'carrier', 'flags',
+          'ifi_type', 'ports']
+ 
+ LAST_STATS = {}
+diff --git a/tests/unit/modules/pyroute2_test.py b/tests/unit/modules/pyroute2_test.py
+new file mode 100644
+index 0000000000..2c73bae12b
+--- /dev/null
++++ b/tests/unit/modules/pyroute2_test.py
+@@ -0,0 +1,40 @@
++# -*- coding: UTF-8 -*-
++
++# Import Python libs
++from __future__ import absolute_import
++
++# Import Salt Testing libs
++from salttesting import skipIf, TestCase
++from salttesting.helpers import ensure_in_syspath
++
++ensure_in_syspath('../../')
++
++# Import Salt libs
++from salt.beacons.network_settings import ATTRS
++
++# Import Third Party libs
++try:
++    from pyroute2 import IPDB
++    HAS_PYROUTE2 = True
++except ImportError:
++    HAS_PYROUTE2 = False
++
++
++@skipIf(not HAS_PYROUTE2, 'no pyroute2 installed, skipping')
++class Pyroute2TestCase(TestCase):
++
++    def test_interface_dict_fields(self):
++        with IPDB() as ipdb:
++            for attr in ATTRS:
++                # ipdb.interfaces is a dict-like object, that
++                # contains interface definitions. Interfaces can
++                # be referenced both with indices and names.
++                #
++                # ipdb.interfaces[1] is an interface with index 1,
++                # that is the loopback interface.
++                self.assertIn(attr, ipdb.interfaces[1])
++
++
++if __name__ == '__main__':
++    from integration import run_tests
++    run_tests(Pyroute2TestCase, needs_daemon=False)
+-- 
+2.13.0
+
+

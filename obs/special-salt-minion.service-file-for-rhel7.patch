@@ -1,0 +1,34 @@
+From 6841af9acfb08d37d3e7e9c5b4161f43ad0f05af Mon Sep 17 00:00:00 2001
+From: Michael Calmer <mc@suse.de>
+Date: Tue, 7 Mar 2017 13:50:13 +0100
+Subject: [PATCH] special salt-minion.service file for rhel7
+
+---
+ pkg/salt-minion.service.rhel7 | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 pkg/salt-minion.service.rhel7
+
+diff --git a/pkg/salt-minion.service.rhel7 b/pkg/salt-minion.service.rhel7
+new file mode 100644
+index 0000000..6917267
+--- /dev/null
++++ b/pkg/salt-minion.service.rhel7
+@@ -0,0 +1,14 @@
++[Unit]
++Description=The Salt Minion
++After=network.target
++
++[Service]
++Type=simple
++LimitNOFILE=8192
++ExecStart=/usr/bin/salt-minion
++KillMode=process
++Restart=on-failure
++RestartSec=15
++
++[Install]
++WantedBy=multi-user.target
+-- 
+2.10.2
+
+

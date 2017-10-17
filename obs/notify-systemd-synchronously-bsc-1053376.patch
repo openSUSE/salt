@@ -1,0 +1,56 @@
+From a5b6da920b2f0a3c3cefc6529103119cdb093904 Mon Sep 17 00:00:00 2001
+From: Johannes Renner <jrenner@suse.com>
+Date: Wed, 16 Aug 2017 16:54:41 +0200
+Subject: [PATCH] Notify systemd synchronously (bsc#1053376)
+
+Forking the systemd-notify command is known to be unreliable at least
+with older versions of the kernel and/or systemd. When systemd receives
+the notification the systemd-notify process may have already exited
+causing an error in the logs while waiting for a (90 seconds) timeout.
+
+This patch instead notifies the systemd NOTIFY_SOCKET synchronously in
+case the systemd.daemon python library is not available.
+
+Fallback to systemd_notify_call() in case of socket.error
+---
+ salt/utils/process.py | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/salt/utils/process.py b/salt/utils/process.py
+index c3b514fff6..cb84dbf934 100644
+--- a/salt/utils/process.py
++++ b/salt/utils/process.py
+@@ -15,6 +15,7 @@ import contextlib
+ import subprocess
+ import multiprocessing
+ import multiprocessing.util
++import socket
+ 
+ 
+ # Import salt libs
+@@ -55,7 +56,20 @@ def notify_systemd():
+         import systemd.daemon
+     except ImportError:
+         if salt.utils.which('systemd-notify') and systemd_notify_call('--booted'):
+-            return systemd_notify_call('--ready')
++            # Notify systemd synchronously
++            notify_socket = os.getenv('NOTIFY_SOCKET')
++            if notify_socket:
++                # Handle abstract namespace socket
++                if notify_socket.startswith('@'):
++                    notify_socket = '\0{0}'.format(notify_socket[1:])
++                try:
++                    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
++                    sock.connect(notify_socket)
++                    sock.sendall('READY=1'.encode())
++                    sock.close()
++                except socket.error:
++                    return systemd_notify_call('--ready')
++                return True
+         return False
+ 
+     if systemd.daemon.booted():
+-- 
+2.13.5
+
+

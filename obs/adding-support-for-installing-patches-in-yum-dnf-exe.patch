@@ -1,0 +1,991 @@
+From 55ac73ad201d8a23ddc8e44b5310343e99562610 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pablo=20Su=C3=A1rez=20Hern=C3=A1ndez?=
+ <psuarezhernandez@suse.com>
+Date: Tue, 21 Mar 2017 11:10:06 +0000
+Subject: [PATCH] Adding support for installing patches in yum/dnf
+ execution module
+
+Adding support for installing patches in Zypper module
+
+Adding list_downloaded function to Zypper module
+
+Adding list_downloaded function to Yum module
+
+Adding new pkg.downloaded state
+
+Adding documentation for pkg.downloaded state
+
+Adding pkg.patched and pkg.patch_downloaded states
+
+Check targets for advisory patches installation
+
+Adds support for listing advisory patches with Zypper
+
+Adds support for listing advisory patches with Yum
+
+Improving function naming
+
+Moving advisory ids checks into pkg_resource.parse_targets
+
+Fixes _find_download_targets to call _preflight_check
+
+Fixes parse_targets when advisory id is passed as name
+
+Pylint fixes
+
+Enables pkg.downloaded to verify packages after package manager call.
+
+Adding missing kwargs parameters to pkg.install call
+
+Adding versionadded flags
+
+Some refactoring and minor fixes
+
+Adding unit tests for Zypper execution module
+
+Adding more unit tests for Zypper module
+
+Pylint fix
+---
+ salt/modules/pkg_resource.py               |   9 +
+ salt/modules/yumpkg.py                     | 108 +++++++-
+ salt/modules/zypper.py                     |  91 ++++++-
+ salt/states/pkg.py                         | 420 +++++++++++++++++++++++++++++
+ tests/unit/modules/zypp/zypper-patches.xml |  10 +
+ tests/unit/modules/zypper_test.py          | 119 ++++++++
+ 6 files changed, 751 insertions(+), 6 deletions(-)
+ create mode 100644 tests/unit/modules/zypp/zypper-patches.xml
+
+diff --git a/salt/modules/pkg_resource.py b/salt/modules/pkg_resource.py
+index 1df9307..ad0f0ff 100644
+--- a/salt/modules/pkg_resource.py
++++ b/salt/modules/pkg_resource.py
+@@ -119,6 +119,15 @@ def parse_targets(name=None,
+         log.error('Only one of "pkgs" and "sources" can be used.')
+         return None, None
+ 
++    elif 'advisory_ids' in kwargs:
++        if pkgs:
++            log.error('Cannot use "advisory_ids" and "pkgs" at the same time')
++            return None, None
++        elif kwargs['advisory_ids']:
++            return kwargs['advisory_ids'], 'advisory'
++        else:
++            return [name], 'advisory'
++
+     elif pkgs:
+         pkgs = _repack_pkgs(pkgs, normalize=normalize)
+         if not pkgs:
+diff --git a/salt/modules/yumpkg.py b/salt/modules/yumpkg.py
+index d67bbe0..f6777d7 100644
+--- a/salt/modules/yumpkg.py
++++ b/salt/modules/yumpkg.py
+@@ -19,6 +19,7 @@ from __future__ import absolute_import
+ import contextlib
+ import copy
+ import fnmatch
++import glob
+ import itertools
+ import logging
+ import os
+@@ -800,6 +801,27 @@ def list_upgrades(refresh=True, **kwargs):
+ list_updates = salt.utils.alias_function(list_upgrades, 'list_updates')
+ 
+ 
++def list_downloaded():
++    '''
++    .. versionadded:: Oxygen
++
++    List prefetched packages downloaded by Yum in the local disk.
++
++    CLI example:
++
++    .. code-block:: bash
++
++        salt '*' pkg.list_downloaded
++    '''
++    CACHE_DIR = os.path.join('/var/cache/', _yum())
++
++    ret = {}
++    for package_path in glob.glob(os.path.join(CACHE_DIR, '*/*/*/packages/*.rpm')):
++        pkg_info = __salt__['lowpkg.bin_pkg_info'](package_path)
++        ret.setdefault(pkg_info['name'], {})[pkg_info['version']] = package_path
++    return ret
++
++
+ def info_installed(*names):
+     '''
+     .. versionadded:: 2015.8.1
+@@ -1082,10 +1104,10 @@ def install(name=None,
+             log.warning('"version" parameter will be ignored for multiple '
+                         'package targets')
+ 
+-    old = list_pkgs(versions_as_list=False)
++    old = list_pkgs(versions_as_list=False) if not downloadonly else list_downloaded()
+     # Use of __context__ means no duplicate work here, just accessing
+     # information already in __context__ from the previous call to list_pkgs()
+-    old_as_list = list_pkgs(versions_as_list=True)
++    old_as_list = list_pkgs(versions_as_list=True) if not downloadonly else list_downloaded()
+ 
+     to_install = []
+     to_downgrade = []
+@@ -1108,6 +1130,16 @@ def install(name=None,
+ 
+     if pkg_type == 'repository':
+         pkg_params_items = six.iteritems(pkg_params)
++    elif pkg_type == 'advisory':
++        pkg_params_items = []
++        cur_patches = list_patches()
++        for advisory_id in pkg_params:
++            if advisory_id not in cur_patches:
++                raise CommandExecutionError(
++                    'Advisory id "{0}" not found'.format(advisory_id)
++                )
++            else:
++                pkg_params_items.append(advisory_id)
+     else:
+         pkg_params_items = []
+         for pkg_source in pkg_params:
+@@ -1131,6 +1163,9 @@ def install(name=None,
+     for pkg_item_list in pkg_params_items:
+         if pkg_type == 'repository':
+             pkgname, version_num = pkg_item_list
++        elif pkg_type == 'advisory':
++            pkgname = pkg_item_list
++            version_num = None
+         else:
+             try:
+                 pkgname, pkgpath, version_num = pkg_item_list
+@@ -1145,6 +1180,8 @@ def install(name=None,
+                     to_reinstall.append((pkgname, pkgname))
+                 else:
+                     to_install.append((pkgname, pkgname))
++            elif pkg_type == 'advisory':
++                to_install.append((pkgname, pkgname))
+             else:
+                 to_install.append((pkgname, pkgpath))
+         else:
+@@ -1291,6 +1328,8 @@ def install(name=None,
+     targets = []
+     with _temporarily_unhold(to_install, targets):
+         if targets:
++            if pkg_type == 'advisory':
++                targets = ["--advisory={0}".format(t) for t in targets]
+             cmd = []
+             if salt.utils.systemd.has_scope(__context__) \
+                 and __salt__['config.get']('systemd.scope', True):
+@@ -1299,7 +1338,7 @@ def install(name=None,
+             if _yum() == 'dnf':
+                 cmd.extend(['--best', '--allowerasing'])
+             _add_common_args(cmd)
+-            cmd.append('install')
++            cmd.append('install' if pkg_type is not 'advisory' else 'update')
+             cmd.extend(targets)
+             out = __salt__['cmd.run_all'](
+                 cmd,
+@@ -1351,7 +1390,7 @@ def install(name=None,
+                 errors.append(out['stdout'])
+ 
+     __context__.pop('pkg.list_pkgs', None)
+-    new = list_pkgs(versions_as_list=False)
++    new = list_pkgs(versions_as_list=False) if not downloadonly else list_downloaded()
+ 
+     ret = salt.utils.compare_dicts(old, new)
+ 
+@@ -2757,3 +2796,64 @@ def diff(*paths):
+                     local_pkgs[pkg]['path'], path) or 'Unchanged'
+ 
+     return ret
++
++
++def _get_patches(installed_only=False):
++    '''
++    List all known patches in repos.
++    '''
++    patches = {}
++
++    cmd = [_yum(), '--quiet', 'updateinfo', 'list', 'security', 'all']
++    ret = __salt__['cmd.run_stdout'](
++        cmd,
++        python_shell=False
++    )
++    for line in salt.utils.itertools.split(ret, os.linesep):
++        inst, advisory_id, sev, pkg = re.match(r'([i|\s]) ([^\s]+) +([^\s]+) +([^\s]+)',
++                                               line).groups()
++        if inst != 'i' and installed_only:
++            continue
++        patches[advisory_id] = {
++            'installed': True if inst == 'i' else False,
++            'summary': pkg
++        }
++    return patches
++
++
++def list_patches(refresh=False):
++    '''
++    .. versionadded:: Oxygen
++
++    List all known advisory patches from available repos.
++
++    refresh
++        force a refresh if set to True.
++        If set to False (default) it depends on yum if a refresh is
++        executed.
++
++    CLI Examples:
++
++    .. code-block:: bash
++
++        salt '*' pkg.list_patches
++    '''
++    if refresh:
++        refresh_db()
++
++    return _get_patches()
++
++
++def list_installed_patches():
++    '''
++    .. versionadded:: Oxygen
++
++    List installed advisory patches on the system.
++
++    CLI Examples:
++
++    .. code-block:: bash
++
++        salt '*' pkg.list_installed_patches
++    '''
++    return _get_patches(installed_only=True)
+diff --git a/salt/modules/zypper.py b/salt/modules/zypper.py
+index 75e529c..28087f5 100644
+--- a/salt/modules/zypper.py
++++ b/salt/modules/zypper.py
+@@ -15,6 +15,7 @@ Package support for openSUSE via the zypper package manager
+ # Import python libs
+ from __future__ import absolute_import
+ import copy
++import glob
+ import logging
+ import re
+ import os
+@@ -1029,10 +1030,18 @@ def install(name=None,
+             for problem in problems:
+                 log.error(problem)
+             return {}
++    elif pkg_type == 'advisory':
++        targets = []
++        cur_patches = list_patches()
++        for advisory_id in pkg_params:
++            if advisory_id not in cur_patches:
++                raise CommandExecutionError('Advisory id "{0}" not found'.format(advisory_id))
++            else:
++                targets.append(advisory_id)
+     else:
+         targets = pkg_params
+ 
+-    old = list_pkgs()
++    old = list_pkgs() if not downloadonly else list_downloaded()
+     downgrades = []
+     if fromrepo:
+         fromrepoopt = ['--force', '--force-resolution', '--from', fromrepo]
+@@ -1050,6 +1059,8 @@ def install(name=None,
+         cmd_install.extend(fromrepoopt)
+ 
+     errors = []
++    if pkg_type == 'advisory':
++        targets = ["patch:{0}".format(t) for t in targets]
+ 
+     # Split the targets into batches of 500 packages each, so that
+     # the maximal length of the command line is not broken
+@@ -1068,7 +1079,7 @@ def install(name=None,
+         __zypper__(no_repo_failure=ignore_repo_failure).call(*cmd)
+ 
+     __context__.pop('pkg.list_pkgs', None)
+-    new = list_pkgs()
++    new = list_pkgs() if not downloadonly else list_downloaded()
+     ret = salt.utils.compare_dicts(old, new)
+ 
+     if errors:
+@@ -1771,6 +1782,28 @@ def download(*packages, **kwargs):
+     )
+ 
+ 
++def list_downloaded():
++    '''
++    .. versionadded:: Oxygen
++
++    List prefetched packages downloaded by Zypper in the local disk.
++
++    CLI example:
++
++    .. code-block:: bash
++
++        salt '*' pkg.list_downloaded
++    '''
++    CACHE_DIR = '/var/cache/zypp/packages/'
++
++    ret = {}
++    # Zypper storage is repository_tag/arch/package-version.rpm
++    for package_path in glob.glob(os.path.join(CACHE_DIR, '*/*/*.rpm')):
++        pkg_info = __salt__['lowpkg.bin_pkg_info'](package_path)
++        ret.setdefault(pkg_info['name'], {})[pkg_info['version']] = package_path
++    return ret
++
++
+ def diff(*paths):
+     '''
+     Return a formatted diff between current files and original in a package.
+@@ -1808,3 +1841,57 @@ def diff(*paths):
+                 ) or 'Unchanged'
+ 
+     return ret
++
++
++def _get_patches(installed_only=False):
++    '''
++    List all known patches in repos.
++    '''
++    patches = {}
++    for element in __zypper__.nolock.xml.call('se', '-t', 'patch').getElementsByTagName('solvable'):
++        installed = element.getAttribute('status') == 'installed'
++        if (installed_only and installed) or not installed_only:
++            patches[element.getAttribute('name')] = {
++                'installed': installed,
++                'summary': element.getAttribute('summary'),
++            }
++
++    return patches
++
++
++def list_patches(refresh=False):
++    '''
++    .. versionadded:: Oxygen
++
++    List all known advisory patches from available repos.
++
++    refresh
++        force a refresh if set to True.
++        If set to False (default) it depends on zypper if a refresh is
++        executed.
++
++    CLI Examples:
++
++    .. code-block:: bash
++
++        salt '*' pkg.list_patches
++    '''
++    if refresh:
++        refresh_db()
++
++    return _get_patches()
++
++
++def list_installed_patches():
++    '''
++    .. versionadded:: Oxygen
++
++    List installed advisory patches on the system.
++
++    CLI Examples:
++
++    .. code-block:: bash
++
++        salt '*' pkg.list_installed_patches
++    '''
++    return _get_patches(installed_only=True)
+diff --git a/salt/states/pkg.py b/salt/states/pkg.py
+index 7c3b27b..d185002 100644
+--- a/salt/states/pkg.py
++++ b/salt/states/pkg.py
+@@ -213,6 +213,171 @@ def _find_unpurge_targets(desired):
+     ]
+ 
+ 
++def _find_download_targets(name=None,
++                           version=None,
++                           pkgs=None,
++                           normalize=True,
++                           skip_suggestions=False,
++                           ignore_epoch=False,
++                           **kwargs):
++    '''
++    Inspect the arguments to pkg.downloaded and discover what packages need to
++    be downloaded. Return a dict of packages to download.
++    '''
++    cur_pkgs = __salt__['pkg.list_downloaded']()
++    if pkgs:
++        to_download = _repack_pkgs(pkgs, normalize=normalize)
++
++        if not to_download:
++            # Badly-formatted SLS
++            return {'name': name,
++                    'changes': {},
++                    'result': False,
++                    'comment': 'Invalidly formatted pkgs parameter. See '
++                               'minion log.'}
++    else:
++        if normalize:
++            _normalize_name = \
++                __salt__.get('pkg.normalize_name', lambda pkgname: pkgname)
++            to_download = {_normalize_name(name): version}
++        else:
++            to_download = {name: version}
++
++        cver = cur_pkgs.get(name, {})
++        if name in to_download:
++            # Package already downloaded, no need to download again
++            if cver and version in cver:
++                return {'name': name,
++                        'changes': {},
++                        'result': True,
++                        'comment': 'Version {0} of package \'{1}\' is already '
++                                   'downloaded'.format(version, name)}
++
++            # if cver is not an empty string, the package is already downloaded
++            elif cver and version is None:
++                # The package is downloaded
++                return {'name': name,
++                        'changes': {},
++                        'result': True,
++                        'comment': 'Package {0} is already '
++                                   'downloaded'.format(name)}
++
++    version_spec = False
++    if not skip_suggestions:
++        try:
++            problems = _preflight_check(to_download, **kwargs)
++        except CommandExecutionError:
++            pass
++        else:
++            comments = []
++            if problems.get('no_suggest'):
++                comments.append(
++                    'The following package(s) were not found, and no '
++                    'possible matches were found in the package db: '
++                    '{0}'.format(
++                ', '.join(sorted(problems['no_suggest']))
++                    )
++                )
++            if problems.get('suggest'):
++                for pkgname, suggestions in \
++                        six.iteritems(problems['suggest']):
++                    comments.append(
++                        'Package \'{0}\' not found (possible matches: '
++                        '{1})'.format(pkgname, ', '.join(suggestions))
++                    )
++            if comments:
++                if len(comments) > 1:
++                    comments.append('')
++                return {'name': name,
++                        'changes': {},
++                        'result': False,
++                        'comment': '. '.join(comments).rstrip()}
++
++    # Find out which packages will be targeted in the call to pkg.download
++    # Check current downloaded versions against specified versions
++    targets = {}
++    problems = []
++    for pkgname, pkgver in six.iteritems(to_download):
++        cver = cur_pkgs.get(pkgname, {})
++        # Package not yet downloaded, so add to targets
++        if not cver:
++            targets[pkgname] = pkgver
++            continue
++        # No version specified but package is already downloaded
++        elif cver and not pkgver:
++            continue
++
++        version_spec = True
++        try:
++            oper, verstr = _get_comparison_spec(pkgver)
++        except CommandExecutionError as exc:
++            problems.append(exc.strerror)
++            continue
++
++        if not _fulfills_version_spec(cver.keys(), oper, verstr,
++                                      ignore_epoch=ignore_epoch):
++            targets[pkgname] = pkgver
++
++    if problems:
++        return {'name': name,
++                'changes': {},
++                'result': False,
++                'comment': ' '.join(problems)}
++
++    if not targets:
++        # All specified packages are already downloaded
++        msg = (
++            'All specified packages{0} are already downloaded'
++            .format(' (matching specified versions)' if version_spec else '')
++        )
++        return {'name': name,
++                'changes': {},
++                'result': True,
++                'comment': msg}
++
++    return targets
++
++
++def _find_advisory_targets(name=None,
++                           advisory_ids=None,
++                           **kwargs):
++    '''
++    Inspect the arguments to pkg.patch_installed and discover what advisory
++    patches need to be installed. Return a dict of advisory patches to install.
++    '''
++    cur_patches = __salt__['pkg.list_installed_patches']()
++    if advisory_ids:
++        to_download = advisory_ids
++    else:
++        to_download = [name]
++        if cur_patches.get(name, {}):
++            # Advisory patch already installed, no need to install it again
++            return {'name': name,
++                    'changes': {},
++                    'result': True,
++                    'comment': 'Advisory patch {0} is already '
++                               'installed'.format(name)}
++
++    # Find out which advisory patches will be targeted in the call to pkg.install
++    targets = []
++    for patch_name in to_download:
++        cver = cur_patches.get(patch_name, {})
++        # Advisory patch not yet installed, so add to targets
++        if not cver:
++            targets.append(patch_name)
++            continue
++
++    if not targets:
++        # All specified packages are already downloaded
++        msg = ('All specified advisory patches are already installed')
++        return {'name': name,
++                'changes': {},
++                'result': True,
++                'comment': msg}
++
++    return targets
++
++
+ def _find_remove_targets(name=None,
+                          version=None,
+                          pkgs=None,
+@@ -1700,6 +1865,261 @@ def installed(
+     return ret
+ 
+ 
++def downloaded(name,
++               version=None,
++               pkgs=None,
++               fromrepo=None,
++               ignore_epoch=None,
++               **kwargs):
++    '''
++    .. versionadded:: Oxygen
++
++    Ensure that the package is downloaded, and that it is the correct version
++    (if specified).
++
++    Currently supported for the following pkg providers:
++    :mod:`yumpkg <salt.modules.yumpkg>` and :mod:`zypper <salt.modules.zypper>`
++
++    :param str name:
++        The name of the package to be downloaded. This parameter is ignored if
++        either "pkgs" is used. Additionally, please note that this option can
++        only be used to download packages from a software repository.
++
++    :param str version:
++        Download a specific version of a package.
++
++        .. important::
++            As of version 2015.8.7, for distros which use yum/dnf, packages
++            which have a version with a nonzero epoch (that is, versions which
++            start with a number followed by a colon must have the epoch included
++            when specifying the version number. For example:
++
++            .. code-block:: yaml
++
++                vim-enhanced:
++                  pkg.downloaded:
++                    - version: 2:7.4.160-1.el7
++
++            An **ignore_epoch** argument has been added to which causes the
++            epoch to be disregarded when the state checks to see if the desired
++            version was installed.
++
++            You can install a specific version when using the ``pkgs`` argument by
++            including the version after the package:
++
++            .. code-block:: yaml
++
++                common_packages:
++                  pkg.downloaded:
++                    - pkgs:
++                      - unzip
++                      - dos2unix
++                      - salt-minion: 2015.8.5-1.el6
++
++    CLI Example:
++
++    .. code-block:: yaml
++
++        zsh:
++          pkg.downloaded:
++            - version: 5.0.5-4.63
++            - fromrepo: "myrepository"
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': None,
++           'comment': ''}
++
++    if 'pkg.list_downloaded' not in __salt__:
++        ret['result'] = False
++        ret['comment'] = 'The pkg.downloaded state is not available on ' \
++                         'this platform'
++        return ret
++
++    if isinstance(pkgs, list) and len(pkgs) == 0:
++        ret['result'] = True
++        ret['comment'] = 'No packages to download provided'
++        return ret
++
++    # It doesn't make sense here to received 'downloadonly' as kwargs
++    # as we're explicitely passing 'downloadonly=True' to execution module.
++    if 'downloadonly' in kwargs:
++        del kwargs['downloadonly']
++
++    # Only downloading not yet downloaded packages
++    targets = _find_download_targets(name,
++                                     version,
++                                     pkgs,
++                                     fromrepo=fromrepo,
++                                     ignore_epoch=ignore_epoch,
++                                     **kwargs)
++    if isinstance(targets, dict) and 'result' in targets:
++        return targets
++    elif not isinstance(targets, dict):
++        ret['result'] = False
++        ret['comment'] = 'An error was encountered while checking targets: ' \
++                         '{0}'.format(targets)
++        return ret
++
++    if __opts__['test']:
++        summary = ', '.join(targets)
++        ret['comment'] = 'The following packages would be ' \
++                         'downloaded: {0}'.format(summary)
++        return ret
++
++    try:
++        pkg_ret = __salt__['pkg.install'](name=name,
++                                          pkgs=pkgs,
++                                          version=version,
++                                          downloadonly=True,
++                                          fromrepo=fromrepo,
++                                          ignore_epoch=ignore_epoch,
++                                          **kwargs)
++        ret['result'] = True
++        ret['changes'].update(pkg_ret)
++    except CommandExecutionError as exc:
++        ret = {'name': name, 'result': False}
++        if exc.info:
++            # Get information for state return from the exception.
++            ret['changes'] = exc.info.get('changes', {})
++            ret['comment'] = exc.strerror_without_changes
++        else:
++            ret['changes'] = {}
++            ret['comment'] = 'An error was encountered while downloading ' \
++                             'package(s): {0}'.format(exc)
++        return ret
++
++    new_pkgs = __salt__['pkg.list_downloaded']()
++    ok, failed = _verify_install(targets, new_pkgs, ignore_epoch=ignore_epoch)
++
++    if failed:
++        summary = ', '.join([_get_desired_pkg(x, targets)
++                             for x in failed])
++        ret['result'] = False
++        ret['comment'] = 'The following packages failed to ' \
++                         'download: {0}'.format(summary)
++
++    if not ret['changes'] and not ret['comment']:
++        ret['result'] = True
++        ret['comment'] = 'Packages are already downloaded: ' \
++                         '{0}'.format(', '.join(targets))
++
++    return ret
++
++
++def patch_installed(name, advisory_ids=None, downloadonly=None, **kwargs):
++    '''
++    .. versionadded:: Oxygen
++
++    Ensure that packages related to certain advisory ids are installed.
++
++    Currently supported for the following pkg providers:
++    :mod:`yumpkg <salt.modules.yumpkg>` and :mod:`zypper <salt.modules.zypper>`
++
++    CLI Example:
++
++    .. code-block:: yaml
++
++        issue-foo-fixed:
++          pkg.patch_installed:
++            - advisory_ids:
++              - SUSE-SLE-SERVER-12-SP2-2017-185
++              - SUSE-SLE-SERVER-12-SP2-2017-150
++              - SUSE-SLE-SERVER-12-SP2-2017-120
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': None,
++           'comment': ''}
++
++    if 'pkg.list_patches' not in __salt__:
++        ret['result'] = False
++        ret['comment'] = 'The pkg.patch_installed state is not available on ' \
++                         'this platform'
++        return ret
++
++    if isinstance(advisory_ids, list) and len(advisory_ids) == 0:
++        ret['result'] = True
++        ret['comment'] = 'No advisory ids provided'
++        return ret
++
++    # Only downloading not yet downloaded packages
++    targets = _find_advisory_targets(name, advisory_ids, **kwargs)
++    if isinstance(targets, dict) and 'result' in targets:
++        return targets
++    elif not isinstance(targets, list):
++        ret['result'] = False
++        ret['comment'] = 'An error was encountered while checking targets: ' \
++                         '{0}'.format(targets)
++        return ret
++
++    if __opts__['test']:
++        summary = ', '.join(targets)
++        ret['comment'] = 'The following advisory patches would be ' \
++                         'downloaded: {0}'.format(summary)
++        return ret
++
++    try:
++        pkg_ret = __salt__['pkg.install'](name=name,
++                                          advisory_ids=advisory_ids,
++                                          downloadonly=downloadonly,
++                                          **kwargs)
++        ret['result'] = True
++        ret['changes'].update(pkg_ret)
++    except CommandExecutionError as exc:
++        ret = {'name': name, 'result': False}
++        if exc.info:
++            # Get information for state return from the exception.
++            ret['changes'] = exc.info.get('changes', {})
++            ret['comment'] = exc.strerror_without_changes
++        else:
++            ret['changes'] = {}
++            ret['comment'] = ('An error was encountered while downloading '
++                              'package(s): {0}'.format(exc))
++        return ret
++
++    if not ret['changes'] and not ret['comment']:
++        status = 'downloaded' if downloadonly else 'installed'
++        ret['result'] = True
++        ret['comment'] = 'Related packages are already {}'.format(status)
++
++    return ret
++
++
++def patch_downloaded(name, advisory_ids=None, **kwargs):
++    '''
++    .. versionadded:: Oxygen
++
++    Ensure that packages related to certain advisory ids are downloaded.
++
++    Currently supported for the following pkg providers:
++    :mod:`yumpkg <salt.modules.yumpkg>` and :mod:`zypper <salt.modules.zypper>`
++
++    CLI Example:
++
++    .. code-block:: yaml
++
++        preparing-to-fix-issues:
++          pkg.patch_downloaded:
++            - advisory_ids:
++              - SUSE-SLE-SERVER-12-SP2-2017-185
++              - SUSE-SLE-SERVER-12-SP2-2017-150
++              - SUSE-SLE-SERVER-12-SP2-2017-120
++    '''
++    if 'pkg.list_patches' not in __salt__:
++        return {'name': name,
++                'result': False,
++                'changes': {},
++                'comment': 'The pkg.patch_downloaded state is not available on '
++                           'this platform'}
++
++    # It doesn't make sense here to received 'downloadonly' as kwargs
++    # as we're explicitely passing 'downloadonly=True' to execution module.
++    if 'downloadonly' in kwargs:
++        del kwargs['downloadonly']
++    return patch_installed(name=name, advisory_ids=advisory_ids, downloadonly=True, **kwargs)
++
++
+ def latest(
+         name,
+         refresh=None,
+diff --git a/tests/unit/modules/zypp/zypper-patches.xml b/tests/unit/modules/zypp/zypper-patches.xml
+new file mode 100644
+index 0000000..2088634
+--- /dev/null
++++ b/tests/unit/modules/zypp/zypper-patches.xml
+@@ -0,0 +1,10 @@
++<?xml version='1.0'?>
++<stream>
++  <search-result version="0.0">
++    <solvable-list>
++      <solvable status="not-installed" name="SUSE-SLE-SERVER-12-SP2-2017-97" summary="Recommended update for ovmf" kind="patch"/>
++      <solvable status="installed" name="SUSE-SLE-SERVER-12-SP2-2017-98" summary="Recommended update for kmod" kind="patch"/>
++      <solvable status="not-installed" name="SUSE-SLE-SERVER-12-SP2-2017-99" summary="Security update for apache2" kind="patch"/>
++    </solvable-list>
++  </search-result>
++</stream>
+diff --git a/tests/unit/modules/zypper_test.py b/tests/unit/modules/zypper_test.py
+index c29d12c..39bd2e7 100644
+--- a/tests/unit/modules/zypper_test.py
++++ b/tests/unit/modules/zypper_test.py
+@@ -462,6 +462,48 @@ Repository 'DUMMY' not found by its alias, number, or URI.
+                             self.assertTrue(pkgs.get(pkg_name))
+                             self.assertEqual(pkgs[pkg_name], pkg_version)
+ 
++    def test_list_patches(self):
++        '''
++        Test advisory patches listing.
++
++        :return:
++        '''
++
++        ref_out = {
++            'stdout': get_test_data('zypper-patches.xml'),
++            'stderr': None,
++            'retcode': 0
++        }
++
++        PATCHES_RET = {
++            'SUSE-SLE-SERVER-12-SP2-2017-97': {'installed': False, 'summary': 'Recommended update for ovmf'},
++            'SUSE-SLE-SERVER-12-SP2-2017-98': {'installed': True, 'summary': 'Recommended update for kmod'},
++            'SUSE-SLE-SERVER-12-SP2-2017-99': {'installed': False, 'summary': 'Security update for apache2'}
++        }
++
++        with patch.dict(zypper.__salt__, {'cmd.run_all': MagicMock(return_value=ref_out)}):
++            list_patches = zypper.list_patches(refresh=False)
++            self.assertEqual(len(list_patches), 3)
++            self.assertDictEqual(list_patches, PATCHES_RET)
++
++    @patch('glob.glob', MagicMock(return_value=['/var/cache/zypper/packages/foo/bar/test_package.rpm']))
++    def test_list_downloaded(self):
++        '''
++        Test downloaded packages listing.
++
++        :return:
++        '''
++        DOWNLOADED_RET = {
++            'test-package': {
++                '1.0': '/var/cache/zypper/packages/foo/bar/test_package.rpm'
++            }
++        }
++
++        with patch.dict(zypper.__salt__, {'lowpkg.bin_pkg_info': MagicMock(return_value={'name': 'test-package', 'version': '1.0'})}):
++            list_downloaded = zypper.list_downloaded()
++            self.assertEqual(len(list_downloaded), 1)
++            self.assertDictEqual(list_downloaded, DOWNLOADED_RET)
++
+     def test_download(self):
+         '''
+         Test package download
+@@ -487,6 +529,83 @@ Repository 'DUMMY' not found by its alias, number, or URI.
+                 test_out['_error'] = "The following package(s) failed to download: foo"
+                 self.assertEqual(zypper.download("nmap", "foo"), test_out)
+ 
++    @patch('salt.modules.zypper._systemd_scope', MagicMock(return_value=False))
++    @patch('salt.modules.zypper.list_downloaded', MagicMock(side_effect=[{}, {'vim': {'1.1': '/foo/bar/test.rpm'}}]))
++    def test_install_with_downloadonly(self):
++        '''
++        Test a package installation with downloadonly=True.
++
++        :return:
++        '''
++        with patch.dict(zypper.__salt__, {'pkg_resource.parse_targets': MagicMock(return_value=({'vim': None}, 'repository'))}):
++            with patch('salt.modules.zypper.__zypper__.noraise.call', MagicMock()) as zypper_mock:
++                ret = zypper.install(pkgs=['vim'], downloadonly=True)
++                zypper_mock.assert_called_once_with(
++                    '--no-refresh',
++                    'install',
++                    '--name',
++                    '--auto-agree-with-licenses',
++                    '--download-only',
++                    'vim'
++                )
++                self.assertDictEqual(ret, {'vim': {'new': {'1.1': '/foo/bar/test.rpm'}, 'old': ''}})
++
++    @patch('salt.modules.zypper._systemd_scope', MagicMock(return_value=False))
++    @patch('salt.modules.zypper.list_downloaded', MagicMock(return_value={'vim': {'1.1': '/foo/bar/test.rpm'}}))
++    def test_install_with_downloadonly_already_downloaded(self):
++        '''
++        Test a package installation with downloadonly=True when package is already downloaded.
++
++        :return:
++        '''
++        with patch.dict(zypper.__salt__, {'pkg_resource.parse_targets': MagicMock(return_value=({'vim': None}, 'repository'))}):
++            with patch('salt.modules.zypper.__zypper__.noraise.call', MagicMock()) as zypper_mock:
++                ret = zypper.install(pkgs=['vim'], downloadonly=True)
++                zypper_mock.assert_called_once_with(
++                    '--no-refresh',
++                    'install',
++                    '--name',
++                    '--auto-agree-with-licenses',
++                    '--download-only',
++                    'vim'
++                )
++                self.assertDictEqual(ret, {})
++
++    @patch('salt.modules.zypper._systemd_scope', MagicMock(return_value=False))
++    @patch('salt.modules.zypper._get_patches', MagicMock(return_value={'SUSE-PATCH-1234': {'installed': False, 'summary': 'test'}}))
++    @patch('salt.modules.zypper.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}]))
++    def test_install_advisory_patch_ok(self):
++        '''
++        Test successfully advisory patch installation.
++
++        :return:
++        '''
++        with patch.dict(zypper.__salt__, {'pkg_resource.parse_targets': MagicMock(return_value=({'SUSE-PATCH-1234': None}, 'advisory'))}):
++            with patch('salt.modules.zypper.__zypper__.noraise.call', MagicMock()) as zypper_mock:
++                ret = zypper.install(advisory_ids=['SUSE-PATCH-1234'])
++                zypper_mock.assert_called_once_with(
++                    '--no-refresh',
++                    'install',
++                    '--name',
++                    '--auto-agree-with-licenses',
++                    'patch:SUSE-PATCH-1234'
++                )
++                self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
++
++    @patch('salt.modules.zypper._systemd_scope', MagicMock(return_value=False))
++    @patch('salt.modules.zypper._get_patches', MagicMock(return_value={'SUSE-PATCH-1234': {'installed': False, 'summary': 'test'}}))
++    @patch('salt.modules.zypper.list_pkgs', MagicMock(return_value={"vim": "1.1"}))
++    def test_install_advisory_patch_failure(self):
++        '''
++        Test failing advisory patch installation because patch does not exist.
++
++        :return:
++        '''
++        with patch.dict(zypper.__salt__, {'pkg_resource.parse_targets': MagicMock(return_value=({'SUSE-PATCH-XXX': None}, 'advisory'))}):
++            with patch('salt.modules.zypper.__zypper__.noraise.call', MagicMock()) as zypper_mock:
++                with self.assertRaisesRegex(CommandExecutionError, '^Advisory id "SUSE-PATCH-XXX" not found$'):
++                    zypper.install(advisory_ids=['SUSE-PATCH-XXX'])
++
+     def test_remove_purge(self):
+         '''
+         Test package removal
+-- 
+2.10.1
+
+

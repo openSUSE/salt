@@ -1,0 +1,26 @@
+From 395c1c262cfff948c30425596cb5d27cc385d5de Mon Sep 17 00:00:00 2001
+From: Daniel Wallace <gtmanfred@users.noreply.github.com>
+Date: Wed, 2 Aug 2017 15:33:08 -0600
+Subject: [PATCH] escape the os.sep
+
+---
+ salt/utils/verify.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/salt/utils/verify.py b/salt/utils/verify.py
+index db513ba675..8690f6fb61 100644
+--- a/salt/utils/verify.py
++++ b/salt/utils/verify.py
+@@ -485,7 +485,7 @@ def clean_id(id_):
+     '''
+     Returns if the passed id is clean.
+     '''
+-    if re.search(r'\.\.{sep}'.format(sep=os.sep), id_):
++    if re.search(r'\.\.\{sep}'.format(sep=os.sep), id_):
+         return False
+     return True
+ 
+-- 
+2.14.2
+
+

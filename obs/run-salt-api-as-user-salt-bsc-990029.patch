@@ -1,0 +1,28 @@
+From 7bbbd3b6ebaf3988a4f97b905040b56be065f201 Mon Sep 17 00:00:00 2001
+From: Michael Calmer <mc@suse.de>
+Date: Fri, 29 Jul 2016 10:50:21 +0200
+Subject: Run salt-api as user salt (bsc#990029)
+
+---
+ pkg/salt-api.service | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/pkg/salt-api.service b/pkg/salt-api.service
+index c3e67d510c..9be2cb8ee6 100644
+--- a/pkg/salt-api.service
++++ b/pkg/salt-api.service
+@@ -3,8 +3,8 @@ Description=The Salt API
+ After=network.target
+ 
+ [Service]
+-Type=notify
+-NotifyAccess=all
++User=salt
++Type=simple
+ LimitNOFILE=8192
+ ExecStart=/usr/bin/salt-api
+ TimeoutStopSec=3
+-- 
+2.11.0
+
+

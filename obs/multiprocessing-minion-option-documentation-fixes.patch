@@ -1,0 +1,47 @@
+From f718e3bf80e304cb29002a9dfb76feb35e39d93e Mon Sep 17 00:00:00 2001
+From: Silvio Moioli <smoioli@suse.de>
+Date: Wed, 20 Sep 2017 14:32:47 +0200
+Subject: [PATCH] multiprocessing minion option: documentation fixes
+
+---
+ doc/man/salt.7                   | 1 +
+ doc/ref/configuration/minion.rst | 7 +++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/doc/man/salt.7 b/doc/man/salt.7
+index b8ef9ad451..5797865ef9 100644
+--- a/doc/man/salt.7
++++ b/doc/man/salt.7
+@@ -10795,6 +10795,7 @@ cmd_whitelist_glob:
+ .UNINDENT
+ .UNINDENT
+ .SS Thread Settings
++.SS \fBmultiprocessing\fP
+ .sp
+ Default: \fBTrue\fP
+ .sp
+diff --git a/doc/ref/configuration/minion.rst b/doc/ref/configuration/minion.rst
+index a51e0cc22d..388cc93611 100644
+--- a/doc/ref/configuration/minion.rst
++++ b/doc/ref/configuration/minion.rst
+@@ -1933,11 +1933,14 @@ Thread Settings
+ 
+ .. conf_minion:: multiprocessing
+ 
++``multiprocessing``
++-------
++
+ Default: ``True``
+ 
+-If `multiprocessing` is enabled when a minion receives a
++If ``multiprocessing`` is enabled when a minion receives a
+ publication a new process is spawned and the command is executed therein.
+-Conversely, if `multiprocessing` is disabled the new publication will be run
++Conversely, if ``multiprocessing`` is disabled the new publication will be run
+ executed in a thread.
+ 
+ 
+-- 
+2.14.2
+
+

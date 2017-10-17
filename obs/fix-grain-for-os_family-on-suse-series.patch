@@ -1,0 +1,132 @@
+From 067ef07513d86093fd5373ac62a4d5eb39bcc5b4 Mon Sep 17 00:00:00 2001
+From: Bo Maryniuk <bo@suse.de>
+Date: Tue, 16 May 2017 14:42:07 +0200
+Subject: [PATCH] Fix grain for os_family on SUSE series
+
+---
+ doc/topics/spm/spm_formula.rst       | 2 +-
+ salt/modules/apache.py               | 2 +-
+ salt/modules/inspectlib/collector.py | 6 +++---
+ salt/modules/iptables.py             | 2 +-
+ salt/modules/localemod.py            | 6 +++---
+ tests/integration/modules/pkg.py     | 2 +-
+ 6 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/doc/topics/spm/spm_formula.rst b/doc/topics/spm/spm_formula.rst
+index 2493527a22..aa53098e2e 100644
+--- a/doc/topics/spm/spm_formula.rst
++++ b/doc/topics/spm/spm_formula.rst
+@@ -11,7 +11,7 @@ describes the package. An example of this file is:
+ 
+     name: apache
+     os: RedHat, Debian, Ubuntu, SUSE, FreeBSD
+-    os_family: RedHat, Debian, SUSE, FreeBSD
++    os_family: RedHat, Debian, Suse, FreeBSD
+     version: 201506
+     release: 2
+     summary: Formula for installing Apache
+diff --git a/salt/modules/apache.py b/salt/modules/apache.py
+index ad502df530..5d2261175a 100644
+--- a/salt/modules/apache.py
++++ b/salt/modules/apache.py
+@@ -52,7 +52,7 @@ def _detect_os():
+     os_family = __grains__['os_family']
+     if os_family == 'RedHat':
+         return 'apachectl'
+-    elif os_family == 'Debian' or os_family == 'SUSE':
++    elif os_family == 'Debian' or os_family == 'Suse':
+         return 'apache2ctl'
+     else:
+         return 'apachectl'
+diff --git a/salt/modules/inspectlib/collector.py b/salt/modules/inspectlib/collector.py
+index 332c6efdec..b87a46b82f 100644
+--- a/salt/modules/inspectlib/collector.py
++++ b/salt/modules/inspectlib/collector.py
+@@ -87,7 +87,7 @@ class Inspector(EnvLoader):
+         '''
+         if self.grains_core.os_data().get('os_family') == 'Debian':
+             return self.__get_cfg_pkgs_dpkg()
+-        elif self.grains_core.os_data().get('os_family') in ['SUSE', 'redhat']:
++        elif self.grains_core.os_data().get('os_family') in ['Suse', 'redhat']:
+             return self.__get_cfg_pkgs_rpm()
+         else:
+             return dict()
+@@ -163,7 +163,7 @@ class Inspector(EnvLoader):
+             if self.grains_core.os_data().get('os_family') == 'Debian':
+                 cfg_data = salt.utils.to_str(self._syscall("dpkg", None, None, '--verify',
+                                                            pkg_name)[0]).split(os.linesep)
+-            elif self.grains_core.os_data().get('os_family') in ['SUSE', 'redhat']:
++            elif self.grains_core.os_data().get('os_family') in ['Suse', 'redhat']:
+                 cfg_data = salt.utils.to_str(self._syscall("rpm", None, None, '-V', '--nodeps', '--nodigest',
+                                                            '--nosignature', '--nomtime', '--nolinkto',
+                                                            pkg_name)[0]).split(os.linesep)
+@@ -240,7 +240,7 @@ class Inspector(EnvLoader):
+         '''
+         if self.grains_core.os_data().get('os_family') == 'Debian':
+             return self.__get_managed_files_dpkg()
+-        elif self.grains_core.os_data().get('os_family') in ['SUSE', 'redhat']:
++        elif self.grains_core.os_data().get('os_family') in ['Suse', 'redhat']:
+             return self.__get_managed_files_rpm()
+ 
+         return list(), list(), list()
+diff --git a/salt/modules/iptables.py b/salt/modules/iptables.py
+index 322553d285..b1823e891a 100644
+--- a/salt/modules/iptables.py
++++ b/salt/modules/iptables.py
+@@ -80,7 +80,7 @@ def _conf(family='ipv4'):
+             return '/var/lib/ip6tables/rules-save'
+         else:
+             return '/var/lib/iptables/rules-save'
+-    elif __grains__['os_family'] == 'SUSE':
++    elif __grains__['os_family'] == 'Suse':
+         # SuSE does not seem to use separate files for IPv4 and IPv6
+         return '/etc/sysconfig/scripts/SuSEfirewall2-custom'
+     else:
+diff --git a/salt/modules/localemod.py b/salt/modules/localemod.py
+index 0bb8690fcc..b805cd429f 100644
+--- a/salt/modules/localemod.py
++++ b/salt/modules/localemod.py
+@@ -132,7 +132,7 @@ def get_locale():
+         return params.get('LANG', '')
+     elif 'RedHat' in __grains__['os_family']:
+         cmd = 'grep "^LANG=" /etc/sysconfig/i18n'
+-    elif 'SUSE' in __grains__['os_family']:
++    elif 'Suse' in __grains__['os_family']:
+         cmd = 'grep "^RC_LANG" /etc/sysconfig/language'
+     elif 'Debian' in __grains__['os_family']:
+         # this block only applies to Debian without systemd
+@@ -172,7 +172,7 @@ def set_locale(locale):
+             'LANG="{0}"'.format(locale),
+             append_if_not_found=True
+         )
+-    elif 'SUSE' in __grains__['os_family']:
++    elif 'Suse' in __grains__['os_family']:
+         if not __salt__['file.file_exists']('/etc/sysconfig/language'):
+             __salt__['file.touch']('/etc/sysconfig/language')
+         __salt__['file.replace'](
+@@ -261,7 +261,7 @@ def gen_locale(locale, **kwargs):
+     on_debian = __grains__.get('os') == 'Debian'
+     on_ubuntu = __grains__.get('os') == 'Ubuntu'
+     on_gentoo = __grains__.get('os_family') == 'Gentoo'
+-    on_suse = __grains__.get('os_family') == 'SUSE'
++    on_suse = __grains__.get('os_family') == 'Suse'
+     on_solaris = __grains__.get('os_family') == 'Solaris'
+ 
+     if on_solaris:  # all locales are pre-generated
+diff --git a/tests/integration/modules/pkg.py b/tests/integration/modules/pkg.py
+index d00d93bd6e..7dd7f1330c 100644
+--- a/tests/integration/modules/pkg.py
++++ b/tests/integration/modules/pkg.py
+@@ -235,7 +235,7 @@ class PkgModuleTest(integration.ModuleCase,
+             keys = ret.keys()
+             self.assertIn('rpm', keys)
+             self.assertIn('yum', keys)
+-        elif os_family == 'SUSE':
++        elif os_family == 'Suse':
+             ret = self.run_function(func, ['less', 'zypper'])
+             keys = ret.keys()
+             self.assertIn('less', keys)
+-- 
+2.11.0
+
+

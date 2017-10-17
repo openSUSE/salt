@@ -1,0 +1,26 @@
+From b338b21fe340ee4efa0045894315fcf20be1dc49 Mon Sep 17 00:00:00 2001
+From: Silvio Moioli <smoioli@suse.de>
+Date: Wed, 14 Dec 2016 10:33:39 +0100
+Subject: Avoid failures on SLES 12 SP2 because of new systemd
+ TaskMax limit (bsc#985112)
+
+---
+ pkg/salt-master.service | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/pkg/salt-master.service b/pkg/salt-master.service
+index 59be50301a..ecd3edd467 100644
+--- a/pkg/salt-master.service
++++ b/pkg/salt-master.service
+@@ -6,6 +6,7 @@ After=network.target
+ LimitNOFILE=16384
+ Type=simple
+ ExecStart=/usr/bin/salt-master
++TasksMax=infinity
+ 
+ [Install]
+ WantedBy=multi-user.target
+-- 
+2.11.0
+
+

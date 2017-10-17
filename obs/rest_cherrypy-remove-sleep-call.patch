@@ -1,0 +1,33 @@
+From 2ac331ef9c2e28bb133bda04a5b3f667aff66c6c Mon Sep 17 00:00:00 2001
+From: Silvio Moioli <smoioli@suse.de>
+Date: Mon, 15 May 2017 07:44:05 +0200
+Subject: [PATCH] rest_cherrypy: remove sleep call
+
+---
+ salt/netapi/rest_cherrypy/app.py | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/salt/netapi/rest_cherrypy/app.py b/salt/netapi/rest_cherrypy/app.py
+index 3e89ff7882..221865a2ee 100644
+--- a/salt/netapi/rest_cherrypy/app.py
++++ b/salt/netapi/rest_cherrypy/app.py
+@@ -465,7 +465,6 @@ import json
+ import os
+ import signal
+ import tarfile
+-import time
+ from multiprocessing import Process, Pipe
+ 
+ # Import third-party libs
+@@ -2238,7 +2237,6 @@ class WebsocketEndpoint(object):
+                         logger.error(
+                                 "Error: Salt event has non UTF-8 data:\n{0}"
+                                 .format(data))
+-                time.sleep(0.1)
+ 
+         parent_pipe, child_pipe = Pipe()
+         handler.pipe = parent_pipe
+-- 
+2.12.0
+
+

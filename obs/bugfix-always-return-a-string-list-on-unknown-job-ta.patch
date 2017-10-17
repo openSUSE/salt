@@ -1,0 +1,69 @@
+From 9dbf90beab63e75d26ed8446fc7ee0fcf08082d1 Mon Sep 17 00:00:00 2001
+From: Bo Maryniuk <bo@suse.de>
+Date: Mon, 9 Oct 2017 17:57:48 +0200
+Subject: [PATCH] Bugfix: always return a string "list" on unknown job
+ target type.
+
+---
+ salt/returners/couchbase_return.py     | 2 +-
+ salt/returners/postgres_local_cache.py | 2 +-
+ salt/runners/jobs.py                   | 2 +-
+ salt/utils/jid.py                      | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/salt/returners/couchbase_return.py b/salt/returners/couchbase_return.py
+index 24c3a9105a..f5adecc2e7 100644
+--- a/salt/returners/couchbase_return.py
++++ b/salt/returners/couchbase_return.py
+@@ -309,7 +309,7 @@ def _format_job_instance(job):
+            'Arguments': list(job.get('arg', [])),
+            # unlikely but safeguard from invalid returns
+            'Target': job.get('tgt', 'unknown-target'),
+-           'Target-type': job.get('tgt_type', []),
++           'Target-type': job.get('tgt_type', 'list'),
+            'User': job.get('user', 'root')}
+ 
+     if 'metadata' in job:
+diff --git a/salt/returners/postgres_local_cache.py b/salt/returners/postgres_local_cache.py
+index 422f8c77c7..28dc2f565c 100644
+--- a/salt/returners/postgres_local_cache.py
++++ b/salt/returners/postgres_local_cache.py
+@@ -180,7 +180,7 @@ def _format_job_instance(job):
+            'Arguments': json.loads(job.get('arg', '[]')),
+            # unlikely but safeguard from invalid returns
+            'Target': job.get('tgt', 'unknown-target'),
+-           'Target-type': job.get('tgt_type', []),
++           'Target-type': job.get('tgt_type', 'list'),
+            'User': job.get('user', 'root')}
+     # TODO: Add Metadata support when it is merged from develop
+     return ret
+diff --git a/salt/runners/jobs.py b/salt/runners/jobs.py
+index f0e8902d70..2e6559db08 100644
+--- a/salt/runners/jobs.py
++++ b/salt/runners/jobs.py
+@@ -539,7 +539,7 @@ def _format_job_instance(job):
+            'Arguments': list(job.get('arg', [])),
+            # unlikely but safeguard from invalid returns
+            'Target': job.get('tgt', 'unknown-target'),
+-           'Target-type': job.get('tgt_type', []),
++           'Target-type': job.get('tgt_type', 'list'),
+            'User': job.get('user', 'root')}
+ 
+     if 'metadata' in job:
+diff --git a/salt/utils/jid.py b/salt/utils/jid.py
+index b134dcb3f9..efa333f97c 100644
+--- a/salt/utils/jid.py
++++ b/salt/utils/jid.py
+@@ -65,7 +65,7 @@ def format_job_instance(job):
+            'Arguments': list(job.get('arg', [])),
+            # unlikely but safeguard from invalid returns
+            'Target': job.get('tgt', 'unknown-target'),
+-           'Target-type': job.get('tgt_type', []),
++           'Target-type': job.get('tgt_type', 'list'),
+            'User': job.get('user', 'root')}
+ 
+     if 'metadata' in job:
+-- 
+2.14.2
+
+

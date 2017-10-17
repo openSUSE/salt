@@ -1,0 +1,155 @@
+From 9c35fb2f389ed7b4766acdb6b2ffe83a35fbfaea Mon Sep 17 00:00:00 2001
+From: Jochen Breuer <jbreuer@suse.de>
+Date: Wed, 23 Aug 2017 21:31:28 +0200
+Subject: [PATCH] Fix for delete_deployment in Kubernetes module
+
+The Kubernetes module function delete_deployment() uses
+api_instance.delete_namespaced_deployment() from the Kubernetes lib. This
+method from the Kubernetes lib returns immediately without giving a success
+or failure indication, which lets Salt mark the job as failed even though we
+don't know if it failed or not.
+
+To actually get a result I've implemented a polling via show_deployment() to
+check if the deployment got removed.
+
+If a time limit is hit, we are returning with an error, otherwise it is a
+success.
+
+Since Windows has no signal.alarm implementation, we are here falling back to
+loop counting.
+---
+ salt/exceptions.py                    |  6 +++++
+ salt/modules/kubernetes.py            | 44 ++++++++++++++++++++++++++++++++++-
+ tests/unit/modules/test_kubernetes.py | 21 +++++++++--------
+ 3 files changed, 60 insertions(+), 11 deletions(-)
+
+diff --git a/salt/exceptions.py b/salt/exceptions.py
+index bd396aca89..84ab414cc2 100644
+--- a/salt/exceptions.py
++++ b/salt/exceptions.py
+@@ -261,6 +261,12 @@ class SaltCacheError(SaltException):
+     '''
+ 
+ 
++class TimeoutError(SaltException):
++    '''
++    Thrown when an opration cannot be completet within a given time limit.
++    '''
++
++
+ class SaltReqTimeoutError(SaltException):
+     '''
+     Thrown when a salt master request call fails to return within the timeout
+diff --git a/salt/modules/kubernetes.py b/salt/modules/kubernetes.py
+index d3d02f2e26..8f2fd2f646 100644
+--- a/salt/modules/kubernetes.py
++++ b/salt/modules/kubernetes.py
+@@ -39,11 +39,15 @@ import base64
+ import logging
+ import yaml
+ import tempfile
++import signal
++from time import sleep
++from contextlib import contextmanager
+ 
+ from salt.exceptions import CommandExecutionError
+ from salt.ext.six import iteritems
+ import salt.utils
+ import salt.utils.templates
++from salt.ext.six.moves import range  # pylint: disable=import-error
+ 
+ try:
+     import kubernetes  # pylint: disable=import-self
+@@ -79,6 +83,21 @@ def __virtual__():
+     return False, 'python kubernetes library not found'
+ 
+ 
++if not salt.utils.is_windows():
++    @contextmanager
++    def _time_limit(seconds):
++        def signal_handler(signum, frame):
++            raise TimeoutException
++        signal.signal(signal.SIGALRM, signal_handler)
++        signal.alarm(seconds)
++        try:
++            yield
++        finally:
++            signal.alarm(0)
++
++    POLLING_TIME_LIMIT = 30
++
++
+ # pylint: disable=no-member
+ def _setup_conn(**kwargs):
+     '''
+@@ -693,7 +712,30 @@ def delete_deployment(name, namespace='default', **kwargs):
+             name=name,
+             namespace=namespace,
+             body=body)
+-        return api_response.to_dict()
++        mutable_api_response = api_response.to_dict()
++        if not salt.utils.is_windows():
++            try:
++                with _time_limit(POLLING_TIME_LIMIT):
++                    while show_deployment(name, namespace) is not None:
++                        sleep(1)
++                    else:  # pylint: disable=useless-else-on-loop
++                        mutable_api_response['code'] = 200
++            except TimeoutException:
++                pass
++        else:
++            # Windows has not signal.alarm implementation, so we are just falling
++            # back to loop-counting.
++            for i in range(60):
++                if show_deployment(name, namespace) is None:
++                    mutable_api_response['code'] = 200
++                    break
++                else:
++                    sleep(1)
++        if mutable_api_response['code'] != 200:
++            log.warning('Reached polling time limit. Deployment is not yet '
++                        'deleted, but we are backing off. Sorry, but you\'ll '
++                        'have to check manually.')
++        return mutable_api_response
+     except (ApiException, HTTPError) as exc:
+         if isinstance(exc, ApiException) and exc.status == 404:
+             return None
+diff --git a/tests/unit/modules/test_kubernetes.py b/tests/unit/modules/test_kubernetes.py
+index 3357cad2df..493822a93c 100644
+--- a/tests/unit/modules/test_kubernetes.py
++++ b/tests/unit/modules/test_kubernetes.py
+@@ -94,19 +94,20 @@ class KubernetesTestCase(TestCase):
+ 
+     def test_delete_deployments(self):
+         '''
+-        Tests deployment creation.
++        Tests deployment deletion
+         :return:
+         '''
+         with patch('salt.modules.kubernetes.kubernetes') as mock_kubernetes_lib:
+-            with patch.dict(kubernetes.__salt__, {'config.option': Mock(return_value="")}):
+-                mock_kubernetes_lib.client.V1DeleteOptions = Mock(return_value="")
+-                mock_kubernetes_lib.client.ExtensionsV1beta1Api.return_value = Mock(
+-                    **{"delete_namespaced_deployment.return_value.to_dict.return_value": {}}
+-                )
+-                self.assertEqual(kubernetes.delete_deployment("test"), {})
+-                self.assertTrue(
+-                    kubernetes.kubernetes.client.ExtensionsV1beta1Api().
+-                    delete_namespaced_deployment().to_dict.called)
++            with patch('salt.modules.kubernetes.show_deployment', Mock(return_value=None)):
++                with patch.dict(kubernetes.__salt__, {'config.option': Mock(return_value="")}):
++                    mock_kubernetes_lib.client.V1DeleteOptions = Mock(return_value="")
++                    mock_kubernetes_lib.client.ExtensionsV1beta1Api.return_value = Mock(
++                        **{"delete_namespaced_deployment.return_value.to_dict.return_value": {'code': ''}}
++                    )
++                    self.assertEqual(kubernetes.delete_deployment("test"), {'code': 200})
++                    self.assertTrue(
++                        kubernetes.kubernetes.client.ExtensionsV1beta1Api().
++                        delete_namespaced_deployment().to_dict.called)
+ 
+     def test_create_deployments(self):
+         '''
+-- 
+2.13.5
+
+

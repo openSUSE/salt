@@ -1,0 +1,804 @@
+From b08fb8338e171d230e1c0e90611a7ee732931457 Mon Sep 17 00:00:00 2001
+From: Silvio Moioli <smoioli@suse.de>
+Date: Thu, 13 Jul 2017 15:59:01 +0200
+Subject: [PATCH] list_pkgs: add parameter for returned attribute
+ selection (bsc#1052264)
+
+zypper.list_pkgs:
+  * It adds a new optional parameter to list_pkg in the zypper module to return more data than the version (original reason is that for SUSE Manager integration we also need arch and install_date). Format is the same of existing method info_installed.
+
+yumpkg.list_pkgs:
+  * It adds a new optional parameter to list_pkg, originally added to the the zypper module via PR #42310, to yumpkg providing the same functionality and interface to the yum package manager.
+---
+ salt/modules/pkg_resource.py      |  41 ++++++++
+ salt/modules/yumpkg.py            | 102 +++++++++++++++-----
+ salt/modules/zypper.py            |  94 ++++++++++++++-----
+ salt/utils/pkg/rpm.py             |  22 +++--
+ tests/unit/modules/test_yumpkg.py | 190 ++++++++++++++++++++++++++++++++++++++
+ tests/unit/modules/zypper_test.py | 105 ++++++++++++++++-----
+ 6 files changed, 481 insertions(+), 73 deletions(-)
+ create mode 100644 tests/unit/modules/test_yumpkg.py
+
+diff --git a/salt/modules/pkg_resource.py b/salt/modules/pkg_resource.py
+index ad0f0ffc76..c8cb82ca20 100644
+--- a/salt/modules/pkg_resource.py
++++ b/salt/modules/pkg_resource.py
+@@ -5,6 +5,7 @@ Resources needed by pkg providers
+ 
+ # Import python libs
+ from __future__ import absolute_import
++import copy
+ import fnmatch
+ import logging
+ import os
+@@ -298,3 +299,43 @@ def check_extra_requirements(pkgname, pkgver):
+         return __salt__['pkg.check_extra_requirements'](pkgname, pkgver)
+ 
+     return True
++
++
++def format_pkg_list(packages, versions_as_list, attr):
++    '''
++    Formats packages according to parameters for list_pkgs.
++    '''
++    ret = copy.deepcopy(packages)
++    if attr:
++        requested_attr = set(['epoch', 'version', 'release', 'arch',
++                              'install_date', 'install_date_time_t'])
++
++        if attr != 'all':
++            requested_attr &= set(attr + ['version'])
++
++        for name in ret:
++            versions = []
++            for all_attr in ret[name]:
++                filtered_attr = {}
++                for key in requested_attr:
++                    if all_attr[key]:
++                        filtered_attr[key] = all_attr[key]
++                versions.append(filtered_attr)
++            ret[name] = versions
++        return ret
++
++    for name in ret:
++        ret[name] = [format_version(d['epoch'], d['version'], d['release'])
++                     for d in ret[name]]
++    if not versions_as_list:
++        stringify(ret)
++    return ret
++
++def format_version(epoch, version, release):
++    '''
++    Formats a version string for list_pkgs.
++    '''
++    full_version = '{0}:{1}'.format(epoch, version) if epoch else version
++    if release:
++        full_version += '-{0}'.format(release)
++    return full_version
+diff --git a/salt/modules/yumpkg.py b/salt/modules/yumpkg.py
+index 690d0c4e3a..556a3b5c31 100644
+--- a/salt/modules/yumpkg.py
++++ b/salt/modules/yumpkg.py
+@@ -17,7 +17,6 @@ Support for YUM/DNF
+ # Import python libs
+ from __future__ import absolute_import
+ import contextlib
+-import copy
+ import datetime
+ import fnmatch
+ import itertools
+@@ -567,15 +566,35 @@ def version_cmp(pkg1, pkg2, ignore_epoch=False):
+ 
+ def list_pkgs(versions_as_list=False, **kwargs):
+     '''
+-    List the packages currently installed in a dict::
++    List the packages currently installed as a dict. By default, the dict
++    contains versions as a comma separated string::
+ 
+-        {'<package_name>': '<version>'}
++        {'<package_name>': '<version>[,<version>...]'}
++
++    versions_as_list:
++        If set to true, the versions are provided as a list
++
++        {'<package_name>': ['<version>', '<version>']}
++
++    attr:
++        If a list of package attributes is specified, returned value will
++        contain them in addition to version, eg.::
++
++        {'<package_name>': [{'version' : 'version', 'arch' : 'arch'}]}
++
++        Valid attributes are: ``epoch``, ``version``, ``release``, ``arch``,
++        ``install_date``, ``install_date_time_t``.
++
++        If ``all`` is specified, all valid attributes will be returned.
++
++            .. versionadded:: Oxygen
+ 
+     CLI Example:
+ 
+     .. code-block:: bash
+ 
+         salt '*' pkg.list_pkgs
++        salt '*' pkg.list_pkgs attr='["version", "arch"]'
+     '''
+     versions_as_list = salt.utils.is_true(versions_as_list)
+     # not yet implemented or not applicable
+@@ -583,17 +602,14 @@ def list_pkgs(versions_as_list=False, **kwargs):
+             for x in ('removed', 'purge_desired')]):
+         return {}
+ 
++    attr = kwargs.get("attr")
+     if 'pkg.list_pkgs' in __context__:
+-        if versions_as_list:
+-            return __context__['pkg.list_pkgs']
+-        else:
+-            ret = copy.deepcopy(__context__['pkg.list_pkgs'])
+-            __salt__['pkg_resource.stringify'](ret)
+-            return ret
++        cached = __context__['pkg.list_pkgs']
++        return __salt__['pkg_resource.format_pkg_list'](cached, versions_as_list, attr)
+ 
+     ret = {}
+     cmd = ['rpm', '-qa', '--queryformat',
+-           salt.utils.pkg.rpm.QUERYFORMAT.replace('%{REPOID}', '(none)\n')]
++           salt.utils.pkg.rpm.QUERYFORMAT.replace('%{REPOID}', '(none)') + '\n']
+     output = __salt__['cmd.run'](cmd,
+                                  python_shell=False,
+                                  output_loglevel='trace')
+@@ -603,15 +619,25 @@ def list_pkgs(versions_as_list=False, **kwargs):
+             osarch=__grains__['osarch']
+         )
+         if pkginfo is not None:
+-            __salt__['pkg_resource.add_pkg'](ret,
+-                                             pkginfo.name,
+-                                             pkginfo.version)
+-
+-    __salt__['pkg_resource.sort_pkglist'](ret)
+-    __context__['pkg.list_pkgs'] = copy.deepcopy(ret)
+-    if not versions_as_list:
+-        __salt__['pkg_resource.stringify'](ret)
+-    return ret
++            # see rpm version string rules available at https://goo.gl/UGKPNd
++            pkgver = pkginfo.version
++            epoch = ''
++            release = ''
++            if ':' in pkgver:
++                epoch, pkgver = pkgver.split(":", 1)
++            if '-' in pkgver:
++                pkgver, release = pkgver.split("-", 1)
++            all_attr = {'epoch': epoch, 'version': pkgver, 'release': release,
++                        'arch': pkginfo.arch, 'install_date': pkginfo.install_date,
++                        'install_date_time_t': pkginfo.install_date_time_t}
++            __salt__['pkg_resource.add_pkg'](ret, pkginfo.name, all_attr)
++
++    for pkgname in ret:
++        ret[pkgname] = sorted(ret[pkgname], key=lambda d: d['version'])
++
++    __context__['pkg.list_pkgs'] = ret
++
++    return __salt__['pkg_resource.format_pkg_list'](ret, versions_as_list, attr)
+ 
+ 
+ def list_repo_pkgs(*args, **kwargs):
+@@ -1079,11 +1105,42 @@ def install(name=None,
+ 
+         .. versionadded:: 2014.7.0
+ 
++    diff_attr:
++        If a list of package attributes is specified, returned value will
++        contain them, eg.::
++
++            {'<package>': {
++                'old': {
++                    'version': '<old-version>',
++                    'arch': '<old-arch>'},
++
++                'new': {
++                    'version': '<new-version>',
++                    'arch': '<new-arch>'}}}
++
++        Valid attributes are: ``epoch``, ``version``, ``release``, ``arch``,
++        ``install_date``, ``install_date_time_t``.
++
++        If ``all`` is specified, all valid attributes will be returned.
++
++        .. versionadded:: Oxygen
+ 
+     Returns a dict containing the new package names and versions::
+ 
+         {'<package>': {'old': '<old-version>',
+                        'new': '<new-version>'}}
++
++    If an attribute list in diff_attr is specified, the dict will also contain
++    any specified attribute, eg.::
++
++        {'<package>': {
++            'old': {
++                'version': '<old-version>',
++                'arch': '<old-arch>'},
++
++            'new': {
++                'version': '<new-version>',
++                'arch': '<new-arch>'}}}
+     '''
+     repo_arg = _get_repo_options(**kwargs)
+     exclude_arg = _get_excludes_option(**kwargs)
+@@ -1112,10 +1169,11 @@ def install(name=None,
+             log.warning('"version" parameter will be ignored for multiple '
+                         'package targets')
+ 
+-    old = list_pkgs(versions_as_list=False) if not downloadonly else list_downloaded()
++    diff_attr = kwargs.get("diff_attr")
++    old = list_pkgs(versions_as_list=False, attr=diff_attr) if not downloadonly else list_downloaded()
+     # Use of __context__ means no duplicate work here, just accessing
+     # information already in __context__ from the previous call to list_pkgs()
+-    old_as_list = list_pkgs(versions_as_list=True) if not downloadonly else list_downloaded()
++    old_as_list = list_pkgs(versions_as_list=True, attr=diff_attr) if not downloadonly else list_downloaded()
+ 
+     to_install = []
+     to_downgrade = []
+@@ -1398,7 +1456,7 @@ def install(name=None,
+                 errors.append(out['stdout'])
+ 
+     __context__.pop('pkg.list_pkgs', None)
+-    new = list_pkgs(versions_as_list=False) if not downloadonly else list_downloaded()
++    new = list_pkgs(versions_as_list=False, attr=diff_attr) if not downloadonly else list_downloaded()
+ 
+     ret = salt.utils.compare_dicts(old, new)
+ 
+diff --git a/salt/modules/zypper.py b/salt/modules/zypper.py
+index 58eb45a948..2299d66dbc 100644
+--- a/salt/modules/zypper.py
++++ b/salt/modules/zypper.py
+@@ -14,7 +14,6 @@ Package support for openSUSE via the zypper package manager
+ 
+ # Import python libs
+ from __future__ import absolute_import
+-import copy
+ import fnmatch
+ import logging
+ import re
+@@ -586,8 +585,8 @@ def version_cmp(ver1, ver2, ignore_epoch=False):
+ 
+ def list_pkgs(versions_as_list=False, **kwargs):
+     '''
+-    List the packages currently installed as a dict with versions
+-    as a comma separated string::
++    List the packages currently installed as a dict. By default, the dict
++    contains versions as a comma separated string::
+ 
+         {'<package_name>': '<version>[,<version>...]'}
+ 
+@@ -596,6 +595,19 @@ def list_pkgs(versions_as_list=False, **kwargs):
+ 
+         {'<package_name>': ['<version>', '<version>']}
+ 
++    attr:
++        If a list of package attributes is specified, returned value will
++        contain them in addition to version, eg.::
++
++        {'<package_name>': [{'version' : 'version', 'arch' : 'arch'}]}
++
++        Valid attributes are: ``epoch``, ``version``, ``release``, ``arch``,
++        ``install_date``, ``install_date_time_t``.
++
++        If ``all`` is specified, all valid attributes will be returned.
++
++            .. versionadded:: Oxygen
++
+     removed:
+         not supported
+ 
+@@ -607,6 +619,7 @@ def list_pkgs(versions_as_list=False, **kwargs):
+     .. code-block:: bash
+ 
+         salt '*' pkg.list_pkgs
++        salt '*' pkg.list_pkgs attr='["version", "arch"]'
+     '''
+     versions_as_list = salt.utils.is_true(versions_as_list)
+     # not yet implemented or not applicable
+@@ -614,30 +627,30 @@ def list_pkgs(versions_as_list=False, **kwargs):
+             for x in ('removed', 'purge_desired')]):
+         return {}
+ 
++    attr = kwargs.get("attr")
+     if 'pkg.list_pkgs' in __context__:
+-        if versions_as_list:
+-            return __context__['pkg.list_pkgs']
+-        else:
+-            ret = copy.deepcopy(__context__['pkg.list_pkgs'])
+-            __salt__['pkg_resource.stringify'](ret)
+-            return ret
++        cached = __context__['pkg.list_pkgs']
++        return __salt__['pkg_resource.format_pkg_list'](cached, versions_as_list, attr)
+ 
+-    cmd = ['rpm', '-qa', '--queryformat', '%{NAME}_|-%{VERSION}_|-%{RELEASE}_|-%|EPOCH?{%{EPOCH}}:{}|\\n']
++    cmd = ['rpm', '-qa', '--queryformat', (
++        "%{NAME}_|-%{VERSION}_|-%{RELEASE}_|-%{ARCH}_|-"
++        "%|EPOCH?{%{EPOCH}}:{}|_|-%{INSTALLTIME}\\n")]
+     ret = {}
+     for line in __salt__['cmd.run'](cmd, output_loglevel='trace', python_shell=False).splitlines():
+-        name, pkgver, rel, epoch = line.split('_|-')
+-        if epoch:
+-            pkgver = '{0}:{1}'.format(epoch, pkgver)
+-        if rel:
+-            pkgver += '-{0}'.format(rel)
+-        __salt__['pkg_resource.add_pkg'](ret, name, pkgver)
+-
+-    __salt__['pkg_resource.sort_pkglist'](ret)
+-    __context__['pkg.list_pkgs'] = copy.deepcopy(ret)
+-    if not versions_as_list:
+-        __salt__['pkg_resource.stringify'](ret)
++        name, pkgver, rel, arch, epoch, install_time = line.split('_|-')
++        install_date = datetime.datetime.utcfromtimestamp(int(install_time)).isoformat() + "Z"
++        install_date_time_t = int(install_time)
+ 
+-    return ret
++        all_attr = {'epoch': epoch, 'version': pkgver, 'release': rel, 'arch': arch,
++                    'install_date': install_date, 'install_date_time_t': install_date_time_t}
++        __salt__['pkg_resource.add_pkg'](ret, name, all_attr)
++
++    for pkgname in ret:
++        ret[pkgname] = sorted(ret[pkgname], key=lambda d: d['version'])
++
++    __context__['pkg.list_pkgs'] = ret
++
++    return __salt__['pkg_resource.format_pkg_list'](ret, versions_as_list, attr)
+ 
+ 
+ def _get_configured_repos():
+@@ -986,11 +999,43 @@ def install(name=None,
+         Zypper returns error code 106 if one of the repositories are not available for various reasons.
+         In case to set strict check, this parameter needs to be set to True. Default: False.
+ 
++    diff_attr:
++        If a list of package attributes is specified, returned value will
++        contain them, eg.::
++
++            {'<package>': {
++                'old': {
++                    'version': '<old-version>',
++                    'arch': '<old-arch>'},
++
++                'new': {
++                    'version': '<new-version>',
++                    'arch': '<new-arch>'}}}
++
++        Valid attributes are: ``epoch``, ``version``, ``release``, ``arch``,
++        ``install_date``, ``install_date_time_t``.
++
++        If ``all`` is specified, all valid attributes will be returned.
++
++        .. versionadded:: Oxygen
++
+ 
+     Returns a dict containing the new package names and versions::
+ 
+         {'<package>': {'old': '<old-version>',
+                        'new': '<new-version>'}}
++
++    If an attribute list is specified in ``diff_attr``, the dict will also contain
++    any specified attribute, eg.::
++
++        {'<package>': {
++            'old': {
++                'version': '<old-version>',
++                'arch': '<old-arch>'},
++
++            'new': {
++                'version': '<new-version>',
++                'arch': '<new-arch>'}}}
+     '''
+     if refresh:
+         refresh_db()
+@@ -1041,7 +1086,8 @@ def install(name=None,
+     else:
+         targets = pkg_params
+ 
+-    old = list_pkgs() if not downloadonly else list_downloaded()
++    diff_attr = kwargs.get("diff_attr")
++    old = list_pkgs(attr=diff_attr) if not downloadonly else list_downloaded()
+     downgrades = []
+     if fromrepo:
+         fromrepoopt = ['--force', '--force-resolution', '--from', fromrepo]
+@@ -1079,7 +1125,7 @@ def install(name=None,
+         __zypper__(no_repo_failure=ignore_repo_failure).call(*cmd)
+ 
+     __context__.pop('pkg.list_pkgs', None)
+-    new = list_pkgs() if not downloadonly else list_downloaded()
++    new = list_pkgs(attr=diff_attr) if not downloadonly else list_downloaded()
+     ret = salt.utils.compare_dicts(old, new)
+ 
+     if errors:
+diff --git a/salt/utils/pkg/rpm.py b/salt/utils/pkg/rpm.py
+index 9c01d5b8b8..fab4ca787b 100644
+--- a/salt/utils/pkg/rpm.py
++++ b/salt/utils/pkg/rpm.py
+@@ -6,6 +6,7 @@ Common functions for working with RPM packages
+ # Import python libs
+ from __future__ import absolute_import
+ import collections
++import datetime
+ import logging
+ 
+ # Import salt libs
+@@ -32,7 +33,7 @@ ARCHES = ARCHES_64 + ARCHES_32 + ARCHES_PPC + ARCHES_S390 + \
+     ARCHES_ALPHA + ARCHES_ARM + ARCHES_SH
+ 
+ # EPOCHNUM can't be used until RHEL5 is EOL as it is not present
+-QUERYFORMAT = '%{NAME}_|-%{EPOCH}_|-%{VERSION}_|-%{RELEASE}_|-%{ARCH}_|-%{REPOID}'
++QUERYFORMAT = '%{NAME}_|-%{EPOCH}_|-%{VERSION}_|-%{RELEASE}_|-%{ARCH}_|-%{REPOID}_|-%{INSTALLTIME}'
+ 
+ 
+ def get_osarch():
+@@ -57,15 +58,17 @@ def check_32(arch, osarch=None):
+     return all(x in ARCHES_32 for x in (osarch, arch))
+ 
+ 
+-def pkginfo(name, version, arch, repoid):
++def pkginfo(name, version, arch, repoid, install_date=None, install_date_time_t=None):
+     '''
+     Build and return a pkginfo namedtuple
+     '''
+     pkginfo_tuple = collections.namedtuple(
+         'PkgInfo',
+-        ('name', 'version', 'arch', 'repoid')
++        ('name', 'version', 'arch', 'repoid', 'install_date',
++         'install_date_time_t')
+     )
+-    return pkginfo_tuple(name, version, arch, repoid)
++    return pkginfo_tuple(name, version, arch, repoid, install_date,
++                         install_date_time_t)
+ 
+ 
+ def resolve_name(name, arch, osarch=None):
+@@ -87,7 +90,7 @@ def parse_pkginfo(line, osarch=None):
+     pkginfo namedtuple.
+     '''
+     try:
+-        name, epoch, version, release, arch, repoid = line.split('_|-')
++        name, epoch, version, release, arch, repoid, install_time = line.split('_|-')
+     # Handle unpack errors (should never happen with the queryformat we are
+     # using, but can't hurt to be careful).
+     except ValueError:
+@@ -99,4 +102,11 @@ def parse_pkginfo(line, osarch=None):
+     if epoch not in ('(none)', '0'):
+         version = ':'.join((epoch, version))
+ 
+-    return pkginfo(name, version, arch, repoid)
++    if install_time not in ('(none)', '0'):
++        install_date = datetime.datetime.utcfromtimestamp(int(install_time)).isoformat() + "Z"
++        install_date_time_t = int(install_time)
++    else:
++        install_date = None
++        install_date_time_t = None
++
++    return pkginfo(name, version, arch, repoid, install_date, install_date_time_t)
+diff --git a/tests/unit/modules/test_yumpkg.py b/tests/unit/modules/test_yumpkg.py
+new file mode 100644
+index 0000000000..574fec1bfe
+--- /dev/null
++++ b/tests/unit/modules/test_yumpkg.py
+@@ -0,0 +1,190 @@
++# -*- coding: utf-8 -*-
++
++# Import Python Libs
++from __future__ import absolute_import
++import os
++
++# Import Salt Testing Libs
++from salttesting.unit import TestCase, skipIf
++from salttesting.mock import (
++    MagicMock,
++    patch,
++    NO_MOCK,
++    NO_MOCK_REASON
++)
++
++# Import Salt libs
++import salt.modules.yumpkg as yumpkg
++import salt.modules.pkg_resource as pkg_resource
++
++# Globals
++yumpkg.__salt__ = dict()
++yumpkg.__grains__ = dict()
++yumpkg.__context__ = dict()
++
++
++@skipIf(NO_MOCK, NO_MOCK_REASON)
++class YumTestCase(TestCase):
++    '''
++    Test cases for salt.modules.yumpkg
++    '''
++
++    def test_list_pkgs(self):
++        '''
++        Test packages listing.
++
++        :return:
++        '''
++        def _add_data(data, key, value):
++            data.setdefault(key, []).append(value)
++
++        rpm_out = [
++            'python-urlgrabber_|-(none)_|-3.10_|-8.el7_|-noarch_|-(none)_|-1487838471',
++            'alsa-lib_|-(none)_|-1.1.1_|-1.el7_|-x86_64_|-(none)_|-1487838475',
++            'gnupg2_|-(none)_|-2.0.22_|-4.el7_|-x86_64_|-(none)_|-1487838477',
++            'rpm-python_|-(none)_|-4.11.3_|-21.el7_|-x86_64_|-(none)_|-1487838477',
++            'pygpgme_|-(none)_|-0.3_|-9.el7_|-x86_64_|-(none)_|-1487838478',
++            'yum_|-(none)_|-3.4.3_|-150.el7.centos_|-noarch_|-(none)_|-1487838479',
++            'lzo_|-(none)_|-2.06_|-8.el7_|-x86_64_|-(none)_|-1487838479',
++            'qrencode-libs_|-(none)_|-3.4.1_|-3.el7_|-x86_64_|-(none)_|-1487838480',
++            'ustr_|-(none)_|-1.0.4_|-16.el7_|-x86_64_|-(none)_|-1487838480',
++            'shadow-utils_|-2_|-4.1.5.1_|-24.el7_|-x86_64_|-(none)_|-1487838481',
++            'util-linux_|-(none)_|-2.23.2_|-33.el7_|-x86_64_|-(none)_|-1487838484',
++            'openssh_|-(none)_|-6.6.1p1_|-33.el7_3_|-x86_64_|-(none)_|-1487838485',
++            'virt-what_|-(none)_|-1.13_|-8.el7_|-x86_64_|-(none)_|-1487838486',
++        ]
++        with patch.dict(yumpkg.__grains__, {'osarch': 'x86_64'}), \
++             patch.dict(yumpkg.__salt__, {'cmd.run': MagicMock(return_value=os.linesep.join(rpm_out))}), \
++             patch.dict(yumpkg.__salt__, {'pkg_resource.add_pkg': _add_data}), \
++             patch.dict(yumpkg.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
++             patch.dict(yumpkg.__salt__, {'pkg_resource.stringify': MagicMock()}):
++            pkgs = yumpkg.list_pkgs(versions_as_list=True)
++            for pkg_name, pkg_version in {
++                'python-urlgrabber': '3.10-8.el7',
++                'alsa-lib': '1.1.1-1.el7',
++                'gnupg2': '2.0.22-4.el7',
++                'rpm-python': '4.11.3-21.el7',
++                'pygpgme': '0.3-9.el7',
++                'yum': '3.4.3-150.el7.centos',
++                'lzo': '2.06-8.el7',
++                'qrencode-libs': '3.4.1-3.el7',
++                'ustr': '1.0.4-16.el7',
++                'shadow-utils': '2:4.1.5.1-24.el7',
++                'util-linux': '2.23.2-33.el7',
++                'openssh': '6.6.1p1-33.el7_3',
++                'virt-what': '1.13-8.el7'}.items():
++                self.assertTrue(pkgs.get(pkg_name))
++                self.assertEqual(pkgs[pkg_name], [pkg_version])
++
++    def test_list_pkgs_with_attr(self):
++        '''
++        Test packages listing with the attr parameter
++
++        :return:
++        '''
++        def _add_data(data, key, value):
++            data.setdefault(key, []).append(value)
++
++        rpm_out = [
++            'python-urlgrabber_|-(none)_|-3.10_|-8.el7_|-noarch_|-(none)_|-1487838471',
++            'alsa-lib_|-(none)_|-1.1.1_|-1.el7_|-x86_64_|-(none)_|-1487838475',
++            'gnupg2_|-(none)_|-2.0.22_|-4.el7_|-x86_64_|-(none)_|-1487838477',
++            'rpm-python_|-(none)_|-4.11.3_|-21.el7_|-x86_64_|-(none)_|-1487838477',
++            'pygpgme_|-(none)_|-0.3_|-9.el7_|-x86_64_|-(none)_|-1487838478',
++            'yum_|-(none)_|-3.4.3_|-150.el7.centos_|-noarch_|-(none)_|-1487838479',
++            'lzo_|-(none)_|-2.06_|-8.el7_|-x86_64_|-(none)_|-1487838479',
++            'qrencode-libs_|-(none)_|-3.4.1_|-3.el7_|-x86_64_|-(none)_|-1487838480',
++            'ustr_|-(none)_|-1.0.4_|-16.el7_|-x86_64_|-(none)_|-1487838480',
++            'shadow-utils_|-2_|-4.1.5.1_|-24.el7_|-x86_64_|-(none)_|-1487838481',
++            'util-linux_|-(none)_|-2.23.2_|-33.el7_|-x86_64_|-(none)_|-1487838484',
++            'openssh_|-(none)_|-6.6.1p1_|-33.el7_3_|-x86_64_|-(none)_|-1487838485',
++            'virt-what_|-(none)_|-1.13_|-8.el7_|-x86_64_|-(none)_|-1487838486',
++        ]
++        with patch.dict(yumpkg.__grains__, {'osarch': 'x86_64'}), \
++             patch.dict(yumpkg.__salt__, {'cmd.run': MagicMock(return_value=os.linesep.join(rpm_out))}), \
++             patch.dict(yumpkg.__salt__, {'pkg_resource.add_pkg': _add_data}), \
++             patch.dict(yumpkg.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
++             patch.dict(yumpkg.__salt__, {'pkg_resource.stringify': MagicMock()}):
++            pkgs = yumpkg.list_pkgs(attr=['epoch', 'release', 'arch', 'install_date_time_t'])
++            for pkg_name, pkg_attr in {
++                'python-urlgrabber': {
++                    'version': '3.10',
++                    'release': '8.el7',
++                    'arch': 'noarch',
++                    'install_date_time_t': 1487838471,
++                },
++                'alsa-lib': {
++                    'version': '1.1.1',
++                    'release': '1.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838475,
++                },
++                'gnupg2': {
++                    'version': '2.0.22',
++                    'release': '4.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838477,
++                },
++                'rpm-python': {
++                    'version': '4.11.3',
++                    'release': '21.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838477,
++                },
++                'pygpgme': {
++                    'version': '0.3',
++                    'release': '9.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838478,
++                },
++                'yum': {
++                    'version': '3.4.3',
++                    'release': '150.el7.centos',
++                    'arch': 'noarch',
++                    'install_date_time_t': 1487838479,
++                },
++                'lzo': {
++                    'version': '2.06',
++                    'release': '8.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838479,
++                },
++                'qrencode-libs': {
++                    'version': '3.4.1',
++                    'release': '3.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838480,
++                },
++                'ustr': {
++                    'version': '1.0.4',
++                    'release': '16.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838480,
++                },
++                'shadow-utils': {
++                    'epoch': '2',
++                    'version': '4.1.5.1',
++                    'release': '24.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838481,
++                },
++                'util-linux': {
++                    'version': '2.23.2',
++                    'release': '33.el7',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838484,
++                },
++                'openssh': {
++                    'version': '6.6.1p1',
++                    'release': '33.el7_3',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1487838485,
++                },
++                'virt-what': {
++                    'version': '1.13',
++                    'release': '8.el7',
++                    'install_date_time_t': 1487838486,
++                    'arch': 'x86_64',
++                }}.items():
++                self.assertTrue(pkgs.get(pkg_name))
++                self.assertEqual(pkgs[pkg_name], [pkg_attr])
+diff --git a/tests/unit/modules/zypper_test.py b/tests/unit/modules/zypper_test.py
+index c9d44d102c..be09d16f47 100644
+--- a/tests/unit/modules/zypper_test.py
++++ b/tests/unit/modules/zypper_test.py
+@@ -22,6 +22,7 @@ from salttesting.mock import (
+ ensure_in_syspath('../../')
+ 
+ # Import Salt libs
++import salt.modules.pkg_resource as pkg_resource
+ from salt.exceptions import CommandExecutionError
+ from salt.ext.six.moves import configparser
+ import salt.ext.six as six
+@@ -437,30 +438,92 @@ Repository 'DUMMY' not found by its alias, number, or URI.
+         :return:
+         '''
+         def _add_data(data, key, value):
+-            data[key] = value
++            data.setdefault(key, []).append(value)
+ 
+         rpm_out = [
+-            'protobuf-java_|-2.6.1_|-3.1.develHead_|-',
+-            'yast2-ftp-server_|-3.1.8_|-8.1_|-',
+-            'jose4j_|-0.4.4_|-2.1.develHead_|-',
+-            'apache-commons-cli_|-1.2_|-1.233_|-',
+-            'jakarta-commons-discovery_|-0.4_|-129.686_|-',
+-            'susemanager-build-keys-web_|-12.0_|-5.1.develHead_|-',
++            'protobuf-java_|-2.6.1_|-3.1.develHead_|-noarch_|-_|-1499257756',
++            'yast2-ftp-server_|-3.1.8_|-8.1_|-x86_64_|-_|-1499257798',
++            'jose4j_|-0.4.4_|-2.1.develHead_|-noarch_|-_|-1499257756',
++            'apache-commons-cli_|-1.2_|-1.233_|-noarch_|-_|-1498636510',
++            'jakarta-commons-discovery_|-0.4_|-129.686_|-noarch_|-_|-1498636511',
++            'susemanager-build-keys-web_|-12.0_|-5.1.develHead_|-noarch_|-_|-1498636510',
+         ]
+-        with patch.dict(zypper.__salt__, {'cmd.run': MagicMock(return_value=os.linesep.join(rpm_out))}):
+-            with patch.dict(zypper.__salt__, {'pkg_resource.add_pkg': _add_data}):
+-                with patch.dict(zypper.__salt__, {'pkg_resource.sort_pkglist': MagicMock()}):
+-                    with patch.dict(zypper.__salt__, {'pkg_resource.stringify': MagicMock()}):
+-                        pkgs = zypper.list_pkgs()
+-                        for pkg_name, pkg_version in {
+-                            'jakarta-commons-discovery': '0.4-129.686',
+-                            'yast2-ftp-server': '3.1.8-8.1',
+-                            'protobuf-java': '2.6.1-3.1.develHead',
+-                            'susemanager-build-keys-web': '12.0-5.1.develHead',
+-                            'apache-commons-cli': '1.2-1.233',
+-                            'jose4j': '0.4.4-2.1.develHead'}.items():
+-                            self.assertTrue(pkgs.get(pkg_name))
+-                            self.assertEqual(pkgs[pkg_name], pkg_version)
++        with patch.dict(zypper.__salt__, {'cmd.run': MagicMock(return_value=os.linesep.join(rpm_out))}), \
++             patch.dict(zypper.__salt__, {'pkg_resource.add_pkg': _add_data}), \
++             patch.dict(zypper.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
++             patch.dict(zypper.__salt__, {'pkg_resource.stringify': MagicMock()}):
++            pkgs = zypper.list_pkgs(versions_as_list=True)
++            for pkg_name, pkg_version in {
++                'jakarta-commons-discovery': '0.4-129.686',
++                'yast2-ftp-server': '3.1.8-8.1',
++                'protobuf-java': '2.6.1-3.1.develHead',
++                'susemanager-build-keys-web': '12.0-5.1.develHead',
++                'apache-commons-cli': '1.2-1.233',
++                'jose4j': '0.4.4-2.1.develHead'}.items():
++                self.assertTrue(pkgs.get(pkg_name))
++                self.assertEqual(pkgs[pkg_name], [pkg_version])
++
++    def test_list_pkgs_with_attr(self):
++        '''
++        Test packages listing with the attr parameter
++
++        :return:
++        '''
++        def _add_data(data, key, value):
++            data.setdefault(key, []).append(value)
++
++        rpm_out = [
++            'protobuf-java_|-2.6.1_|-3.1.develHead_|-noarch_|-_|-1499257756',
++            'yast2-ftp-server_|-3.1.8_|-8.1_|-x86_64_|-_|-1499257798',
++            'jose4j_|-0.4.4_|-2.1.develHead_|-noarch_|-_|-1499257756',
++            'apache-commons-cli_|-1.2_|-1.233_|-noarch_|-_|-1498636510',
++            'jakarta-commons-discovery_|-0.4_|-129.686_|-noarch_|-_|-1498636511',
++            'susemanager-build-keys-web_|-12.0_|-5.1.develHead_|-noarch_|-_|-1498636510',
++        ]
++        with patch.dict(zypper.__salt__, {'cmd.run': MagicMock(return_value=os.linesep.join(rpm_out))}), \
++             patch.dict(zypper.__salt__, {'pkg_resource.add_pkg': _add_data}), \
++             patch.dict(zypper.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
++             patch.dict(zypper.__salt__, {'pkg_resource.stringify': MagicMock()}):
++            pkgs = zypper.list_pkgs(attr=['epoch', 'release', 'arch', 'install_date_time_t'])
++            for pkg_name, pkg_attr in {
++                'jakarta-commons-discovery': {
++                    'version': '0.4',
++                    'release': '129.686',
++                    'arch': 'noarch',
++                    'install_date_time_t': 1498636511,
++                },
++                'yast2-ftp-server': {
++                    'version': '3.1.8',
++                    'release': '8.1',
++                    'arch': 'x86_64',
++                    'install_date_time_t': 1499257798,
++                },
++                'protobuf-java': {
++                    'version': '2.6.1',
++                    'release': '3.1.develHead',
++                    'install_date_time_t': 1499257756,
++                    'arch': 'noarch',
++                },
++                'susemanager-build-keys-web': {
++                    'version': '12.0',
++                    'release': '5.1.develHead',
++                    'arch': 'noarch',
++                    'install_date_time_t': 1498636510,
++                },
++                'apache-commons-cli': {
++                    'version': '1.2',
++                    'release': '1.233',
++                    'arch': 'noarch',
++                    'install_date_time_t': 1498636510,
++                },
++                'jose4j': {
++                    'arch': 'noarch',
++                    'version': '0.4.4',
++                    'release': '2.1.develHead',
++                    'install_date_time_t': 1499257756,
++                }}.items():
++                self.assertTrue(pkgs.get(pkg_name))
++                self.assertEqual(pkgs[pkg_name], [pkg_attr])
+ 
+     def test_list_patches(self):
+         '''
+-- 
+2.13.5
+
+

@@ -1,0 +1,77 @@
+From 257e7dc14458e879844ae6dda2337b3f7fba441c Mon Sep 17 00:00:00 2001
+From: Bo Maryniuk <bo@suse.de>
+Date: Tue, 16 May 2017 12:06:51 +0200
+Subject: [PATCH] Bugfix: unable to use 127 as hostname
+
+Unit test for accepting hosts names as 127
+
+Harden to 127. IP part
+
+Add unit test for hostname can be started from 127
+---
+ salt/utils/network.py            |  4 ++--
+ tests/unit/utils/network_test.py | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+), 2 deletions(-)
+
+diff --git a/salt/utils/network.py b/salt/utils/network.py
+index 8d2e9f5fb2..036c00d430 100644
+--- a/salt/utils/network.py
++++ b/salt/utils/network.py
+@@ -95,8 +95,8 @@ def _generate_minion_id():
+         Needs to work on Python 2.6, because of collections.OrderedDict only since 2.7 version.
+         Override 'filter()' for custom filtering.
+         '''
+-        localhost_matchers = ['localhost.*', 'ip6-.*', '127.*', r'0\.0\.0\.0',
+-                              '::1.*', 'ipv6-.*', 'fe00::.*', 'fe02::.*', '1.0.0.*.ip6.arpa']
++        localhost_matchers = [r'localhost.*', r'ip6-.*', r'127[.]\d', r'0\.0\.0\.0',
++                              r'::1.*', r'ipv6-.*', r'fe00::.*', r'fe02::.*', r'1.0.0.*.ip6.arpa']
+ 
+         def append(self, p_object):
+             if p_object and p_object not in self and not self.filter(p_object):
+diff --git a/tests/unit/utils/network_test.py b/tests/unit/utils/network_test.py
+index a13492f8f8..b7eea54eb1 100644
+--- a/tests/unit/utils/network_test.py
++++ b/tests/unit/utils/network_test.py
+@@ -266,6 +266,38 @@ class NetworkTestCase(TestCase):
+         self.assertEqual(network._generate_minion_id(),
+                          ['hostname.domainname.blank', 'nodename', 'hostname', '1.2.3.4', '5.6.7.8'])
+ 
++    @patch('platform.node', MagicMock(return_value='127'))
++    @patch('socket.gethostname', MagicMock(return_value='127'))
++    @patch('socket.getfqdn', MagicMock(return_value='127.domainname.blank'))
++    @patch('socket.getaddrinfo', MagicMock(return_value=[(2, 3, 0, 'attrname', ('127.0.1.1', 0))]))
++    @patch('salt.utils.fopen', MagicMock(return_value=False))
++    @patch('os.path.exists', MagicMock(return_value=False))
++    @patch('salt.utils.network.ip_addrs', MagicMock(return_value=['1.2.3.4', '5.6.7.8']))
++    def test_generate_minion_id_127_name(self):
++        '''
++        Test if minion IDs can be named 127.foo
++
++        :return:
++        '''
++        self.assertEqual(network._generate_minion_id(),
++                         ['127.domainname.blank', '127', '1.2.3.4', '5.6.7.8'])
++
++    @patch('platform.node', MagicMock(return_value='127890'))
++    @patch('socket.gethostname', MagicMock(return_value='127890'))
++    @patch('socket.getfqdn', MagicMock(return_value='127890.domainname.blank'))
++    @patch('socket.getaddrinfo', MagicMock(return_value=[(2, 3, 0, 'attrname', ('127.0.1.1', 0))]))
++    @patch('salt.utils.fopen', MagicMock(return_value=False))
++    @patch('os.path.exists', MagicMock(return_value=False))
++    @patch('salt.utils.network.ip_addrs', MagicMock(return_value=['1.2.3.4', '5.6.7.8']))
++    def test_generate_minion_id_127_name_startswith(self):
++        '''
++        Test if minion IDs can be named starting from "127"
++
++        :return:
++        '''
++        self.assertEqual(network._generate_minion_id(),
++                         ['127890.domainname.blank', '127890', '1.2.3.4', '5.6.7.8'])
++
+     @patch('platform.node', MagicMock(return_value='hostname'))
+     @patch('socket.gethostname', MagicMock(return_value='hostname'))
+     @patch('socket.getfqdn', MagicMock(return_value='hostname'))
+-- 
+2.11.0
+
+

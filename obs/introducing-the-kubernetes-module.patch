@@ -1,0 +1,2760 @@
+From 974be23a5a42b5f05a87f107b5eea3ab70884a20 Mon Sep 17 00:00:00 2001
+From: Flavio Castelli <fcastelli@suse.com>
+Date: Mon, 20 Feb 2017 14:28:54 +0100
+Subject: [PATCH] Introducing the kubernetes module
+
+Allows interaction with a kubernetes cluster. The following functions are implemented:
+    * kubernetes.ping
+    * kubernetes.nodes
+    * kubernetes.node
+    * kubernetes.node_add_label
+    * kubernetes.node_remove_label
+    * kubernetes.namespaces
+    * kubernetes.deployments
+    * kubernetes.services
+    * kubernetes.pods
+    * kubernetes.secrets
+    * kubernetes.configmaps
+    * kubernetes.show_deployment
+    * kubernetes.show_service
+    * kubernetes.show_pod
+    * kubernetes.show_namespace
+    * kubernetes.show_secret
+    * kubernetes.show_configmap
+    * kubernetes.delete_deployment
+    * kubernetes.delete_service
+    * kubernetes.delete_pod
+    * kubernetes.delete_namespace
+    * kubernetes.delete_secret
+    * kubernetes.delete_configmap
+    * kubernetes.create_deployment
+    * kubernetes.create_pod
+    * kubernetes.create_service
+    * kubernetes.create_secret
+    * kubernetes.create_configmap
+    * kubernetes.create_namespace
+    * kubernetes.replace_deployment
+    * kubernetes.replace_service
+    * kubernetes.replace_secret
+    * kubernetes.replace_configmap
+
+Added unit tests:
+    * Node listing,
+    * deployment listing,
+    * service listing,
+    * pod listing,
+    * deployment deletion and
+    * deployment creation.
+---
+ salt/modules/kubernetes.py            | 1474 +++++++++++++++++++++++++++++++++
+ salt/states/k8s.py                    |   42 +
+ salt/states/kubernetes.py             |  989 ++++++++++++++++++++++
+ tests/unit/modules/test_kubernetes.py |  125 +++
+ 4 files changed, 2630 insertions(+)
+ create mode 100644 salt/modules/kubernetes.py
+ create mode 100644 salt/states/kubernetes.py
+ create mode 100644 tests/unit/modules/test_kubernetes.py
+
+diff --git a/salt/modules/kubernetes.py b/salt/modules/kubernetes.py
+new file mode 100644
+index 0000000000..d3d02f2e26
+--- /dev/null
++++ b/salt/modules/kubernetes.py
+@@ -0,0 +1,1474 @@
++# -*- coding: utf-8 -*-
++'''
++Module for handling kubernetes calls.
++
++:optdepends:    - kubernetes Python client
++:configuration: The k8s API settings are provided either in a pillar, in
++    the minion's config file, or in master's config file::
++
++        kubernetes.user: admin
++        kubernetes.password: verybadpass
++        kubernetes.api_url: 'http://127.0.0.1:8080'
++        kubernetes.certificate-authority-data: '...'
++        kubernetes.client-certificate-data: '....n
++        kubernetes.client-key-data: '...'
++        kubernetes.certificate-authority-file: '/path/to/ca.crt'
++        kubernetes.client-certificate-file: '/path/to/client.crt'
++        kubernetes.client-key-file: '/path/to/client.key'
++
++
++These settings can be also overrided by adding `api_url`, `api_user`,
++`api_password`, `api_certificate_authority_file`, `api_client_certificate_file`
++or `api_client_key_file` parameters when calling a function:
++
++The data format for `kubernetes.*-data` values is the same as provided in `kubeconfig`.
++It's base64 encoded certificates/keys in one line.
++
++For an item only one field should be provided. Either a `data` or a `file` entry.
++In case both are provided the `file` entry is prefered.
++
++.. code-block:: bash
++    salt '*' kubernetes.nodes api_url=http://k8s-api-server:port api_user=myuser api_password=pass
++
++'''
++
++# Import Python Futures
++from __future__ import absolute_import
++import os.path
++import base64
++import logging
++import yaml
++import tempfile
++
++from salt.exceptions import CommandExecutionError
++from salt.ext.six import iteritems
++import salt.utils
++import salt.utils.templates
++
++try:
++    import kubernetes  # pylint: disable=import-self
++    import kubernetes.client
++    from kubernetes.client.rest import ApiException
++    from urllib3.exceptions import HTTPError
++
++    HAS_LIBS = True
++except ImportError:
++    HAS_LIBS = False
++
++try:
++    # There is an API change in Kubernetes >= 2.0.0.
++    from kubernetes.client import V1beta1Deployment as AppsV1beta1Deployment
++    from kubernetes.client import V1beta1DeploymentSpec as AppsV1beta1DeploymentSpec
++except ImportError:
++    from kubernetes.client import AppsV1beta1Deployment
++    from kubernetes.client import AppsV1beta1DeploymentSpec
++
++
++log = logging.getLogger(__name__)
++
++__virtualname__ = 'kubernetes'
++
++
++def __virtual__():
++    '''
++    Check dependencies
++    '''
++    if HAS_LIBS:
++        return __virtualname__
++
++    return False, 'python kubernetes library not found'
++
++
++# pylint: disable=no-member
++def _setup_conn(**kwargs):
++    '''
++    Setup kubernetes API connection singleton
++    '''
++    host = __salt__['config.option']('kubernetes.api_url',
++                                     'http://localhost:8080')
++    username = __salt__['config.option']('kubernetes.user')
++    password = __salt__['config.option']('kubernetes.password')
++    ca_cert = __salt__['config.option']('kubernetes.certificate-authority-data')
++    client_cert = __salt__['config.option']('kubernetes.client-certificate-data')
++    client_key = __salt__['config.option']('kubernetes.client-key-data')
++    ca_cert_file = __salt__['config.option']('kubernetes.certificate-authority-file')
++    client_cert_file = __salt__['config.option']('kubernetes.client-certificate-file')
++    client_key_file = __salt__['config.option']('kubernetes.client-key-file')
++
++    # Override default API settings when settings are provided
++    if 'api_url' in kwargs:
++        host = kwargs.get('api_url')
++
++    if 'api_user' in kwargs:
++        username = kwargs.get('api_user')
++
++    if 'api_password' in kwargs:
++        password = kwargs.get('api_password')
++
++    if 'api_certificate_authority_file' in kwargs:
++        ca_cert_file = kwargs.get('api_certificate_authority_file')
++
++    if 'api_client_certificate_file' in kwargs:
++        client_cert_file = kwargs.get('api_client_certificate_file')
++
++    if 'api_client_key_file' in kwargs:
++        client_key_file = kwargs.get('api_client_key_file')
++
++    if (
++            kubernetes.client.configuration.host != host or
++            kubernetes.client.configuration.user != username or
++            kubernetes.client.configuration.password != password):
++        # Recreates API connection if settings are changed
++        kubernetes.client.configuration.__init__()
++
++    kubernetes.client.configuration.host = host
++    kubernetes.client.configuration.user = username
++    kubernetes.client.configuration.passwd = password
++
++    if ca_cert_file:
++        kubernetes.client.configuration.ssl_ca_cert = ca_cert_file
++    elif ca_cert:
++        with tempfile.NamedTemporaryFile(prefix='salt-kube-', delete=False) as ca:
++            ca.write(base64.b64decode(ca_cert))
++            kubernetes.client.configuration.ssl_ca_cert = ca.name
++    else:
++        kubernetes.client.configuration.ssl_ca_cert = None
++
++    if client_cert_file:
++        kubernetes.client.configuration.cert_file = client_cert_file
++    elif client_cert:
++        with tempfile.NamedTemporaryFile(prefix='salt-kube-', delete=False) as c:
++            c.write(base64.b64decode(client_cert))
++            kubernetes.client.configuration.cert_file = c.name
++    else:
++        kubernetes.client.configuration.cert_file = None
++
++    if client_key_file:
++        kubernetes.client.configuration.key_file = client_key_file
++    if client_key:
++        with tempfile.NamedTemporaryFile(prefix='salt-kube-', delete=False) as k:
++            k.write(base64.b64decode(client_key))
++            kubernetes.client.configuration.key_file = k.name
++    else:
++        kubernetes.client.configuration.key_file = None
++
++
++def _cleanup(**kwargs):
++    ca = kubernetes.client.configuration.ssl_ca_cert
++    cert = kubernetes.client.configuration.cert_file
++    key = kubernetes.client.configuration.key_file
++    if cert and os.path.exists(cert) and os.path.basename(cert).startswith('salt-kube-'):
++        salt.utils.safe_rm(cert)
++    if key and os.path.exists(key) and os.path.basename(key).startswith('salt-kube-'):
++        salt.utils.safe_rm(key)
++    if ca and os.path.exists(ca) and os.path.basename(ca).startswith('salt-kube-'):
++        salt.utils.safe_rm(ca)
++
++
++def ping(**kwargs):
++    '''
++    Checks connections with the kubernetes API server.
++    Returns True if the connection can be established, False otherwise.
++
++    CLI Example:
++        salt '*' kubernetes.ping
++    '''
++    status = True
++    try:
++        nodes(**kwargs)
++    except CommandExecutionError:
++        status = False
++
++    return status
++
++
++def nodes(**kwargs):
++    '''
++    Return the names of the nodes composing the kubernetes cluster
++
++    CLI Examples::
++
++        salt '*' kubernetes.nodes
++        salt '*' kubernetes.nodes api_url=http://myhost:port api_user=my-user
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.list_node()
++
++        return [k8s_node['metadata']['name'] for k8s_node in api_response.to_dict().get('items')]
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling CoreV1Api->list_node: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def node(name, **kwargs):
++    '''
++    Return the details of the node identified by the specified name
++
++    CLI Examples::
++
++        salt '*' kubernetes.node name='minikube'
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.list_node()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling CoreV1Api->list_node: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++    for k8s_node in api_response.items:
++        if k8s_node.metadata.name == name:
++            return k8s_node.to_dict()
++
++    return None
++
++
++def node_labels(name, **kwargs):
++    '''
++    Return the labels of the node identified by the specified name
++
++    CLI Examples::
++
++        salt '*' kubernetes.node_labels name="minikube"
++    '''
++    match = node(name, **kwargs)
++
++    if match is not None:
++        return match.metadata.labels
++
++    return {}
++
++
++def node_add_label(node_name, label_name, label_value, **kwargs):
++    '''
++    Set the value of the label identified by `label_name` to `label_value` on
++    the node identified by the name `node_name`.
++    Creates the lable if not present.
++
++    CLI Examples::
++
++        salt '*' kubernetes.node_add_label node_name="minikube" \
++            label_name="foo" label_value="bar"
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        body = {
++            'metadata': {
++                'labels': {
++                    label_name: label_value}
++                }
++        }
++        api_response = api_instance.patch_node(node_name, body)
++        return api_response
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling CoreV1Api->patch_node: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++    return None
++
++
++def node_remove_label(node_name, label_name, **kwargs):
++    '''
++    Removes the label identified by `label_name` from
++    the node identified by the name `node_name`.
++
++    CLI Examples::
++
++        salt '*' kubernetes.node_remove_label node_name="minikube" \
++            label_name="foo"
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        body = {
++            'metadata': {
++                'labels': {
++                    label_name: None}
++                }
++        }
++        api_response = api_instance.patch_node(node_name, body)
++        return api_response
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling CoreV1Api->patch_node: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++    return None
++
++
++def namespaces(**kwargs):
++    '''
++    Return the names of the available namespaces
++
++    CLI Examples::
++
++        salt '*' kubernetes.namespaces
++        salt '*' kubernetes.namespaces api_url=http://myhost:port api_user=my-user
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.list_namespace()
++
++        return [nms['metadata']['name'] for nms in api_response.to_dict().get('items')]
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling CoreV1Api->list_namespace: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def deployments(namespace='default', **kwargs):
++    '''
++    Return a list of kubernetes deployments defined in the namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.deployments
++        salt '*' kubernetes.deployments namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.ExtensionsV1beta1Api()
++        api_response = api_instance.list_namespaced_deployment(namespace)
++
++        return [dep['metadata']['name'] for dep in api_response.to_dict().get('items')]
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'ExtensionsV1beta1Api->list_namespaced_deployment: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def services(namespace='default', **kwargs):
++    '''
++    Return a list of kubernetes services defined in the namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.services
++        salt '*' kubernetes.services namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.list_namespaced_service(namespace)
++
++        return [srv['metadata']['name'] for srv in api_response.to_dict().get('items')]
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->list_namespaced_service: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def pods(namespace='default', **kwargs):
++    '''
++    Return a list of kubernetes pods defined in the namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.pods
++        salt '*' kubernetes.pods namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.list_namespaced_pod(namespace)
++
++        return [pod['metadata']['name'] for pod in api_response.to_dict().get('items')]
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->list_namespaced_pod: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def secrets(namespace='default', **kwargs):
++    '''
++    Return a list of kubernetes secrets defined in the namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.secrets
++        salt '*' kubernetes.secrets namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.list_namespaced_secret(namespace)
++
++        return [secret['metadata']['name'] for secret in api_response.to_dict().get('items')]
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->list_namespaced_secret: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def configmaps(namespace='default', **kwargs):
++    '''
++    Return a list of kubernetes configmaps defined in the namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.configmaps
++        salt '*' kubernetes.configmaps namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.list_namespaced_config_map(namespace)
++
++        return [secret['metadata']['name'] for secret in api_response.to_dict().get('items')]
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->list_namespaced_config_map: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def show_deployment(name, namespace='default', **kwargs):
++    '''
++    Return the kubernetes deployment defined by name and namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.show_deployment my-nginx default
++        salt '*' kubernetes.show_deployment name=my-nginx namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.ExtensionsV1beta1Api()
++        api_response = api_instance.read_namespaced_deployment(name, namespace)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'ExtensionsV1beta1Api->read_namespaced_deployment: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def show_service(name, namespace='default', **kwargs):
++    '''
++    Return the kubernetes service defined by name and namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.show_service my-nginx default
++        salt '*' kubernetes.show_service name=my-nginx namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.read_namespaced_service(name, namespace)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->read_namespaced_service: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def show_pod(name, namespace='default', **kwargs):
++    '''
++    Return POD information for a given pod name defined in the namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.show_pod guestbook-708336848-fqr2x
++        salt '*' kubernetes.show_pod guestbook-708336848-fqr2x namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.read_namespaced_pod(name, namespace)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->read_namespaced_pod: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def show_namespace(name, **kwargs):
++    '''
++    Return information for a given namespace defined by the specified name
++
++    CLI Examples::
++
++        salt '*' kubernetes.show_namespace kube-system
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.read_namespace(name)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->read_namespace: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def show_secret(name, namespace='default', decode=False, **kwargs):
++    '''
++    Return the kubernetes secret defined by name and namespace.
++    The secrets can be decoded if specified by the user. Warning: this has
++    security implications.
++
++    CLI Examples::
++
++        salt '*' kubernetes.show_secret confidential default
++        salt '*' kubernetes.show_secret name=confidential namespace=default
++        salt '*' kubernetes.show_secret name=confidential decode=True
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.read_namespaced_secret(name, namespace)
++
++        if api_response.data and (decode or decode == 'True'):
++            for key in api_response.data:
++                value = api_response.data[key]
++                api_response.data[key] = base64.b64decode(value)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->read_namespaced_secret: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def show_configmap(name, namespace='default', **kwargs):
++    '''
++    Return the kubernetes configmap defined by name and namespace.
++
++    CLI Examples::
++
++        salt '*' kubernetes.show_configmap game-config default
++        salt '*' kubernetes.show_configmap name=game-config namespace=default
++    '''
++    _setup_conn(**kwargs)
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.read_namespaced_config_map(
++            name,
++            namespace)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->read_namespaced_config_map: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def delete_deployment(name, namespace='default', **kwargs):
++    '''
++    Deletes the kubernetes deployment defined by name and namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.delete_deployment my-nginx
++        salt '*' kubernetes.delete_deployment name=my-nginx namespace=default
++    '''
++    _setup_conn(**kwargs)
++    body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
++
++    try:
++        api_instance = kubernetes.client.ExtensionsV1beta1Api()
++        api_response = api_instance.delete_namespaced_deployment(
++            name=name,
++            namespace=namespace,
++            body=body)
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'ExtensionsV1beta1Api->delete_namespaced_deployment: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def delete_service(name, namespace='default', **kwargs):
++    '''
++    Deletes the kubernetes service defined by name and namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.delete_service my-nginx default
++        salt '*' kubernetes.delete_service name=my-nginx namespace=default
++    '''
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.delete_namespaced_service(
++            name=name,
++            namespace=namespace)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling CoreV1Api->delete_namespaced_service: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def delete_pod(name, namespace='default', **kwargs):
++    '''
++    Deletes the kubernetes pod defined by name and namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.delete_pod guestbook-708336848-5nl8c default
++        salt '*' kubernetes.delete_pod name=guestbook-708336848-5nl8c namespace=default
++    '''
++    _setup_conn(**kwargs)
++    body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.delete_namespaced_pod(
++            name=name,
++            namespace=namespace,
++            body=body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->delete_namespaced_pod: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def delete_namespace(name, **kwargs):
++    '''
++    Deletes the kubernetes namespace defined by name
++
++    CLI Examples::
++
++        salt '*' kubernetes.delete_namespace salt
++        salt '*' kubernetes.delete_namespace name=salt
++    '''
++    _setup_conn(**kwargs)
++    body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.delete_namespace(name=name, body=body)
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->delete_namespace: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def delete_secret(name, namespace='default', **kwargs):
++    '''
++    Deletes the kubernetes secret defined by name and namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.delete_secret confidential default
++        salt '*' kubernetes.delete_secret name=confidential namespace=default
++    '''
++    _setup_conn(**kwargs)
++    body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.delete_namespaced_secret(
++            name=name,
++            namespace=namespace,
++            body=body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling CoreV1Api->delete_namespaced_secret: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def delete_configmap(name, namespace='default', **kwargs):
++    '''
++    Deletes the kubernetes configmap defined by name and namespace
++
++    CLI Examples::
++
++        salt '*' kubernetes.delete_configmap settings default
++        salt '*' kubernetes.delete_configmap name=settings namespace=default
++    '''
++    _setup_conn(**kwargs)
++    body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.delete_namespaced_config_map(
++            name=name,
++            namespace=namespace,
++            body=body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->delete_namespaced_config_map: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def create_deployment(
++        name,
++        namespace,
++        metadata,
++        spec,
++        source,
++        template,
++        saltenv,
++        **kwargs):
++    '''
++    Creates the kubernetes deployment as defined by the user.
++    '''
++    body = __create_object_body(
++        kind='Deployment',
++        obj_class=AppsV1beta1Deployment,
++        spec_creator=__dict_to_deployment_spec,
++        name=name,
++        namespace=namespace,
++        metadata=metadata,
++        spec=spec,
++        source=source,
++        template=template,
++        saltenv=saltenv)
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.ExtensionsV1beta1Api()
++        api_response = api_instance.create_namespaced_deployment(
++            namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'ExtensionsV1beta1Api->create_namespaced_deployment: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def create_pod(
++        name,
++        namespace,
++        metadata,
++        spec,
++        source,
++        template,
++        saltenv,
++        **kwargs):
++    '''
++    Creates the kubernetes deployment as defined by the user.
++    '''
++    body = __create_object_body(
++        kind='Pod',
++        obj_class=kubernetes.client.V1Pod,
++        spec_creator=__dict_to_pod_spec,
++        name=name,
++        namespace=namespace,
++        metadata=metadata,
++        spec=spec,
++        source=source,
++        template=template,
++        saltenv=saltenv)
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.create_namespaced_pod(
++            namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->create_namespaced_pod: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def create_service(
++        name,
++        namespace,
++        metadata,
++        spec,
++        source,
++        template,
++        saltenv,
++        **kwargs):
++    '''
++    Creates the kubernetes service as defined by the user.
++    '''
++    body = __create_object_body(
++        kind='Service',
++        obj_class=kubernetes.client.V1Service,
++        spec_creator=__dict_to_service_spec,
++        name=name,
++        namespace=namespace,
++        metadata=metadata,
++        spec=spec,
++        source=source,
++        template=template,
++        saltenv=saltenv)
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.create_namespaced_service(
++            namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->create_namespaced_service: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def create_secret(
++        name,
++        namespace,
++        data,
++        source,
++        template,
++        saltenv,
++        **kwargs):
++    '''
++    Creates the kubernetes secret as defined by the user.
++    '''
++    if source:
++        data = __read_and_render_yaml_file(source, template, saltenv)
++    elif data is None:
++        data = {}
++
++    data = __enforce_only_strings_dict(data)
++
++    # encode the secrets using base64 as required by kubernetes
++    for key in data:
++        data[key] = base64.b64encode(data[key])
++
++    body = kubernetes.client.V1Secret(
++        metadata=__dict_to_object_meta(name, namespace, {}),
++        data=data)
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.create_namespaced_secret(
++            namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->create_namespaced_secret: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def create_configmap(
++        name,
++        namespace,
++        data,
++        source,
++        template,
++        saltenv,
++        **kwargs):
++    '''
++    Creates the kubernetes configmap as defined by the user.
++    '''
++    if source:
++        data = __read_and_render_yaml_file(source, template, saltenv)
++    elif data is None:
++        data = {}
++
++    data = __enforce_only_strings_dict(data)
++
++    body = kubernetes.client.V1ConfigMap(
++        metadata=__dict_to_object_meta(name, namespace, {}),
++        data=data)
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.create_namespaced_config_map(
++            namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->create_namespaced_config_map: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def create_namespace(
++        name,
++        **kwargs):
++    '''
++    Creates a namespace with the specified name.
++
++    CLI Example:
++        salt '*' kubernetes.create_namespace salt
++        salt '*' kubernetes.create_namespace name=salt
++    '''
++
++    meta_obj = kubernetes.client.V1ObjectMeta(name=name)
++    body = kubernetes.client.V1Namespace(metadata=meta_obj)
++    body.metadata.name = name
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.create_namespace(body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->create_namespace: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def replace_deployment(name,
++                       metadata,
++                       spec,
++                       source,
++                       template,
++                       saltenv,
++                       namespace='default',
++                       **kwargs):
++    '''
++    Replaces an existing deployment with a new one defined by name and
++    namespace, having the specificed metadata and spec.
++    '''
++    body = __create_object_body(
++        kind='Deployment',
++        obj_class=AppsV1beta1Deployment,
++        spec_creator=__dict_to_deployment_spec,
++        name=name,
++        namespace=namespace,
++        metadata=metadata,
++        spec=spec,
++        source=source,
++        template=template,
++        saltenv=saltenv)
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.ExtensionsV1beta1Api()
++        api_response = api_instance.replace_namespaced_deployment(
++            name, namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'ExtensionsV1beta1Api->replace_namespaced_deployment: '
++                '{0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def replace_service(name,
++                    metadata,
++                    spec,
++                    source,
++                    template,
++                    old_service,
++                    saltenv,
++                    namespace='default',
++                    **kwargs):
++    '''
++    Replaces an existing service with a new one defined by name and namespace,
++    having the specificed metadata and spec.
++    '''
++    body = __create_object_body(
++        kind='Service',
++        obj_class=kubernetes.client.V1Service,
++        spec_creator=__dict_to_service_spec,
++        name=name,
++        namespace=namespace,
++        metadata=metadata,
++        spec=spec,
++        source=source,
++        template=template,
++        saltenv=saltenv)
++
++    # Some attributes have to be preserved
++    # otherwise exceptions will be thrown
++    body.spec.cluster_ip = old_service['spec']['cluster_ip']
++    body.metadata.resource_version = old_service['metadata']['resource_version']
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.replace_namespaced_service(
++            name, namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->replace_namespaced_service: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def replace_secret(name,
++                   data,
++                   source,
++                   template,
++                   saltenv,
++                   namespace='default',
++                   **kwargs):
++    '''
++    Replaces an existing secret with a new one defined by name and namespace,
++    having the specificed data.
++    '''
++    if source:
++        data = __read_and_render_yaml_file(source, template, saltenv)
++    elif data is None:
++        data = {}
++
++    data = __enforce_only_strings_dict(data)
++
++    # encode the secrets using base64 as required by kubernetes
++    for key in data:
++        data[key] = base64.b64encode(data[key])
++
++    body = kubernetes.client.V1Secret(
++        metadata=__dict_to_object_meta(name, namespace, {}),
++        data=data)
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.replace_namespaced_secret(
++            name, namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->replace_namespaced_secret: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def replace_configmap(name,
++                      data,
++                      source,
++                      template,
++                      saltenv,
++                      namespace='default',
++                      **kwargs):
++    '''
++    Replaces an existing configmap with a new one defined by name and
++    namespace, having the specificed data.
++    '''
++    if source:
++        data = __read_and_render_yaml_file(source, template, saltenv)
++
++    data = __enforce_only_strings_dict(data)
++
++    body = kubernetes.client.V1ConfigMap(
++        metadata=__dict_to_object_meta(name, namespace, {}),
++        data=data)
++
++    _setup_conn(**kwargs)
++
++    try:
++        api_instance = kubernetes.client.CoreV1Api()
++        api_response = api_instance.replace_namespaced_config_map(
++            name, namespace, body)
++
++        return api_response.to_dict()
++    except (ApiException, HTTPError) as exc:
++        if isinstance(exc, ApiException) and exc.status == 404:
++            return None
++        else:
++            log.exception(
++                'Exception when calling '
++                'CoreV1Api->replace_namespaced_configmap: {0}'.format(exc)
++            )
++            raise CommandExecutionError(exc)
++    finally:
++        _cleanup()
++
++
++def __create_object_body(kind,
++                         obj_class,
++                         spec_creator,
++                         name,
++                         namespace,
++                         metadata,
++                         spec,
++                         source,
++                         template,
++                         saltenv):
++    '''
++    Create a Kubernetes Object body instance.
++    '''
++    if source:
++        src_obj = __read_and_render_yaml_file(source, template, saltenv)
++        if (
++                not isinstance(src_obj, dict) or
++                'kind' not in src_obj or
++                src_obj['kind'] != kind):
++            raise CommandExecutionError(
++                'The source file should define only '
++                'a {0} object'.format(kind))
++
++        if 'metadata' in src_obj:
++            metadata = src_obj['metadata']
++        if 'spec' in src_obj:
++            spec = src_obj['spec']
++
++    return obj_class(
++        metadata=__dict_to_object_meta(name, namespace, metadata),
++        spec=spec_creator(spec))
++
++
++def __read_and_render_yaml_file(source,
++                                template,
++                                saltenv):
++    '''
++    Read a yaml file and, if needed, renders that using the specifieds
++    templating. Returns the python objects defined inside of the file.
++    '''
++    sfn = __salt__['cp.cache_file'](source, saltenv)
++    if not sfn:
++        raise CommandExecutionError(
++            'Source file \'{0}\' not found'.format(source))
++
++    with salt.utils.fopen(sfn, 'r') as src:
++        contents = src.read()
++
++        if template:
++            if template in salt.utils.templates.TEMPLATE_REGISTRY:
++                # TODO: should we allow user to set also `context` like  # pylint: disable=fixme
++                # `file.managed` does?
++                # Apply templating
++                data = salt.utils.templates.TEMPLATE_REGISTRY[template](
++                    contents,
++                    from_str=True,
++                    to_str=True,
++                    saltenv=saltenv,
++                    grains=__grains__,
++                    pillar=__pillar__,
++                    salt=__salt__,
++                    opts=__opts__)
++
++                if not data['result']:
++                    # Failed to render the template
++                    raise CommandExecutionError(
++                        'Failed to render file path with error: '
++                        '{0}'.format(data['data'])
++                    )
++
++                contents = data['data'].encode('utf-8')
++            else:
++                raise CommandExecutionError(
++                    'Unknown template specified: {0}'.format(
++                        template))
++
++        return yaml.load(contents)
++
++
++def __dict_to_object_meta(name, namespace, metadata):
++    '''
++    Converts a dictionary into kubernetes ObjectMetaV1 instance.
++    '''
++    meta_obj = kubernetes.client.V1ObjectMeta()
++    meta_obj.namespace = namespace
++    for key, value in iteritems(metadata):
++        if hasattr(meta_obj, key):
++            setattr(meta_obj, key, value)
++
++    if meta_obj.name != name:
++        log.warning(
++            'The object already has a name attribute, overwriting it with '
++            'the one defined inside of salt')
++        meta_obj.name = name
++
++    return meta_obj
++
++
++def __dict_to_deployment_spec(spec):
++    '''
++    Converts a dictionary into kubernetes AppsV1beta1DeploymentSpec instance.
++    '''
++    spec_obj = AppsV1beta1DeploymentSpec()
++    for key, value in iteritems(spec):
++        if hasattr(spec_obj, key):
++            setattr(spec_obj, key, value)
++
++    return spec_obj
++
++
++def __dict_to_pod_spec(spec):
++    '''
++    Converts a dictionary into kubernetes V1PodSpec instance.
++    '''
++    spec_obj = kubernetes.client.V1PodSpec()
++    for key, value in iteritems(spec):
++        if hasattr(spec_obj, key):
++            setattr(spec_obj, key, value)
++
++    return spec_obj
++
++
++def __dict_to_service_spec(spec):
++    '''
++    Converts a dictionary into kubernetes V1ServiceSpec instance.
++    '''
++    spec_obj = kubernetes.client.V1ServiceSpec()
++    for key, value in iteritems(spec):  # pylint: disable=too-many-nested-blocks
++        if key == 'ports':
++            spec_obj.ports = []
++            for port in value:
++                kube_port = kubernetes.client.V1ServicePort()
++                if isinstance(port, dict):
++                    for port_key, port_value in iteritems(port):
++                        if hasattr(kube_port, port_key):
++                            setattr(kube_port, port_key, port_value)
++                else:
++                    kube_port.port = port
++                spec_obj.ports.append(kube_port)
++        elif hasattr(spec_obj, key):
++            setattr(spec_obj, key, value)
++
++    return spec_obj
++
++
++def __enforce_only_strings_dict(dictionary):
++    '''
++    Returns a dictionary that has string keys and values.
++    '''
++    ret = {}
++
++    for key, value in iteritems(dictionary):
++        ret[str(key)] = str(value)
++
++    return ret
+diff --git a/salt/states/k8s.py b/salt/states/k8s.py
+index 879843be17..9c64c558ae 100644
+--- a/salt/states/k8s.py
++++ b/salt/states/k8s.py
+@@ -25,6 +25,11 @@ Manage Kubernetes
+         - node: myothernodename
+         - apiserver: http://mykubeapiserer:8080
+ '''
++from __future__ import absolute_import
++
++# Import salt libs
++import salt.utils
++
+ 
+ __virtualname__ = 'k8s'
+ 
+@@ -42,6 +47,10 @@ def label_present(
+         node=None,
+         apiserver=None):
+     '''
++    .. deprecated:: Nitrogen
++        This state has been moved to :py:func:`kubernetes.node_label_present
++        <salt.states.kubernetes.node_label_present`.
++
+     Ensure the label exists on the kube node.
+ 
+     name
+@@ -60,6 +69,14 @@ def label_present(
+     # Use salt k8s module to set label
+     ret = __salt__['k8s.label_present'](name, value, node, apiserver)
+ 
++    msg = (
++        'The k8s.label_present state has been replaced by '
++        'kubernetes.node_label_present. Update your SLS to use the new '
++        'function name to get rid of this warning.'
++    )
++    salt.utils.warn_until('Fluorine', msg)
++    ret.setdefault('warnings', []).append(msg)
++
+     return ret
+ 
+ 
+@@ -68,6 +85,10 @@ def label_absent(
+         node=None,
+         apiserver=None):
+     '''
++    .. deprecated:: Nitrogen
++        This state has been moved to :py:func:`kubernetes.node_label_absent
++        <salt.states.kubernetes.node_label_absent`.
++
+     Ensure the label doesn't exist on the kube node.
+ 
+     name
+@@ -83,6 +104,14 @@ def label_absent(
+     # Use salt k8s module to set label
+     ret = __salt__['k8s.label_absent'](name, node, apiserver)
+ 
++    msg = (
++        'The k8s.label_absent state has been replaced by '
++        'kubernetes.node_label_absent. Update your SLS to use the new '
++        'function name to get rid of this warning.'
++    )
++    salt.utils.warn_until('Fluorine', msg)
++    ret.setdefault('warnings', []).append(msg)
++
+     return ret
+ 
+ 
+@@ -91,6 +120,10 @@ def label_folder_absent(
+         node=None,
+         apiserver=None):
+     '''
++    .. deprecated:: Nitrogen
++        This state has been moved to :py:func:`kubernetes.node_label_folder_absent
++        <salt.states.kubernetes.node_label_folder_absent`.
++
+     Ensure the label folder doesn't exist on the kube node.
+ 
+     name
+@@ -106,4 +139,13 @@ def label_folder_absent(
+     # Use salt k8s module to set label
+     ret = __salt__['k8s.folder_absent'](name, node, apiserver)
+ 
++    msg = (
++        'The k8s.label_folder_absent state has been replaced by '
++        'kubernetes.node_label_folder_absent. Update your SLS to use the new '
++        'function name to get rid of this warning.'
++
++    )
++    salt.utils.warn_until('Fluorine', msg)
++    ret.setdefault('warnings', []).append(msg)
++
+     return ret
+diff --git a/salt/states/kubernetes.py b/salt/states/kubernetes.py
+new file mode 100644
+index 0000000000..64cd451532
+--- /dev/null
++++ b/salt/states/kubernetes.py
+@@ -0,0 +1,989 @@
++# -*- coding: utf-8 -*-
++'''
++Manage kubernetes resources as salt states
++==========================================
++
++NOTE: This module requires the proper pillar values set. See
++salt.modules.kubernetes for more information.
++
++The kubernetes module is used to manage different kubernetes resources.
++
++
++.. code-block:: yaml
++
++    my-nginx:
++      kubernetes.deployment_present:
++        - namespace: default
++          metadata:
++            app: frontend
++          spec:
++            replicas: 1
++            template:
++              metadata:
++                labels:
++                  run: my-nginx
++              spec:
++                containers:
++                - name: my-nginx
++                  image: nginx
++                  ports:
++                  - containerPort: 80
++
++    my-mariadb:
++      kubernetes.deployment_absent:
++        - namespace: default
++
++    # kubernetes deployment as specified inside of
++    # a file containing the definition of the the
++    # deployment using the official kubernetes format
++    redis-master-deployment:
++      kubernetes.deployment_present:
++        - name: redis-master
++        - source: salt://k8s/redis-master-deployment.yml
++      require:
++        - pip: kubernetes-python-module
++
++    # kubernetes service as specified inside of
++    # a file containing the definition of the the
++    # service using the official kubernetes format
++    redis-master-service:
++      kubernetes.service_present:
++        - name: redis-master
++        - source: salt://k8s/redis-master-service.yml
++      require:
++        - kubernetes.deployment_present: redis-master
++
++    # kubernetes deployment as specified inside of
++    # a file containing the definition of the the
++    # deployment using the official kubernetes format
++    # plus some jinja directives
++     nginx-source-template:
++      kubernetes.deployment_present:
++        - source: salt://k8s/nginx.yml.jinja
++        - template: jinja
++      require:
++        - pip: kubernetes-python-module
++
++
++    # Kubernetes secret
++    k8s-secret:
++      kubernetes.secret_present:
++        - name: top-secret
++          data:
++            key1: value1
++            key2: value2
++            key3: value3
++'''
++from __future__ import absolute_import
++
++import copy
++import logging
++log = logging.getLogger(__name__)
++
++
++def __virtual__():
++    '''
++    Only load if the kubernetes module is available in __salt__
++    '''
++    return 'kubernetes.ping' in __salt__
++
++
++def _error(ret, err_msg):
++    '''
++    Helper function to propagate errors to
++    the end user.
++    '''
++    ret['result'] = False
++    ret['comment'] = err_msg
++    return ret
++
++
++def deployment_absent(name, namespace='default', **kwargs):
++    '''
++    Ensures that the named deployment is absent from the given namespace.
++
++    name
++        The name of the deployment
++
++    namespace
++        The name of the namespace
++    '''
++
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    deployment = __salt__['kubernetes.show_deployment'](name, namespace, **kwargs)
++
++    if deployment is None:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The deployment does not exist'
++        return ret
++
++    if __opts__['test']:
++        ret['comment'] = 'The deployment is going to be deleted'
++        ret['result'] = None
++        return ret
++
++    res = __salt__['kubernetes.delete_deployment'](name, namespace, **kwargs)
++    if res['code'] == 200:
++        ret['result'] = True
++        ret['changes'] = {
++            'kubernetes.deployment': {
++                'new': 'absent', 'old': 'present'}}
++        ret['comment'] = res['message']
++    else:
++        ret['comment'] = 'Something went wrong, response: {0}'.format(res)
++
++    return ret
++
++
++def deployment_present(
++        name,
++        namespace='default',
++        metadata=None,
++        spec=None,
++        source='',
++        template='',
++        **kwargs):
++    '''
++    Ensures that the named deployment is present inside of the specified
++    namespace with the given metadata and spec.
++    If the deployment exists it will be replaced.
++
++    name
++        The name of the deployment.
++
++    namespace
++        The namespace holding the deployment. The 'default' one is going to be
++        used unless a different one is specified.
++
++    metadata
++        The metadata of the deployment object.
++
++    spec
++        The spec of the deployment object.
++
++    source
++        A file containing the definition of the deployment (metadata and
++        spec) in the official kubernetes format.
++
++    template
++        Template engine to be used to render the source file.
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    if (metadata or spec) and source:
++        return _error(
++            ret,
++            '\'source\' cannot be used in combination with \'metadata\' or '
++            '\'spec\''
++        )
++
++    if metadata is None:
++        metadata = {}
++
++    if spec is None:
++        spec = {}
++
++    deployment = __salt__['kubernetes.show_deployment'](name, namespace, **kwargs)
++
++    if deployment is None:
++        if __opts__['test']:
++            ret['result'] = None
++            ret['comment'] = 'The deployment is going to be created'
++            return ret
++        res = __salt__['kubernetes.create_deployment'](name=name,
++                                                       namespace=namespace,
++                                                       metadata=metadata,
++                                                       spec=spec,
++                                                       source=source,
++                                                       template=template,
++                                                       saltenv=__env__,
++                                                       **kwargs)
++        ret['changes']['{0}.{1}'.format(namespace, name)] = {
++            'old': {},
++            'new': res}
++    else:
++        if __opts__['test']:
++            ret['result'] = None
++            return ret
++
++        # TODO: improve checks  # pylint: disable=fixme
++        log.info('Forcing the recreation of the deployment')
++        ret['comment'] = 'The deployment is already present. Forcing recreation'
++        res = __salt__['kubernetes.replace_deployment'](
++            name=name,
++            namespace=namespace,
++            metadata=metadata,
++            spec=spec,
++            source=source,
++            template=template,
++            saltenv=__env__,
++            **kwargs)
++
++    ret['changes'] = {
++        'metadata': metadata,
++        'spec': spec
++    }
++    ret['result'] = True
++    return ret
++
++
++def service_present(
++        name,
++        namespace='default',
++        metadata=None,
++        spec=None,
++        source='',
++        template='',
++        **kwargs):
++    '''
++    Ensures that the named service is present inside of the specified namespace
++    with the given metadata and spec.
++    If the deployment exists it will be replaced.
++
++    name
++        The name of the service.
++
++    namespace
++        The namespace holding the service. The 'default' one is going to be
++        used unless a different one is specified.
++
++    metadata
++        The metadata of the service object.
++
++    spec
++        The spec of the service object.
++
++    source
++        A file containing the definition of the service (metadata and
++        spec) in the official kubernetes format.
++
++    template
++        Template engine to be used to render the source file.
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    if (metadata or spec) and source:
++        return _error(
++            ret,
++            '\'source\' cannot be used in combination with \'metadata\' or '
++            '\'spec\''
++        )
++
++    if metadata is None:
++        metadata = {}
++
++    if spec is None:
++        spec = {}
++
++    service = __salt__['kubernetes.show_service'](name, namespace, **kwargs)
++
++    if service is None:
++        if __opts__['test']:
++            ret['result'] = None
++            ret['comment'] = 'The service is going to be created'
++            return ret
++        res = __salt__['kubernetes.create_service'](name=name,
++                                                    namespace=namespace,
++                                                    metadata=metadata,
++                                                    spec=spec,
++                                                    source=source,
++                                                    template=template,
++                                                    saltenv=__env__,
++                                                    **kwargs)
++        ret['changes']['{0}.{1}'.format(namespace, name)] = {
++            'old': {},
++            'new': res}
++    else:
++        if __opts__['test']:
++            ret['result'] = None
++            return ret
++
++        # TODO: improve checks  # pylint: disable=fixme
++        log.info('Forcing the recreation of the service')
++        ret['comment'] = 'The service is already present. Forcing recreation'
++        res = __salt__['kubernetes.replace_service'](
++            name=name,
++            namespace=namespace,
++            metadata=metadata,
++            spec=spec,
++            source=source,
++            template=template,
++            old_service=service,
++            saltenv=__env__,
++            **kwargs)
++
++    ret['changes'] = {
++        'metadata': metadata,
++        'spec': spec
++    }
++    ret['result'] = True
++    return ret
++
++
++def service_absent(name, namespace='default', **kwargs):
++    '''
++    Ensures that the named service is absent from the given namespace.
++
++    name
++        The name of the service
++
++    namespace
++        The name of the namespace
++    '''
++
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    service = __salt__['kubernetes.show_service'](name, namespace, **kwargs)
++
++    if service is None:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The service does not exist'
++        return ret
++
++    if __opts__['test']:
++        ret['comment'] = 'The service is going to be deleted'
++        ret['result'] = None
++        return ret
++
++    res = __salt__['kubernetes.delete_service'](name, namespace, **kwargs)
++    if res['code'] == 200:
++        ret['result'] = True
++        ret['changes'] = {
++            'kubernetes.service': {
++                'new': 'absent', 'old': 'present'}}
++        ret['comment'] = res['message']
++    else:
++        ret['comment'] = 'Something went wrong, response: {0}'.format(res)
++
++    return ret
++
++
++def namespace_absent(name, **kwargs):
++    '''
++    Ensures that the named namespace is absent.
++
++    name
++        The name of the namespace
++    '''
++
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    namespace = __salt__['kubernetes.show_namespace'](name, **kwargs)
++
++    if namespace is None:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The namespace does not exist'
++        return ret
++
++    if __opts__['test']:
++        ret['comment'] = 'The namespace is going to be deleted'
++        ret['result'] = None
++        return ret
++
++    res = __salt__['kubernetes.delete_namespace'](name, **kwargs)
++    if (
++            res['code'] == 200 or
++            (
++                isinstance(res['status'], str) and
++                'Terminating' in res['status']
++            ) or
++            (
++                isinstance(res['status'], dict) and
++                res['status']['phase'] == 'Terminating'
++            )):
++        ret['result'] = True
++        ret['changes'] = {
++            'kubernetes.namespace': {
++                'new': 'absent', 'old': 'present'}}
++        if res['message']:
++            ret['comment'] = res['message']
++        else:
++            ret['comment'] = 'Terminating'
++    else:
++        ret['comment'] = 'Something went wrong, response: {0}'.format(res)
++
++    return ret
++
++
++def namespace_present(name, **kwargs):
++    '''
++    Ensures that the named namespace is present.
++
++    name
++        The name of the deployment.
++
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    namespace = __salt__['kubernetes.show_namespace'](name, **kwargs)
++
++    if namespace is None:
++        if __opts__['test']:
++            ret['result'] = None
++            ret['comment'] = 'The namespace is going to be created'
++            return ret
++
++        res = __salt__['kubernetes.create_namespace'](name, **kwargs)
++        ret['changes']['namespace'] = {
++            'old': {},
++            'new': res}
++    else:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The namespace already exists'
++
++    return ret
++
++
++def secret_absent(name, namespace='default', **kwargs):
++    '''
++    Ensures that the named secret is absent from the given namespace.
++
++    name
++        The name of the secret
++
++    namespace
++        The name of the namespace
++    '''
++
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    secret = __salt__['kubernetes.show_secret'](name, namespace, **kwargs)
++
++    if secret is None:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The secret does not exist'
++        return ret
++
++    if __opts__['test']:
++        ret['comment'] = 'The secret is going to be deleted'
++        ret['result'] = None
++        return ret
++
++    __salt__['kubernetes.delete_secret'](name, namespace, **kwargs)
++
++    # As for kubernetes 1.6.4 doesn't set a code when deleting a secret
++    # The kubernetes module will raise an exception if the kubernetes
++    # server will return an error
++    ret['result'] = True
++    ret['changes'] = {
++        'kubernetes.secret': {
++            'new': 'absent', 'old': 'present'}}
++    ret['comment'] = 'Secret deleted'
++    return ret
++
++
++def secret_present(
++        name,
++        namespace='default',
++        data=None,
++        source='',
++        template='',
++        **kwargs):
++    '''
++    Ensures that the named secret is present inside of the specified namespace
++    with the given data.
++    If the secret exists it will be replaced.
++
++    name
++        The name of the secret.
++
++    namespace
++        The namespace holding the secret. The 'default' one is going to be
++        used unless a different one is specified.
++
++    data
++        The dictionary holding the secrets.
++
++    source
++        A file containing the data of the secret in plain format.
++
++    template
++        Template engine to be used to render the source file.
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    if data and source:
++        return _error(
++            ret,
++            '\'source\' cannot be used in combination with \'data\''
++        )
++
++    secret = __salt__['kubernetes.show_secret'](name, namespace, **kwargs)
++
++    if secret is None:
++        if data is None:
++            data = {}
++
++        if __opts__['test']:
++            ret['result'] = None
++            ret['comment'] = 'The secret is going to be created'
++            return ret
++        res = __salt__['kubernetes.create_secret'](name=name,
++                                                   namespace=namespace,
++                                                   data=data,
++                                                   source=source,
++                                                   template=template,
++                                                   saltenv=__env__,
++                                                   **kwargs)
++        ret['changes']['{0}.{1}'.format(namespace, name)] = {
++            'old': {},
++            'new': res}
++    else:
++        if __opts__['test']:
++            ret['result'] = None
++            return ret
++
++        # TODO: improve checks  # pylint: disable=fixme
++        log.info('Forcing the recreation of the service')
++        ret['comment'] = 'The secret is already present. Forcing recreation'
++        res = __salt__['kubernetes.replace_secret'](
++            name=name,
++            namespace=namespace,
++            data=data,
++            source=source,
++            template=template,
++            saltenv=__env__,
++            **kwargs)
++
++    ret['changes'] = {
++        # Omit values from the return. They are unencrypted
++        # and can contain sensitive data.
++        'data': res['data'].keys()
++    }
++    ret['result'] = True
++
++    return ret
++
++
++def configmap_absent(name, namespace='default', **kwargs):
++    '''
++    Ensures that the named configmap is absent from the given namespace.
++
++    name
++        The name of the configmap
++
++    namespace
++        The name of the namespace
++    '''
++
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    configmap = __salt__['kubernetes.show_configmap'](name, namespace, **kwargs)
++
++    if configmap is None:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The configmap does not exist'
++        return ret
++
++    if __opts__['test']:
++        ret['comment'] = 'The configmap is going to be deleted'
++        ret['result'] = None
++        return ret
++
++    __salt__['kubernetes.delete_configmap'](name, namespace, **kwargs)
++    # As for kubernetes 1.6.4 doesn't set a code when deleting a configmap
++    # The kubernetes module will raise an exception if the kubernetes
++    # server will return an error
++    ret['result'] = True
++    ret['changes'] = {
++        'kubernetes.configmap': {
++            'new': 'absent', 'old': 'present'}}
++    ret['comment'] = 'ConfigMap deleted'
++
++    return ret
++
++
++def configmap_present(
++        name,
++        namespace='default',
++        data=None,
++        source='',
++        template='',
++        **kwargs):
++    '''
++    Ensures that the named configmap is present inside of the specified namespace
++    with the given data.
++    If the configmap exists it will be replaced.
++
++    name
++        The name of the configmap.
++
++    namespace
++        The namespace holding the configmap. The 'default' one is going to be
++        used unless a different one is specified.
++
++    data
++        The dictionary holding the configmaps.
++
++    source
++        A file containing the data of the configmap in plain format.
++
++    template
++        Template engine to be used to render the source file.
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    if data and source:
++        return _error(
++            ret,
++            '\'source\' cannot be used in combination with \'data\''
++        )
++
++    configmap = __salt__['kubernetes.show_configmap'](name, namespace, **kwargs)
++
++    if configmap is None:
++        if __opts__['test']:
++            ret['result'] = None
++            ret['comment'] = 'The configmap is going to be created'
++            return ret
++        res = __salt__['kubernetes.create_configmap'](name=name,
++                                                      namespace=namespace,
++                                                      data=data,
++                                                      source=source,
++                                                      template=template,
++                                                      saltenv=__env__,
++                                                      **kwargs)
++        ret['changes']['{0}.{1}'.format(namespace, name)] = {
++            'old': {},
++            'new': res}
++    else:
++        if __opts__['test']:
++            ret['result'] = None
++            return ret
++
++        # TODO: improve checks  # pylint: disable=fixme
++        log.info('Forcing the recreation of the service')
++        ret['comment'] = 'The configmap is already present. Forcing recreation'
++        res = __salt__['kubernetes.replace_configmap'](
++            name=name,
++            namespace=namespace,
++            data=data,
++            source=source,
++            template=template,
++            saltenv=__env__,
++            **kwargs)
++
++    ret['changes'] = {
++        'data': res['data']
++    }
++    ret['result'] = True
++    return ret
++
++
++def pod_absent(name, namespace='default', **kwargs):
++    '''
++    Ensures that the named pod is absent from the given namespace.
++
++    name
++        The name of the pod
++
++    namespace
++        The name of the namespace
++    '''
++
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    pod = __salt__['kubernetes.show_pod'](name, namespace, **kwargs)
++
++    if pod is None:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The pod does not exist'
++        return ret
++
++    if __opts__['test']:
++        ret['comment'] = 'The pod is going to be deleted'
++        ret['result'] = None
++        return ret
++
++    res = __salt__['kubernetes.delete_pod'](name, namespace, **kwargs)
++    if res['code'] == 200 or res['code'] is None:
++        ret['result'] = True
++        ret['changes'] = {
++            'kubernetes.pod': {
++                'new': 'absent', 'old': 'present'}}
++        if res['code'] is None:
++            ret['comment'] = 'In progress'
++        else:
++            ret['comment'] = res['message']
++    else:
++        ret['comment'] = 'Something went wrong, response: {0}'.format(res)
++
++    return ret
++
++
++def pod_present(
++        name,
++        namespace='default',
++        metadata=None,
++        spec=None,
++        source='',
++        template='',
++        **kwargs):
++    '''
++    Ensures that the named pod is present inside of the specified
++    namespace with the given metadata and spec.
++    If the pod exists it will be replaced.
++
++    name
++        The name of the pod.
++
++    namespace
++        The namespace holding the pod. The 'default' one is going to be
++        used unless a different one is specified.
++
++    metadata
++        The metadata of the pod object.
++
++    spec
++        The spec of the pod object.
++
++    source
++        A file containing the definition of the pod (metadata and
++        spec) in the official kubernetes format.
++
++    template
++        Template engine to be used to render the source file.
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    if (metadata or spec) and source:
++        return _error(
++            ret,
++            '\'source\' cannot be used in combination with \'metadata\' or '
++            '\'spec\''
++        )
++
++    if metadata is None:
++        metadata = {}
++
++    if spec is None:
++        spec = {}
++
++    pod = __salt__['kubernetes.show_pod'](name, namespace, **kwargs)
++
++    if pod is None:
++        if __opts__['test']:
++            ret['result'] = None
++            ret['comment'] = 'The pod is going to be created'
++            return ret
++        res = __salt__['kubernetes.create_pod'](name=name,
++                                                namespace=namespace,
++                                                metadata=metadata,
++                                                spec=spec,
++                                                source=source,
++                                                template=template,
++                                                saltenv=__env__,
++                                                **kwargs)
++        ret['changes']['{0}.{1}'.format(namespace, name)] = {
++            'old': {},
++            'new': res}
++    else:
++        if __opts__['test']:
++            ret['result'] = None
++            return ret
++
++        # TODO: fix replace_namespaced_pod validation issues
++        ret['comment'] = 'salt is currently unable to replace a pod without ' \
++            'deleting it. Please perform the removal of the pod requiring ' \
++            'the \'pod_absent\' state if this is the desired behaviour.'
++        ret['result'] = False
++        return ret
++
++    ret['changes'] = {
++        'metadata': metadata,
++        'spec': spec
++    }
++    ret['result'] = True
++    return ret
++
++
++def node_label_absent(name, node, **kwargs):
++    '''
++    Ensures that the named label is absent from the node.
++
++    name
++        The name of the label
++
++    node
++        The name of the node
++    '''
++
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    labels = __salt__['kubernetes.node_labels'](node, **kwargs)
++
++    if name not in labels:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The label does not exist'
++        return ret
++
++    if __opts__['test']:
++        ret['comment'] = 'The label is going to be deleted'
++        ret['result'] = None
++        return ret
++
++    __salt__['kubernetes.node_remove_label'](
++        node_name=node,
++        label_name=name,
++        **kwargs)
++
++    ret['result'] = True
++    ret['changes'] = {
++        'kubernetes.node_label': {
++            'new': 'absent', 'old': 'present'}}
++    ret['comment'] = 'Label removed from node'
++
++    return ret
++
++
++def node_label_folder_absent(name, node, **kwargs):
++    '''
++    Ensures the label folder doesn't exist on the specified node.
++
++    name
++        The name of label folder
++
++    node
++        The name of the node
++    '''
++
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++    labels = __salt__['kubernetes.node_labels'](node, **kwargs)
++
++    folder = name.strip("/") + "/"
++    labels_to_drop = []
++    new_labels = []
++    for label in labels:
++        if label.startswith(folder):
++            labels_to_drop.append(label)
++        else:
++            new_labels.append(label)
++
++    if not labels_to_drop:
++        ret['result'] = True if not __opts__['test'] else None
++        ret['comment'] = 'The label folder does not exist'
++        return ret
++
++    if __opts__['test']:
++        ret['comment'] = 'The label folder is going to be deleted'
++        ret['result'] = None
++        return ret
++
++    for label in labels_to_drop:
++        __salt__['kubernetes.node_remove_label'](
++            node_name=node,
++            label_name=label,
++            **kwargs)
++
++    ret['result'] = True
++    ret['changes'] = {
++        'kubernetes.node_label_folder_absent': {
++            'new': new_labels, 'old': labels.keys()}}
++    ret['comment'] = 'Label folder removed from node'
++
++    return ret
++
++
++def node_label_present(
++        name,
++        node,
++        value,
++        **kwargs):
++    '''
++    Ensures that the named label is set on the named node
++    with the given value.
++    If the label exists it will be replaced.
++
++    name
++        The name of the label.
++
++    value
++        Value of the label.
++
++    node
++        Node to change.
++    '''
++    ret = {'name': name,
++           'changes': {},
++           'result': False,
++           'comment': ''}
++
++    labels = __salt__['kubernetes.node_labels'](node, **kwargs)
++
++    if name not in labels:
++        if __opts__['test']:
++            ret['result'] = None
++            ret['comment'] = 'The label is going to be set'
++            return ret
++        __salt__['kubernetes.node_add_label'](label_name=name,
++                                              label_value=value,
++                                              node_name=node,
++                                              **kwargs)
++    elif labels[name] == value:
++        ret['result'] = True
++        ret['comment'] = 'The label is already set and has the specified value'
++        return ret
++    else:
++        if __opts__['test']:
++            ret['result'] = None
++            return ret
++
++        ret['comment'] = 'The label is already set, changing the value'
++        __salt__['kubernetes.node_add_label'](
++            node_name=node,
++            label_name=name,
++            label_value=value,
++            **kwargs)
++
++    old_labels = copy.copy(labels)
++    labels[name] = value
++
++    ret['changes']['{0}.{1}'.format(node, name)] = {
++        'old': old_labels,
++        'new': labels}
++    ret['result'] = True
++
++    return ret
+diff --git a/tests/unit/modules/test_kubernetes.py b/tests/unit/modules/test_kubernetes.py
+new file mode 100644
+index 0000000000..3357cad2df
+--- /dev/null
++++ b/tests/unit/modules/test_kubernetes.py
+@@ -0,0 +1,125 @@
++# -*- coding: utf-8 -*-
++'''
++    :codeauthor: :email:`Jochen Breuer <jbreuer@suse.de>`
++'''
++
++# Import Python Libs
++from __future__ import absolute_import
++
++# Import Salt Testing Libs
++from salttesting import TestCase, skipIf
++from salttesting.mock import (
++    Mock,
++    patch,
++    NO_MOCK,
++    NO_MOCK_REASON
++)
++
++try:
++    from salt.modules import kubernetes
++except ImportError:
++    kubernetes = False
++
++# Globals
++kubernetes.__salt__ = dict()
++kubernetes.__grains__ = dict()
++kubernetes.__context__ = dict()
++
++
++@skipIf(NO_MOCK, NO_MOCK_REASON)
++@skipIf(kubernetes is False, "Probably Kubernetes client lib is not installed. \
++                              Skipping test_kubernetes.py")
++class KubernetesTestCase(TestCase):
++    '''
++    Test cases for salt.modules.kubernetes
++    '''
++
++    def test_nodes(self):
++        '''
++        Test node listing.
++        :return:
++        '''
++        with patch('salt.modules.kubernetes.kubernetes') as mock_kubernetes_lib:
++            with patch.dict(kubernetes.__salt__, {'config.option': Mock(return_value="")}):
++                mock_kubernetes_lib.client.CoreV1Api.return_value = Mock(
++                    **{"list_node.return_value.to_dict.return_value":
++                        {'items': [{'metadata': {'name': 'mock_node_name'}}]}}
++                )
++                self.assertEqual(kubernetes.nodes(), ['mock_node_name'])
++                self.assertTrue(kubernetes.kubernetes.client.CoreV1Api().list_node().to_dict.called)
++
++    def test_deployments(self):
++        '''
++        Tests deployment listing.
++        :return:
++        '''
++        with patch('salt.modules.kubernetes.kubernetes') as mock_kubernetes_lib:
++            with patch.dict(kubernetes.__salt__, {'config.option': Mock(return_value="")}):
++                mock_kubernetes_lib.client.ExtensionsV1beta1Api.return_value = Mock(
++                    **{"list_namespaced_deployment.return_value.to_dict.return_value":
++                        {'items': [{'metadata': {'name': 'mock_deployment_name'}}]}}
++                )
++                self.assertEqual(kubernetes.deployments(), ['mock_deployment_name'])
++                self.assertTrue(
++                    kubernetes.kubernetes.client.ExtensionsV1beta1Api().list_namespaced_deployment().to_dict.called)
++
++    def test_services(self):
++        '''
++        Tests services listing.
++        :return:
++        '''
++        with patch('salt.modules.kubernetes.kubernetes') as mock_kubernetes_lib:
++            with patch.dict(kubernetes.__salt__, {'config.option': Mock(return_value="")}):
++                mock_kubernetes_lib.client.CoreV1Api.return_value = Mock(
++                    **{"list_namespaced_service.return_value.to_dict.return_value":
++                        {'items': [{'metadata': {'name': 'mock_service_name'}}]}}
++                )
++                self.assertEqual(kubernetes.services(), ['mock_service_name'])
++                self.assertTrue(kubernetes.kubernetes.client.CoreV1Api().list_namespaced_service().to_dict.called)
++
++    def test_pods(self):
++        '''
++        Tests pods listing.
++        :return:
++        '''
++        with patch('salt.modules.kubernetes.kubernetes') as mock_kubernetes_lib:
++            with patch.dict(kubernetes.__salt__, {'config.option': Mock(return_value="")}):
++                mock_kubernetes_lib.client.CoreV1Api.return_value = Mock(
++                    **{"list_namespaced_pod.return_value.to_dict.return_value":
++                        {'items': [{'metadata': {'name': 'mock_pod_name'}}]}}
++                )
++                self.assertEqual(kubernetes.pods(), ['mock_pod_name'])
++                self.assertTrue(kubernetes.kubernetes.client.CoreV1Api().
++                                list_namespaced_pod().to_dict.called)
++
++    def test_delete_deployments(self):
++        '''
++        Tests deployment creation.
++        :return:
++        '''
++        with patch('salt.modules.kubernetes.kubernetes') as mock_kubernetes_lib:
++            with patch.dict(kubernetes.__salt__, {'config.option': Mock(return_value="")}):
++                mock_kubernetes_lib.client.V1DeleteOptions = Mock(return_value="")
++                mock_kubernetes_lib.client.ExtensionsV1beta1Api.return_value = Mock(
++                    **{"delete_namespaced_deployment.return_value.to_dict.return_value": {}}
++                )
++                self.assertEqual(kubernetes.delete_deployment("test"), {})
++                self.assertTrue(
++                    kubernetes.kubernetes.client.ExtensionsV1beta1Api().
++                    delete_namespaced_deployment().to_dict.called)
++
++    def test_create_deployments(self):
++        '''
++        Tests deployment creation.
++        :return:
++        '''
++        with patch('salt.modules.kubernetes.kubernetes') as mock_kubernetes_lib:
++            with patch.dict(kubernetes.__salt__, {'config.option': Mock(return_value="")}):
++                mock_kubernetes_lib.client.ExtensionsV1beta1Api.return_value = Mock(
++                    **{"create_namespaced_deployment.return_value.to_dict.return_value": {}}
++                )
++                self.assertEqual(kubernetes.create_deployment("test", "default", {}, {},
++                                                              None, None, None), {})
++                self.assertTrue(
++                    kubernetes.kubernetes.client.ExtensionsV1beta1Api().
++                    create_namespaced_deployment().to_dict.called)
+-- 
+2.13.5
+
+

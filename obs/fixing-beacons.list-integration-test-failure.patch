@@ -1,0 +1,26 @@
+From 9d303be7e9f856ab41bec24e6dd83a00a1a7a04e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Piotr=20Ka=C5=BAmierczak?= <me@piotrkazmierczak.com>
+Date: Wed, 3 May 2017 18:38:15 +0200
+Subject: [PATCH] fixing beacons.list integration test failure
+
+---
+ tests/integration/modules/beacons.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/integration/modules/beacons.py b/tests/integration/modules/beacons.py
+index e04aa92dd6..ee1e81b898 100644
+--- a/tests/integration/modules/beacons.py
++++ b/tests/integration/modules/beacons.py
+@@ -66,7 +66,7 @@ class BeaconsTest(integration.ModuleCase):
+ 
+     @classmethod
+     def tearDownClass(cls):
+-        if os.path.isfile(cls.beacons_config_file_path):
++        if cls.beacons_config_file_path and os.path.isfile(cls.beacons_config_file_path):
+             os.unlink(cls.beacons_config_file_path)
+ 
+     def setUp(self):
+-- 
+2.12.2
+
+

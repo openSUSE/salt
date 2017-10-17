@@ -1,0 +1,185 @@
+From eccd490094b6ac9e55de1b7526a763106c04ef72 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Pablo=20Su=C3=A1rez=20Hern=C3=A1ndez?=
+ <psuarezhernandez@suse.com>
+Date: Tue, 18 Apr 2017 16:04:14 +0100
+Subject: [PATCH] Search the entire CACHE_DIR because storage paths
+ change across versions
+
+Prevents zero length error on Python 2.6
+
+Fixes Zypper unit test
+
+Enhances pkg.list_downloaded information of a package
+
+Listing all patches instead of security ones only
+
+Adapting Zypper test to new list_downloaded output
+
+Fixes zypper test error after backporting
+
+Pylint fixes
+---
+ salt/modules/yumpkg.py            | 18 +++++++++++++-----
+ salt/modules/zypper.py            | 17 ++++++++++++-----
+ salt/states/pkg.py                |  3 ++-
+ tests/unit/modules/zypper_test.py | 20 ++++++++++++++------
+ 4 files changed, 41 insertions(+), 17 deletions(-)
+
+diff --git a/salt/modules/yumpkg.py b/salt/modules/yumpkg.py
+index f6777d770f..690d0c4e3a 100644
+--- a/salt/modules/yumpkg.py
++++ b/salt/modules/yumpkg.py
+@@ -18,8 +18,8 @@ Support for YUM/DNF
+ from __future__ import absolute_import
+ import contextlib
+ import copy
++import datetime
+ import fnmatch
+-import glob
+ import itertools
+ import logging
+ import os
+@@ -816,9 +816,17 @@ def list_downloaded():
+     CACHE_DIR = os.path.join('/var/cache/', _yum())
+ 
+     ret = {}
+-    for package_path in glob.glob(os.path.join(CACHE_DIR, '*/*/*/packages/*.rpm')):
+-        pkg_info = __salt__['lowpkg.bin_pkg_info'](package_path)
+-        ret.setdefault(pkg_info['name'], {})[pkg_info['version']] = package_path
++    for root, dirnames, filenames in os.walk(CACHE_DIR):
++        for filename in fnmatch.filter(filenames, '*.rpm'):
++            package_path = os.path.join(root, filename)
++            pkg_info = __salt__['lowpkg.bin_pkg_info'](package_path)
++            pkg_timestamp = int(os.path.getctime(package_path))
++            ret.setdefault(pkg_info['name'], {})[pkg_info['version']] = {
++                'path': package_path,
++                'size': os.path.getsize(package_path),
++                'creation_date_time_t': pkg_timestamp,
++                'creation_date_time': datetime.datetime.fromtimestamp(pkg_timestamp).isoformat(),
++            }
+     return ret
+ 
+ 
+@@ -2804,7 +2812,7 @@ def _get_patches(installed_only=False):
+     '''
+     patches = {}
+ 
+-    cmd = [_yum(), '--quiet', 'updateinfo', 'list', 'security', 'all']
++    cmd = [_yum(), '--quiet', 'updateinfo', 'list', 'all']
+     ret = __salt__['cmd.run_stdout'](
+         cmd,
+         python_shell=False
+diff --git a/salt/modules/zypper.py b/salt/modules/zypper.py
+index 60591fa71f..58eb45a948 100644
+--- a/salt/modules/zypper.py
++++ b/salt/modules/zypper.py
+@@ -15,7 +15,7 @@ Package support for openSUSE via the zypper package manager
+ # Import python libs
+ from __future__ import absolute_import
+ import copy
+-import glob
++import fnmatch
+ import logging
+ import re
+ import os
+@@ -1797,10 +1797,17 @@ def list_downloaded():
+     CACHE_DIR = '/var/cache/zypp/packages/'
+ 
+     ret = {}
+-    # Zypper storage is repository_tag/arch/package-version.rpm
+-    for package_path in glob.glob(os.path.join(CACHE_DIR, '*/*/*.rpm')):
+-        pkg_info = __salt__['lowpkg.bin_pkg_info'](package_path)
+-        ret.setdefault(pkg_info['name'], {})[pkg_info['version']] = package_path
++    for root, dirnames, filenames in os.walk(CACHE_DIR):
++        for filename in fnmatch.filter(filenames, '*.rpm'):
++            package_path = os.path.join(root, filename)
++            pkg_info = __salt__['lowpkg.bin_pkg_info'](package_path)
++            pkg_timestamp = int(os.path.getctime(package_path))
++            ret.setdefault(pkg_info['name'], {})[pkg_info['version']] = {
++                'path': package_path,
++                'size': os.path.getsize(package_path),
++                'creation_date_time_t': pkg_timestamp,
++                'creation_date_time': datetime.datetime.fromtimestamp(pkg_timestamp).isoformat(),
++            }
+     return ret
+ 
+ 
+diff --git a/salt/states/pkg.py b/salt/states/pkg.py
+index 6629630023..db67ade08e 100644
+--- a/salt/states/pkg.py
++++ b/salt/states/pkg.py
+@@ -2081,7 +2081,8 @@ def patch_installed(name, advisory_ids=None, downloadonly=None, **kwargs):
+     if not ret['changes'] and not ret['comment']:
+         status = 'downloaded' if downloadonly else 'installed'
+         ret['result'] = True
+-        ret['comment'] = 'Related packages are already {}'.format(status)
++        ret['comment'] = ('Advisory patch is not needed or related packages '
++                          'are already {0}'.format(status))
+ 
+     return ret
+ 
+diff --git a/tests/unit/modules/zypper_test.py b/tests/unit/modules/zypper_test.py
+index 39bd2e73e8..c9d44d102c 100644
+--- a/tests/unit/modules/zypper_test.py
++++ b/tests/unit/modules/zypper_test.py
+@@ -486,7 +486,10 @@ Repository 'DUMMY' not found by its alias, number, or URI.
+             self.assertEqual(len(list_patches), 3)
+             self.assertDictEqual(list_patches, PATCHES_RET)
+ 
+-    @patch('glob.glob', MagicMock(return_value=['/var/cache/zypper/packages/foo/bar/test_package.rpm']))
++    @patch('os.walk', MagicMock(return_value=[('test', 'test', 'test')]))
++    @patch('os.path.getsize', MagicMock(return_value=123456))
++    @patch('os.path.getctime', MagicMock(return_value=1234567890.123456))
++    @patch('fnmatch.filter', MagicMock(return_value=['/var/cache/zypper/packages/foo/bar/test_package.rpm']))
+     def test_list_downloaded(self):
+         '''
+         Test downloaded packages listing.
+@@ -495,7 +498,12 @@ Repository 'DUMMY' not found by its alias, number, or URI.
+         '''
+         DOWNLOADED_RET = {
+             'test-package': {
+-                '1.0': '/var/cache/zypper/packages/foo/bar/test_package.rpm'
++                '1.0': {
++                    'path': '/var/cache/zypper/packages/foo/bar/test_package.rpm',
++                    'size': 123456,
++                    'creation_date_time_t': 1234567890,
++                    'creation_date_time': '2009-02-13T23:31:30',
++                }
+             }
+         }
+ 
+@@ -530,7 +538,7 @@ Repository 'DUMMY' not found by its alias, number, or URI.
+                 self.assertEqual(zypper.download("nmap", "foo"), test_out)
+ 
+     @patch('salt.modules.zypper._systemd_scope', MagicMock(return_value=False))
+-    @patch('salt.modules.zypper.list_downloaded', MagicMock(side_effect=[{}, {'vim': {'1.1': '/foo/bar/test.rpm'}}]))
++    @patch('salt.modules.zypper.list_downloaded', MagicMock(side_effect=[{}, {'vim': {'1.1': {'path': '/foo/bar/test.rpm', 'size': 1234, 'creation_date_time_t': 1234567890, 'creation_date_time': '2009-02-13T23:31:30'}}}]))
+     def test_install_with_downloadonly(self):
+         '''
+         Test a package installation with downloadonly=True.
+@@ -548,10 +556,10 @@ Repository 'DUMMY' not found by its alias, number, or URI.
+                     '--download-only',
+                     'vim'
+                 )
+-                self.assertDictEqual(ret, {'vim': {'new': {'1.1': '/foo/bar/test.rpm'}, 'old': ''}})
++                self.assertDictEqual(ret, {'vim': {'new': {'1.1': {'path': '/foo/bar/test.rpm', 'size': 1234, 'creation_date_time_t': 1234567890, 'creation_date_time': '2009-02-13T23:31:30'}}, 'old': ''}})
+ 
+     @patch('salt.modules.zypper._systemd_scope', MagicMock(return_value=False))
+-    @patch('salt.modules.zypper.list_downloaded', MagicMock(return_value={'vim': {'1.1': '/foo/bar/test.rpm'}}))
++    @patch('salt.modules.zypper.list_downloaded', MagicMock(return_value={'vim': {'1.1': {'path': '/foo/bar/test.rpm', 'size': 1234, 'creation_date_time_t': 1234567890, 'creation_date_time': '2017-01-01T11:00:00'}}}))
+     def test_install_with_downloadonly_already_downloaded(self):
+         '''
+         Test a package installation with downloadonly=True when package is already downloaded.
+@@ -603,7 +611,7 @@ Repository 'DUMMY' not found by its alias, number, or URI.
+         '''
+         with patch.dict(zypper.__salt__, {'pkg_resource.parse_targets': MagicMock(return_value=({'SUSE-PATCH-XXX': None}, 'advisory'))}):
+             with patch('salt.modules.zypper.__zypper__.noraise.call', MagicMock()) as zypper_mock:
+-                with self.assertRaisesRegex(CommandExecutionError, '^Advisory id "SUSE-PATCH-XXX" not found$'):
++                with self.assertRaisesRegexp(CommandExecutionError, '^Advisory id "SUSE-PATCH-XXX" not found$'):
+                     zypper.install(advisory_ids=['SUSE-PATCH-XXX'])
+ 
+     def test_remove_purge(self):
+-- 
+2.12.2
+
+

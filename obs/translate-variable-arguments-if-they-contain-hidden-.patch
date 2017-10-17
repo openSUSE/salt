@@ -1,0 +1,91 @@
+From 7313bf5574a72557a6389b9a991316d0b2c6f848 Mon Sep 17 00:00:00 2001
+From: Michael Calmer <mc@suse.de>
+Date: Wed, 1 Mar 2017 15:37:04 +0100
+Subject: [PATCH] translate variable arguments if they contain hidden
+ keywords (bsc#1025896)
+
+- includes a test
+---
+ salt/states/module.py            | 30 ++++++++++++++++++++++--------
+ tests/unit/states/module_test.py | 14 ++++++++++++++
+ 2 files changed, 36 insertions(+), 8 deletions(-)
+
+diff --git a/salt/states/module.py b/salt/states/module.py
+index 6865468..adc6e12 100644
+--- a/salt/states/module.py
++++ b/salt/states/module.py
+@@ -218,16 +218,30 @@ def run(name, **kwargs):
+         ret['result'] = False
+         return ret
+ 
+-    if aspec.varargs and aspec.varargs in kwargs:
+-        varargs = kwargs.pop(aspec.varargs)
++    if aspec.varargs:
++        if aspec.varargs == 'name':
++            rarg = 'm_name'
++        elif aspec.varargs == 'fun':
++            rarg = 'm_fun'
++        elif aspec.varargs == 'names':
++            rarg = 'm_names'
++        elif aspec.varargs == 'state':
++            rarg = 'm_state'
++        elif aspec.varargs == 'saltenv':
++            rarg = 'm_saltenv'
++        else:
++            rarg = aspec.varargs
+ 
+-        if not isinstance(varargs, list):
+-            msg = "'{0}' must be a list."
+-            ret['comment'] = msg.format(aspec.varargs)
+-            ret['result'] = False
+-            return ret
++        if rarg in kwargs:
++            varargs = kwargs.pop(rarg)
++
++            if not isinstance(varargs, list):
++                msg = "'{0}' must be a list."
++                ret['comment'] = msg.format(aspec.varargs)
++                ret['result'] = False
++                return ret
+ 
+-        args.extend(varargs)
++            args.extend(varargs)
+ 
+     nkwargs = {}
+     if aspec.keywords and aspec.keywords in kwargs:
+diff --git a/tests/unit/states/module_test.py b/tests/unit/states/module_test.py
+index 0c025e3..20dda73 100644
+--- a/tests/unit/states/module_test.py
++++ b/tests/unit/states/module_test.py
+@@ -38,6 +38,10 @@ class ModuleStateTest(TestCase):
+                     varargs=None,
+                     keywords=None,
+                     defaults=False)
++    bspec = ArgSpec(args=[],
++                    varargs='names',
++                    keywords='kwargs',
++                    defaults=None)
+ 
+     def test_module_run_module_not_available(self):
+         '''
+@@ -69,6 +73,16 @@ class ModuleStateTest(TestCase):
+         comment = 'The following arguments are missing: world hello'
+         self.assertEqual(ret['comment'], comment)
+ 
++    @patch('salt.utils.args.get_function_argspec', MagicMock(return_value=bspec))
++    def test_module_run_hidden_varargs(self):
++        '''
++        Tests the return of module.run state when hidden varargs are used with
++        wrong type.
++        '''
++        ret = module.run(CMD, m_names = 'anyname')
++        comment = "'names' must be a list."
++        self.assertEqual(ret['comment'], comment)
++
+ 
+ if __name__ == '__main__':
+     from integration import run_tests
+-- 
+2.10.2
+
+

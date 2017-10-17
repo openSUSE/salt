@@ -1,0 +1,35 @@
+From b3a4df6e02568bb6e5768b825dc6646516c97d08 Mon Sep 17 00:00:00 2001
+From: Bo Maryniuk <bo@suse.de>
+Date: Mon, 17 Jul 2017 15:26:54 +0200
+Subject: [PATCH] Bugfix: Jobs scheduled to run at a future time stay
+ pending for Salt minions (bsc#1036125)
+
+---
+ salt/utils/schedule.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/salt/utils/schedule.py b/salt/utils/schedule.py
+index a1d7a12514..2d9b1b5990 100644
+--- a/salt/utils/schedule.py
++++ b/salt/utils/schedule.py
+@@ -332,6 +332,7 @@ import logging
+ import errno
+ import random
+ import yaml
++import copy
+ 
+ # Import Salt libs
+ import salt.config
+@@ -839,7 +840,7 @@ class Schedule(object):
+             if argspec.keywords:
+                 # this function accepts **kwargs, pack in the publish data
+                 for key, val in six.iteritems(ret):
+-                    kwargs['__pub_{0}'.format(key)] = val
++                    kwargs['__pub_{0}'.format(key)] = copy.deepcopy(val)
+ 
+             ret['return'] = self.functions[func](*args, **kwargs)
+ 
+-- 
+2.13.0
+
+
