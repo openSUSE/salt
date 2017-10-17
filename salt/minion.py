@@ -843,9 +843,7 @@ class MinionBase:
         # ``FunctionWrapper`` and plain-dict callers.
         _config_loader = getattr(functions, "_dunder_salt", None) or functions
         if "config.merge" in _config_loader:
-            b_conf = _config_loader["config.merge"](
-                "beacons", self.opts["beacons"], omit_opts=True
-            )
+            b_conf = _config_loader["config.merge"]("beacons", self.opts["beacons"])
             if b_conf:
                 return self.beacons.process(
                     b_conf, self.opts["grains"]
