@@ -150,6 +150,7 @@ Patch44:        escape-the-os.sep.patch
 Patch45:        bugfix-always-return-a-string-list-on-unknown-job-ta.patch
 # PATCH-FIX_UPSTREAM https://github.com/saltstack/salt/pull/44011
 Patch46:        security-fixes-cve-2017-14695-and-cve-2017-14696.patch
+# TEST
 
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildRequires:  logrotate
