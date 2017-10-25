@@ -51,10 +51,6 @@ class Beacon(object):
                 current_beacon_config = {}
                 list(map(current_beacon_config.update, config[mod]))
             elif isinstance(config[mod], dict):
-                salt.utils.warn_until(
-                    'Nitrogen',
-                    'Beacon configuration should be a list instead of a dictionary.'
-                )
                 current_beacon_config = config[mod]
 
             if 'enabled' in current_beacon_config:
