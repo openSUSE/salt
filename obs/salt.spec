@@ -150,6 +150,7 @@ Patch44:        escape-the-os.sep.patch
 Patch45:        bugfix-always-return-a-string-list-on-unknown-job-ta.patch
 # PATCH-FIX_UPSTREAM https://github.com/saltstack/salt/pull/44011
 Patch46:        security-fixes-cve-2017-14695-and-cve-2017-14696.patch
+Patch47:        Removes-Beacon-configuration-Deprecation-Warning-48.patch
 
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildRequires:  logrotate
@@ -548,6 +549,7 @@ cp %{S:5} ./.travis.yml
 %patch44 -p1
 %patch45 -p1
 %patch46 -p1
+%patch47 -p1
 
 %build
 %{__python} setup.py --salt-transport=both build
