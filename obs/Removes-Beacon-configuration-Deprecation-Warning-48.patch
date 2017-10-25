@@ -1,0 +1,42 @@
+From 3f5e4e4ad6bae3816280fb05f066487388239707 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jo=C3=A3o=20Cavalheiro?=
+ <cavalheiro@users.noreply.github.com>
+Date: Wed, 25 Oct 2017 11:05:03 +0100
+Subject: [PATCH] Removes Beacon configuration Deprecation Warning (#48)
+
+The message "DeprecationWarning: Beacon configuration should be a list
+instead of a dictionary." was shown on the console if any beacon was defined
+not using lists.
+
+This was incompatible with beacon cfg loaders, namely inotify, that was not yet
+upgraded to support this change, causing an error whenever a list definition was
+used:
+
+File "/usr/lib/python2.7/site-packages/salt/beacons/inotify.py", line 247
+TypeError: list indices must be integers, not dict.,
+On same file we can read the comment:
+"Configuration for inotify beacon should be a dict of dicts"
+
+This commit removes the deprecation message as per @isbm suggestion.
+---
+ salt/beacons/__init__.py | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/salt/beacons/__init__.py b/salt/beacons/__init__.py
+index 21b4391227..101332a3d7 100644
+--- a/salt/beacons/__init__.py
++++ b/salt/beacons/__init__.py
+@@ -51,10 +51,6 @@ class Beacon(object):
+                 current_beacon_config = {}
+                 list(map(current_beacon_config.update, config[mod]))
+             elif isinstance(config[mod], dict):
+-                salt.utils.warn_until(
+-                    'Nitrogen',
+-                    'Beacon configuration should be a list instead of a dictionary.'
+-                )
+                 current_beacon_config = config[mod]
+ 
+             if 'enabled' in current_beacon_config:
+-- 
+2.14.2
+
