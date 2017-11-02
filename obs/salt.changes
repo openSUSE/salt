@@ -1,3 +1,9 @@
+Wed Oct 25 15:55:37 UTC 2017 - mdinca@suse.de
+
+- Porting PR#48
+- Added:
+  * Removes-Beacon-configuration-Deprecation-Warning-48.patch
+
 -------------------------------------------------------------------
 Wed Oct 11 12:47:37 UTC 2017 - jbreuer@suse.de
 
