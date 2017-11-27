@@ -55,7 +55,7 @@ WATCHDOG_CRON="/etc/cron.d/salt-minion"
 
 set_watchdog() {
     if [ ! -f $WATCHDOG_CRON ]; then
-        echo -e '* * * * * root /usr/bin/salt-daemon-watcher --with-init\n' > $WATCHDOG_CRON
+        echo -e '-* * * * * root /usr/bin/salt-daemon-watcher --with-init\n' > $WATCHDOG_CRON
         # Kick the watcher for 1 minute immediately, because cron will wake up only afterwards
         /usr/bin/salt-daemon-watcher --with-init & disown
     fi
