@@ -8,6 +8,7 @@ from __future__ import absolute_import
 import logging
 import os
 import platform
+import socket
 
 # Import Salt Testing Libs
 from salttesting import TestCase, skipIf
@@ -615,6 +616,24 @@ PATCHLEVEL = 3
                     get_dns = core.dns()
                     self.assertEqual(get_dns, ret)
 
+    @skipIf(not salt.utils.is_linux(), 'System is not Linux')
+    def test_fqdns_return(self):
+        reverse_resolv_mock = [('foo.bar.baz', [], ['1.2.3.4']),
+        ('rinzler.evil-corp.com', [], ['5.6.7.8']),
+        ('foo.bar.baz', [], ['fe80::a8b2:93ff:fe00:0']),
+        ('bluesniff.foo.bar', [], ['fe80::a8b2:93ff:dead:beef'])]
+        ret = {'fqdns': ['rinzler.evil-corp.com', 'foo.bar.baz', 'bluesniff.foo.bar']}
+        self._run_fqdns_test(reverse_resolv_mock, ret)
+
+    def _run_fqdns_test(self, reverse_resolv_mock, ret):
+        with patch.object(salt.utils, 'is_windows', MagicMock(return_value=False)):
+            with patch('salt.utils.network.ip_addrs',
+            MagicMock(return_value=['1.2.3.4', '5.6.7.8'])),\
+            patch('salt.utils.network.ip_addrs6',
+            MagicMock(return_value=['fe80::a8b2:93ff:fe00:0', 'fe80::a8b2:93ff:dead:beef'])):
+                with patch.object(socket, 'gethostbyaddr', side_effect=reverse_resolv_mock):
+                    fqdns = core.fqdns()
+                    self.assertEqual(fqdns, ret)
 
 if __name__ == '__main__':
     from integration import run_tests
