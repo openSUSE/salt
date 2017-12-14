@@ -52,6 +52,7 @@ class TestModulesGrains(integration.ModuleCase):
             'cpuarch',
             'domain',
             'fqdn',
+            'fqdns',
             'gid',
             'groupname',
             'host',
