@@ -85,6 +85,7 @@ def __virtual__():
     Only make these states available if a service provider has been detected or
     assigned for this minion
     """
+    __salt__._load_all()
     if "service.start" in __salt__:
         return __virtualname__
     else:
