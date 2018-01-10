@@ -116,13 +116,23 @@ class UserTest(integration.ModuleCase,
 
     @destructiveTest
     @skipIf(os.geteuid() != 0, 'you must be root to run this test')
-    def test_user_present_nondefault(self):
+    @requires_system_grains
+    def test_user_present_nondefault(self, grains=None):
         '''
         This is a DESTRUCTIVE TEST it creates a new user on the on the minion.
         '''
         ret = self.run_state('user.present', name='salt_test',
                              home='/var/lib/salt_test')
         self.assertSaltTrueReturn(ret)
+        ret = self.run_function('user.info', ['salt_test'])
+        self.assertReturnNonEmptySaltType(ret)
+        group_name = grp.getgrgid(ret['gid']).gr_name
+        if grains['os_family'] in ('Suse',):
+            self.assertEqual(group_name, 'users')
+        elif grains['os_family'] == 'MacOS':
+            self.assertEqual(group_name, 'staff')
+        else:
+            self.assertEqual(group_name, 'salt_test')
         self.assertTrue(os.path.isdir('/var/lib/salt_test'))
         ret = self.run_state('user.absent', name='salt_test')
         self.assertSaltTrueReturn(ret)
@@ -142,21 +152,26 @@ class UserTest(integration.ModuleCase,
         # user
         gid_from_name = False if grains['os_family'] == 'MacOS' else True
 
-        ret = self.run_state('user.present', name='salt_test',
+        ret_user_present = self.run_state('user.present', name='salt_test',
                              gid_from_name=gid_from_name, home='/var/lib/salt_test')
-        self.assertSaltTrueReturn(ret)
 
-        ret = self.run_function('user.info', ['salt_test'])
-        self.assertReturnNonEmptySaltType(ret)
-        group_name = grp.getgrgid(ret['gid']).gr_name
-
-        self.assertTrue(os.path.isdir('/var/lib/salt_test'))
-        if grains['os_family'] in ('Suse',):
-            self.assertEqual(group_name, 'users')
-        elif grains['os_family'] == 'MacOS':
-            self.assertEqual(group_name, 'staff')
+        if gid_from_name:
+            self.assertSaltFalseReturn(ret_user_present)
+            ret_user_present = ret_user_present[next(iter(ret_user_present))]
+            self.assertTrue('is not present' in ret_user_present['comment'])
         else:
-            self.assertEqual(group_name, 'salt_test')
+            self.assertSaltTrueReturn(ret_user_present)
+            ret_user_info = self.run_function('user.info', ['salt_test'])
+            self.assertReturnNonEmptySaltType(ret_user_info)
+            group_name = grp.getgrgid(ret_user_info['gid']).gr_name
+            if not salt.utils.is_darwin():
+                self.assertTrue(os.path.isdir('/var/lib/salt_test'))
+            if grains['os_family'] in ('Suse',):
+                self.assertEqual(group_name, 'users')
+            elif grains['os_family'] == 'MacOS':
+                self.assertEqual(group_name, 'staff')
+            else:
+                self.assertEqual(group_name, 'salt_test')
 
         ret = self.run_state('user.absent', name='salt_test')
         self.assertSaltTrueReturn(ret)
