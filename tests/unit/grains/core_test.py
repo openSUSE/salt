@@ -627,13 +627,11 @@ PATCHLEVEL = 3
 
     def _run_fqdns_test(self, reverse_resolv_mock, ret):
         with patch.object(salt.utils, 'is_windows', MagicMock(return_value=False)):
-            with patch('salt.utils.network.ip_addrs',
-            MagicMock(return_value=['1.2.3.4', '5.6.7.8'])),\
-            patch('salt.utils.network.ip_addrs6',
-            MagicMock(return_value=['fe80::a8b2:93ff:fe00:0', 'fe80::a8b2:93ff:dead:beef'])):
-                with patch.object(socket, 'gethostbyaddr', side_effect=reverse_resolv_mock):
-                    fqdns = core.fqdns()
-                    self.assertEqual(fqdns, ret)
+            with patch('salt.utils.network.ip_addrs', MagicMock(return_value=['1.2.3.4', '5.6.7.8'])):
+                with patch('salt.utils.network.ip_addrs6', MagicMock(return_value=['fe80::a8b2:93ff:fe00:0', 'fe80::a8b2:93ff:dead:beef'])):
+                    with patch.object(socket, 'gethostbyaddr', side_effect=reverse_resolv_mock):
+                        fqdns = core.fqdns()
+                        self.assertEqual(fqdns, ret)
 
 if __name__ == '__main__':
     from integration import run_tests

@@ -5,6 +5,7 @@
 
 # Import Python Libs
 from __future__ import absolute_import
+import sys
 
 # Import Salt Testing Libs
 from salttesting import TestCase, skipIf
@@ -15,15 +16,17 @@ from salttesting.mock import (
     NO_MOCK_REASON
 )
 
-try:
-    from salt.modules import kubernetes
-except ImportError:
+if sys.version_info < (2, 7):
     kubernetes = False
-
-# Globals
-kubernetes.__salt__ = dict()
-kubernetes.__grains__ = dict()
-kubernetes.__context__ = dict()
+else:
+    try:
+        from salt.modules import kubernetes
+        # Globals
+        kubernetes.__salt__ = dict()
+        kubernetes.__grains__ = dict()
+        kubernetes.__context__ = dict()
+    except ImportError:
+        kubernetes = False
 
 
 @skipIf(NO_MOCK, NO_MOCK_REASON)
