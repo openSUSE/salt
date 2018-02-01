@@ -335,7 +335,7 @@ def _file_lists(load, form):
                 return path.replace('\\', '/') if os.path.sep == '\\' else path
 
             for item in items:
-                abs_path = os.path.join(parent_dir, item)
+                abs_path = os.path.join(parent_dir, item.decode('utf8'))
                 log.trace('roots: Processing %s', abs_path)
                 is_link = os.path.islink(abs_path)
                 log.trace(

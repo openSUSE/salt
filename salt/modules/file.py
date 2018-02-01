@@ -4760,7 +4760,7 @@ def manage_file(name,
                 contents = os.linesep.join(
                     _splitlines_preserving_trailing_newline(contents))
             with salt.utils.fopen(tmp, 'w') as tmp_:
-                tmp_.write(str(contents))
+                tmp_.write(contents.encode('utf-8'))
 
             # Compare contents of files to know if we need to replace
             with salt.utils.fopen(tmp, 'r') as src:
@@ -4946,7 +4946,7 @@ def manage_file(name,
                 contents = os.linesep.join(
                     _splitlines_preserving_trailing_newline(contents))
             with salt.utils.fopen(tmp, 'w') as tmp_:
-                tmp_.write(str(contents))
+                tmp_.write(contents.encode('utf-8'))
             # Copy into place
             salt.utils.files.copyfile(tmp,
                                 name,

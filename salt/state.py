@@ -1307,6 +1307,8 @@ class State(object):
                         continue
                     if isinstance(arg, dict):
                         for key, val in six.iteritems(arg):
+                            if isinstance(val, unicode):
+                                val = val.encode('utf8')
                             if key == 'names':
                                 for _name in val:
                                     if _name not in names:
