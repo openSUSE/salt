@@ -1290,6 +1290,8 @@ class State(object):
                         continue
                     if isinstance(arg, dict):
                         for key, val in six.iteritems(arg):
+                            if isinstance(val, unicode):
+                                val = val.encode('utf8')
                             if key == 'names':
                                 names.update(val)
                             elif key == 'state':
