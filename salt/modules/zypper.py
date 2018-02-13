@@ -309,7 +309,7 @@ class _Zypper(object):
         if self.error_msg and not self.__no_raise and not self.__ignore_repo_failure:
             raise CommandExecutionError('Zypper command failure: {0}'.format(self.error_msg))
 
-        return self._is_xml_mode() and dom.parseString(self.__call_result['stdout']) or self.__call_result['stdout']
+        return self._is_xml_mode() and dom.parseString(self.__call_result['stdout'].encode('utf-8')) or self.__call_result['stdout']
 
 
 __zypper__ = _Zypper()
@@ -482,15 +482,6 @@ def info_installed(*names, **kwargs):
         t_nfo = dict()
         # Translate dpkg-specific keys to a common structure
         for key, value in six.iteritems(pkg_nfo):
-            if isinstance(value, six.string_types):
-                # Check, if string is encoded in a proper UTF-8
-                if six.PY3:
-                    value_ = value.encode('UTF-8', 'ignore').decode('UTF-8', 'ignore')
-                else:
-                    value_ = value.decode('UTF-8', 'ignore').encode('UTF-8', 'ignore')
-                if value != value_:
-                    value = kwargs.get('errors', 'ignore') == 'ignore' and value_ or 'N/A (invalid UTF-8)'
-                    log.error('Package %s has bad UTF-8 code in %s: %s', pkg_name, key, value)
             if key == 'source_rpm':
                 t_nfo['source'] = value
             else:
