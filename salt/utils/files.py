@@ -16,7 +16,6 @@ import stat
 import subprocess
 import tempfile
 import time
-import urllib
 
 # Import Salt libs
 import salt.utils.path
@@ -35,6 +34,9 @@ try:
 except ImportError:
     # fcntl is not available on windows
     HAS_FCNTL = False
+
+from salt.ext.six.moves.urllib.parse import quote  # pylint: disable=no-name-in-module
+
 
 log = logging.getLogger(__name__)
 
@@ -563,7 +565,7 @@ def safe_filename_leaf(file_basename):
     :codeauthor: Damon Atkins <https://github.com/damon-atkins>
     '''
     def _replace(re_obj):
-        return urllib.quote(re_obj.group(0), safe='')
+        return quote(re_obj.group(0), safe=u'')
     if not isinstance(file_basename, six.text_type):
         # the following string is not prefixed with u
         return re.sub('[\\\\:/*?"<>|]',
