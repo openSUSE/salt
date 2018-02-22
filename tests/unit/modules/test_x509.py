@@ -23,9 +23,8 @@ try:
 except ImportError as import_error:
     pytest = None
 
-from tests.support.mixins import LoaderModuleMockMixin
-from tests.support.unit import TestCase, skipIf
-from tests.support.mock import (
+from salttesting.unit import TestCase, skipIf
+from salttesting.mock import (
     patch,
     MagicMock,
     NO_MOCK,
@@ -37,7 +36,7 @@ from salt.modules import x509
 
 @skipIf(NO_MOCK, NO_MOCK_REASON)
 @skipIf(not bool(pytest), False)
-class X509TestCase(TestCase, LoaderModuleMockMixin):
+class X509TestCase(TestCase):
 
     def setup_loader_modules(self):
         return {x509: {}}
