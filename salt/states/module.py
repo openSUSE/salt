@@ -99,6 +99,7 @@ import salt.loader
 import salt.utils
 import salt.utils.jid
 from salt.ext.six.moves import range
+from salt.ext import six
 
 
 def wait(name, **kwargs):
@@ -291,6 +292,24 @@ def run(name, **kwargs):
                 ret['result'] = changes_ret.get('result', {})
             elif changes_ret.get('retcode', 0) != 0:
                 ret['result'] = False
+            # Explore dict in depth to determine if there is a
+            # 'result' key set to False which sets the global
+            # state result.
+            else:
+                ret['result'] = _get_dict_result(changes_ret)
+    return ret
+
+
+def _get_dict_result(node):
+    ret = True
+    for key, val in six.iteritems(node):
+        if key == 'result' and val is False:
+            ret = False
+            break
+        elif isinstance(val, dict):
+            ret = _get_dict_result(val)
+            if ret is False:
+                break
     return ret
 
 mod_watch = salt.utils.alias_function(run, 'mod_watch')

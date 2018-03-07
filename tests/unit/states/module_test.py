@@ -27,6 +27,57 @@ MOCK = MagicMock()
 module.__salt__ = {CMD: MOCK}
 module.__opts__ = {'test': False}
 
+STATE_APPLY_RET = {
+    'module_|-test2_|-state.apply_|-run': {
+        'comment': 'Module function state.apply executed',
+        'name': 'state.apply',
+        'start_time': '16:11:48.818932',
+        'result': False,
+        'duration': 179.439,
+        '__run_num__': 0,
+        'changes': {
+            'ret': {
+                'module_|-test3_|-state.apply_|-run': {
+                    'comment': 'Module function state.apply executed',
+                    'name': 'state.apply',
+                    'start_time': '16:11:48.904796',
+                    'result': True,
+                    'duration': 89.522,
+                    '__run_num__': 0,
+                    'changes': {
+                        'ret': {
+                            'module_|-test4_|-cmd.run_|-run': {
+                                'comment': 'Module function cmd.run executed',
+                                'name': 'cmd.run',
+                                'start_time': '16:11:48.988574',
+                                'result': True,
+                                'duration': 4.543,
+                                '__run_num__': 0,
+                                'changes': {
+                                    'ret': 'Wed Mar  7 16:11:48 CET 2018'
+                                },
+                                '__id__': 'test4'
+                            }
+                        }
+                    },
+                    '__id__': 'test3'
+                },
+                'module_|-test3_fail_|-test3_fail_|-run': {
+                    'comment': 'Module function test3_fail is not available',
+                    'name': 'test3_fail',
+                    'start_time': '16:11:48.994607',
+                    'result': False,
+                    'duration': 0.466,
+                    '__run_num__': 1,
+                    'changes': {},
+                    '__id__': 'test3_fail'
+                }
+            }
+        },
+        '__id__': 'test2'
+    }
+}
+
 
 @skipIf(NO_MOCK, NO_MOCK_REASON)
 class ModuleStateTest(TestCase):
@@ -63,6 +114,16 @@ class ModuleStateTest(TestCase):
             ret = module.run(CMD)
             comment = 'Module function {0} is set to execute'.format(CMD)
             self.assertEqual(ret['comment'], comment)
+
+    def test_run_state_apply_result_false(self):
+        '''
+        Tests the 'result' of module.run that calls state.apply execution module
+        :return:
+        '''
+        with patch.dict(module.__salt__, {"state.apply": MagicMock(return_value=STATE_APPLY_RET)}):
+            ret = module.run(**{"name": "state.apply", 'mods': 'test2'})
+            if ret['result']:
+                self.fail('module.run did not report false result: {0}'.format(ret))
 
     @patch('salt.utils.args.get_function_argspec', MagicMock(return_value=aspec))
     def test_module_run_missing_arg(self):
