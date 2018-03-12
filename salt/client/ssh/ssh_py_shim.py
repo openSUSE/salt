@@ -16,11 +16,13 @@ import sys
 import os
 import stat
 import subprocess
+import time
 
 THIN_ARCHIVE = 'salt-thin.tgz'
 EXT_ARCHIVE = 'salt-ext_mods.tgz'
 
 # Keep these in sync with salt/defaults/exitcodes.py
+EX_THIN_PYTHON_INVALID = 10
 EX_THIN_DEPLOY = 11
 EX_THIN_CHECKSUM = 12
 EX_MOD_DEPLOY = 13
@@ -28,14 +30,13 @@ EX_SCP_NOT_FOUND = 14
 EX_CANTCREAT = 73
 
 
-class OBJ(object):
+class OptionsContainer(object):
     '''
     An empty class for holding instance attribute values.
     '''
-    pass
 
 
-OPTIONS = None
+OPTIONS = OptionsContainer()
 ARGS = None
 # The below line is where OPTIONS can be redefined with internal options
 # (rather than cli arguments) when the shim is bundled by
@@ -128,7 +129,7 @@ def need_deployment():
                 os.chmod(OPTIONS.saltdir, stt.st_mode | stat.S_IWGRP | stat.S_IRGRP | stat.S_IXGRP)
             except OSError:
                 sys.stdout.write('\n\nUnable to set permissions on thin directory.\nIf sudo_user is set '
-                        'and is not root, be certain the user is in the same group\nas the login user')
+                                 'and is not root, be certain the user is in the same group\nas the login user')
                 sys.exit(1)
 
     # Delimiter emitted on stdout *only* to indicate shim message to master.
@@ -161,11 +162,15 @@ def unpack_thin(thin_path):
     old_umask = os.umask(0o077)
     tfile.extractall(path=OPTIONS.saltdir)
     tfile.close()
-    os.umask(old_umask)
+    checksum_path = os.path.normpath(os.path.join(OPTIONS.saltdir, "thin_checksum"))
+    with open(checksum_path, 'w') as chk:
+        chk.write(OPTIONS.checksum + '\n')
+    os.umask(old_umask)  # pylint: disable=blacklisted-function
     try:
         os.unlink(thin_path)
     except OSError:
         pass
+    reset_time(OPTIONS.saltdir)
 
 
 def need_ext():
@@ -199,6 +204,47 @@ def unpack_ext(ext_path):
     shutil.move(ver_path, ver_dst)
 
 
+def reset_time(path='.', amt=None):
+    '''
+    Reset atime/mtime on all files to prevent systemd swipes only part of the files in the /tmp.
+    '''
+    if not amt:
+        amt = int(time.time())
+    for fname in os.listdir(path):
+        fname = os.path.join(path, fname)
+        if os.path.isdir(fname):
+            reset_time(fname, amt=amt)
+        os.utime(fname, (amt, amt,))
+
+
+def get_executable():
+    '''
+    Find executable which matches supported python version in the thin
+    '''
+    pymap = {}
+    with open(os.path.join(OPTIONS.saltdir, 'supported-versions')) as _fp:
+        for line in _fp.readlines():
+            ns, v_maj, v_min = line.strip().split(':')
+            pymap[ns] = (int(v_maj), int(v_min))
+
+    pycmds = (sys.executable, 'python3', 'python27', 'python2.7', 'python26', 'python2.6', 'python2', 'python')
+    for py_cmd in pycmds:
+        cmd = py_cmd + ' -c  "import sys; sys.stdout.write(\'%s:%s\' % (sys.version_info[0], sys.version_info[1]))"'
+        stdout, _ = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True).communicate()
+        if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+            stdout = stdout.decode(get_system_encoding(), "replace").strip()
+        else:
+            stdout = stdout.decode(encoding=get_system_encoding(), errors="replace").strip()
+        if not stdout:
+            continue
+        c_vn = tuple([int(x) for x in stdout.split(':')])
+        for ns in pymap:
+            if c_vn[0] == pymap[ns][0] and c_vn >= pymap[ns] and os.path.exists(os.path.join(OPTIONS.saltdir, ns)):
+                return py_cmd
+
+    sys.exit(EX_THIN_PYTHON_INVALID)
+
+
 def main(argv):  # pylint: disable=W0613
     '''
     Main program body
@@ -215,30 +261,30 @@ def main(argv):  # pylint: disable=W0613
             if scpstat != 0:
                 sys.exit(EX_SCP_NOT_FOUND)
 
-        if not os.path.exists(OPTIONS.saltdir):
-            need_deployment()
-
-        if not os.path.isdir(OPTIONS.saltdir):
+        if os.path.exists(OPTIONS.saltdir) and not os.path.isdir(OPTIONS.saltdir):
             sys.stderr.write(
                 'ERROR: salt path "{0}" exists but is'
                 ' not a directory\n'.format(OPTIONS.saltdir)
             )
             sys.exit(EX_CANTCREAT)
 
-        version_path = os.path.normpath(os.path.join(OPTIONS.saltdir, 'version'))
-        if not os.path.exists(version_path) or not os.path.isfile(version_path):
+        if not os.path.exists(OPTIONS.saltdir):
+            need_deployment()
+
+        checksum_path = os.path.normpath(os.path.join(OPTIONS.saltdir, 'thin_checksum'))
+        if not os.path.exists(checksum_path) or not os.path.isfile(checksum_path):
             sys.stderr.write(
                 'WARNING: Unable to locate current thin '
-                ' version: {0}.\n'.format(version_path)
+                ' checksum: {0}.\n'.format(checksum_path)
             )
             need_deployment()
-        with open(version_path, 'r') as vpo:
-            cur_version = vpo.readline().strip()
-        if cur_version != OPTIONS.version:
+        with open(checksum_path, 'r') as vpo:
+            cur_checksum = vpo.readline().strip()
+        if cur_checksum != OPTIONS.checksum:
             sys.stderr.write(
-                'WARNING: current thin version {0}'
+                'WARNING: current thin checksum {0}'
                 ' is not up-to-date with {1}.\n'.format(
-                    cur_version, OPTIONS.version
+                    cur_checksum, OPTIONS.checksum
                 )
             )
             need_deployment()
@@ -270,7 +316,7 @@ def main(argv):  # pylint: disable=W0613
         argv_prepared = ARGS
 
     salt_argv = [
-        sys.executable,
+        get_executable(),
         salt_call_path,
         '--retcode-passthrough',
         '--local',
@@ -303,7 +349,10 @@ def main(argv):  # pylint: disable=W0613
     if OPTIONS.tty:
         # Returns bytes instead of string on python 3
         stdout, _ = subprocess.Popen(salt_argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-        sys.stdout.write(stdout.decode(encoding=get_system_encoding(), errors="replace"))
+        if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+            sys.stdout.write(stdout.decode(get_system_encoding(), "replace"))
+        else:
+            sys.stdout.write(stdout.decode(encoding=get_system_encoding(), errors="replace"))
         sys.stdout.flush()
         if OPTIONS.wipe:
             shutil.rmtree(OPTIONS.saltdir)
@@ -314,6 +363,7 @@ def main(argv):  # pylint: disable=W0613
         subprocess.call(salt_argv)
     if OPTIONS.cmd_umask is not None:
         os.umask(old_umask)
+
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
