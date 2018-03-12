@@ -171,6 +171,9 @@ def unpack_thin(thin_path):
     old_umask = os.umask(0o077)  # pylint: disable=blacklisted-function
     tfile.extractall(path=OPTIONS.saltdir)
     tfile.close()
+    checksum_path = os.path.normpath(os.path.join(OPTIONS.saltdir, "thin_checksum"))
+    with open(checksum_path, "w") as chk:
+        chk.write(OPTIONS.checksum + "\n")
     os.umask(old_umask)  # pylint: disable=blacklisted-function
     try:
         os.unlink(thin_path)
