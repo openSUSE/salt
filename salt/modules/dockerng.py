@@ -1914,6 +1914,7 @@ def login(*registries):
                     errors.append(login_cmd['stderr'])
                 elif login_cmd['stdout']:
                     errors.append(login_cmd['stdout'])
+    ret['retcode'] = len(errors)
     return ret
 
 
@@ -4136,6 +4137,7 @@ def push(image,
 
     if errors:
         ret['Errors'] = errors
+    ret['retcode'] = len(errors)
     return ret
 
 
@@ -4210,6 +4212,7 @@ def rmi(*names, **kwargs):
            'Tags': [x for x in pre_tags if x not in list_tags()]}
     if errors:
         ret['Errors'] = errors
+    ret['retcode'] = len(errors)
     return ret
 
 
