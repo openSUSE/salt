@@ -55,7 +55,7 @@ try:
     import MySQLdb.cursors
     import MySQLdb.converters
     from MySQLdb.constants import FIELD_TYPE, FLAG
-    from MySQLdb import OperationalError
+    from MySQLdb.connections import OperationalError
 except ImportError:
     try:
         # MySQLdb import failed, try to import PyMySQL
@@ -66,7 +66,7 @@ except ImportError:
         import MySQLdb.cursors
         import MySQLdb.converters
         from MySQLdb.constants import FIELD_TYPE, FLAG
-        from MySQLdb import OperationalError
+        from MySQLdb.err import OperationalError
     except ImportError:
         MySQLdb = None
 
