@@ -159,7 +159,10 @@ def is_binary(data):
         nontext = data.translate(trans)
     else:
         if isinstance(data, unicode):  # pylint: disable=incompatible-py3-code
-            trans_args = ({ord(x): None for x in text_characters},)
+            char_map = {}
+            for x in text_characters:
+                char_map[ord(x)] = None
+            trans_args = (char_map,)
         else:
             trans_args = (None, str(text_characters))  # future lint: blacklisted-function
         nontext = data.translate(*trans_args)
