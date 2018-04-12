@@ -53,9 +53,18 @@ PROCESS=salt-minion
 RETVAL=0
 WATCHDOG_CRON="/etc/cron.d/salt-minion"
 
+cleanup_watchdog() {
+    if [ -f $WATCHDOG_CRON ]; then
+        grep "^-\*" $WATCHDOG_CRON > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            sed -i -e "s/^-//" $WATCHDOG_CRON
+        fi
+    fi
+}
+
 set_watchdog() {
     if [ ! -f $WATCHDOG_CRON ]; then
-        echo -e '-* * * * * root /usr/bin/salt-daemon-watcher --with-init\n' > $WATCHDOG_CRON
+        echo -e '* * * * * root /usr/bin/salt-daemon-watcher --with-init\n' > $WATCHDOG_CRON
         # Kick the watcher for 1 minute immediately, because cron will wake up only afterwards
         /usr/bin/salt-daemon-watcher --with-init & disown
     fi
@@ -67,6 +76,7 @@ remove_watchdog() {
 }
 
 start() {
+    cleanup_watchdog;
     set_watchdog;
     echo -n $"Starting salt-minion daemon: "
     if [ -f $SUSE_RELEASE ]; then
