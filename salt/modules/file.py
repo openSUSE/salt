@@ -5008,8 +5008,7 @@ def get_diff(file1,
                         *salt.utils.data.decode(args)
                     )
                 )
-        return ret
-    return ''
+    return ret
 
 
 def manage_file(name,
