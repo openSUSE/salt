@@ -453,8 +453,8 @@ def query(params=None, setname=None, requesturl=None, location=None,
     MAX_RETRIES = 6
     attempts = 0
     while attempts < MAX_RETRIES:
-        log.debug('AWS Request: %s', requesturl)
-        log.trace('AWS Request Parameters: %s', params_with_headers)
+        LOG.debug('AWS Request: {0}'.format(requesturl))
+        LOG.trace('AWS Request Parameters: {0}'.format(params_with_headers))
         try:
             result = requests.get(requesturl, headers=headers, params=params_with_headers)
             LOG.debug(
