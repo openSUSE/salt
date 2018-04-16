@@ -202,14 +202,12 @@ import tornado.ioloop
 import tornado.web
 import tornado.gen
 from tornado.concurrent import Future
-from zmq.eventloop import ioloop
-from salt.ext import six
 # pylint: enable=import-error
-
-# instantiate the zmq IOLoop (specialized poller)
-ioloop.install()
+import salt.utils
+salt.utils.zeromq.install_zmq()
 
 # salt imports
+import salt.ext.six as six
 import salt.netapi
 import salt.utils.args
 import salt.utils.event
@@ -245,7 +243,7 @@ def _json_dumps(obj, **kwargs):
 
 # # master side
 #  - "runner" (done)
-#  - "wheel" (need async api...)
+#  - "wheel" (need asynchronous api...)
 
 
 AUTH_TOKEN_HEADER = 'X-Auth-Token'
@@ -274,7 +272,7 @@ class Any(Future):
 class EventListener(object):
     '''
     Class responsible for listening to the salt master event bus and updating
-    futures. This is the core of what makes this async, this allows us to do
+    futures. This is the core of what makes this asynchronous, this allows us to do
     non-blocking work in the main processes and "wait" for an event to happen
     '''
 
@@ -324,7 +322,7 @@ class EventListener(object):
                   timeout=None
                   ):
         '''
-        Get an event (async of course) return a future that will get it later
+        Get an event (asynchronous of course) return a future that will get it later
         '''
         # if the request finished, no reason to allow event fetching, since we
         # can't send back to the client
@@ -629,7 +627,7 @@ class SaltAuthHandler(BaseSaltAPIHandler):  # pylint: disable=W0223
 
         self.write(self.serialize(ret))
 
-    # TODO: make async? Underlying library isn't... and we ARE making disk calls :(
+    # TODO: make asynchronous? Underlying library isn't... and we ARE making disk calls :(
     def post(self):
         '''
         :ref:`Authenticate  <rest_tornado-auth>` against Salt's eauth system
