@@ -848,6 +848,7 @@ class Schedule(object):
                     if key is not 'kwargs':
                         kwargs['__pub_{0}'.format(key)] = copy.deepcopy(val)
 
+            self.functions.pack['__context__']['retcode'] = 0
             ret['return'] = self.functions[func](*args, **kwargs)
 
             # runners do not provide retcode
