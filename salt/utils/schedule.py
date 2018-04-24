@@ -842,6 +842,7 @@ class Schedule(object):
                 for key, val in six.iteritems(ret):
                     kwargs['__pub_{0}'.format(key)] = copy.deepcopy(val)
 
+            self.functions.pack['__context__']['retcode'] = 0
             ret['return'] = self.functions[func](*args, **kwargs)
 
             data_returner = data.get('returner', None)
