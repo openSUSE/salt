@@ -52,17 +52,18 @@ def _get_gecos(name):
     '''
     Retrieve GECOS field info and return it in dictionary form
     '''
-    gecos_field = pwd.getpwnam(_quote_username(name)).pw_gecos.split(',', 3)
+    gecos_field = pwd.getpwnam(_quote_username(name)).pw_gecos.split(',', 4)
     if not gecos_field:
         return {}
     else:
         # Assign empty strings for any unspecified trailing GECOS fields
-        while len(gecos_field) < 4:
+        while len(gecos_field) < 5:
             gecos_field.append('')
         return {'fullname': locales.sdecode(gecos_field[0]),
                 'roomnumber': locales.sdecode(gecos_field[1]),
                 'workphone': locales.sdecode(gecos_field[2]),
-                'homephone': locales.sdecode(gecos_field[3])}
+                'homephone': locales.sdecode(gecos_field[3]),
+                'other': locales.sdecode(gecos_field[4])}
 
 
 def _build_gecos(gecos_dict):
@@ -70,10 +71,11 @@ def _build_gecos(gecos_dict):
     Accepts a dictionary entry containing GECOS field names and their values,
     and returns a full GECOS comment string, to be used with usermod.
     '''
-    return u'{0},{1},{2},{3}'.format(gecos_dict.get('fullname', ''),
-                                    gecos_dict.get('roomnumber', ''),
-                                    gecos_dict.get('workphone', ''),
-                                    gecos_dict.get('homephone', '')).rstrip(',')
+    return '{0},{1},{2},{3},{4}'.format(gecos_dict.get('fullname', ''),
+                                        gecos_dict.get('roomnumber', ''),
+                                        gecos_dict.get('workphone', ''),
+                                        gecos_dict.get('homephone', ''),
+                                        gecos_dict.get('other', ''),).rstrip(',')
 
 
 def _update_gecos(name, key, value, root=None):
@@ -114,6 +116,7 @@ def add(name,
         roomnumber='',
         workphone='',
         homephone='',
+        other='',
         createhome=True,
         loginclass=None,
         root=None):
@@ -221,6 +224,8 @@ def add(name,
         chworkphone(name, workphone)
     if homephone:
         chhomephone(name, homephone)
+    if other:
+        chother(name, other)
     return True
 
 
@@ -491,6 +496,19 @@ def chhomephone(name, homephone):
     return _update_gecos(name, 'homephone', homephone)
 
 
+def chother(name, other):
+    '''
+    Change the user's other GECOS attribute
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' user.chother foobar
+    '''
+    return _update_gecos(name, 'other', other)
+
+
 def chloginclass(name, loginclass, root=None):
     '''
     Change the default login class of the user
@@ -572,9 +590,9 @@ def _format_info(data):
     Return user information in a pretty way
     '''
     # Put GECOS info into a list
-    gecos_field = data.pw_gecos.split(',', 3)
+    gecos_field = data.pw_gecos.split(',', 4)
     # Make sure our list has at least four elements
-    while len(gecos_field) < 4:
+    while len(gecos_field) < 5:
         gecos_field.append('')
 
     return {'gid': data.pw_gid,
@@ -587,7 +605,8 @@ def _format_info(data):
             'fullname': gecos_field[0],
             'roomnumber': gecos_field[1],
             'workphone': gecos_field[2],
-            'homephone': gecos_field[3]}
+            'homephone': gecos_field[3],
+            'other': gecos_field[4]}
 
 
 @decorators.which('id')
