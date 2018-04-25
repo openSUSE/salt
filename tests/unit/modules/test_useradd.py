@@ -4,11 +4,17 @@
 '''
 
 # Import Python libs
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function, unicode_literals
+try:
+    import pwd
+    HAS_PWD = True
+except ImportError:
+    HAS_PWD = False
 
 # Import Salt Testing Libs
-from salttesting import TestCase, skipIf
-from salttesting.mock import (
+from tests.support.mixins import LoaderModuleMockMixin
+from tests.support.unit import TestCase, skipIf
+from tests.support.mock import (
     MagicMock,
     patch,
     NO_MOCK,
@@ -16,33 +22,36 @@ from salttesting.mock import (
 )
 
 # Import Salt Libs
-from salt.modules import useradd
+import salt.modules.useradd as useradd
 from salt.exceptions import CommandExecutionError
-import pwd
-
-# Globals
-useradd.__grains__ = {}
-useradd.__salt__ = {}
-useradd.__context__ = {}
 
 
 @skipIf(NO_MOCK, NO_MOCK_REASON)
-class UserAddTestCase(TestCase):
+class UserAddTestCase(TestCase, LoaderModuleMockMixin):
     '''
     Test cases for salt.modules.useradd
     '''
-    mock_pwall = {'gid': 0,
-                  'groups': ['root'],
-                  'home': '/root',
-                  'name': 'root',
-                  'passwd': 'x',
-                  'shell': '/bin/bash',
-                  'uid': 0,
-                  'fullname': 'root',
-                  'roomnumber': '',
-                  'workphone': '',
-                  'homephone': '',
-                  'other': ''}
+    def setup_loader_modules(self):
+        return {useradd: {}}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mock_pwall = {'gid': 0,
+                          'groups': ['root'],
+                          'home': '/root',
+                          'name': 'root',
+                          'passwd': 'x',
+                          'shell': '/bin/bash',
+                          'uid': 0,
+                          'fullname': 'root',
+                          'roomnumber': '',
+                          'workphone': '',
+                          'homephone': '',
+                          'other': ''}
+
+    @classmethod
+    def tearDownClass(cls):
+        del cls.mock_pwall
 
     # 'add' function tests: 1
 
@@ -64,33 +73,34 @@ class UserAddTestCase(TestCase):
 
     # 'getent' function tests: 2
 
-    @patch('salt.modules.useradd.__context__', MagicMock(return_value='Salt'))
+    @skipIf(HAS_PWD is False, 'The pwd module is not available')
     def test_getent(self):
         '''
         Test if user.getent already have a value
         '''
-        self.assertTrue(useradd.getent())
+        with patch('salt.modules.useradd.__context__', MagicMock(return_value='Salt')):
+            self.assertTrue(useradd.getent())
 
-    @patch('salt.modules.useradd._format_info',
-           MagicMock(return_value=mock_pwall))
-    @patch('pwd.getpwall', MagicMock(return_value=['']))
+    @skipIf(HAS_PWD is False, 'The pwd module is not available')
     def test_getent_user(self):
         '''
         Tests the return information on all users
         '''
-        ret = [{'gid': 0,
-                  'groups': ['root'],
-                  'home': '/root',
-                  'name': 'root',
-                  'passwd': 'x',
-                  'shell': '/bin/bash',
-                  'uid': 0,
-                  'fullname': 'root',
-                  'roomnumber': '',
-                  'workphone': '',
-                  'homephone': '',
-                  'other': ''}]
-        self.assertEqual(useradd.getent(), ret)
+        with patch('pwd.getpwall', MagicMock(return_value=[''])):
+            ret = [{'gid': 0,
+                    'groups': ['root'],
+                    'home': '/root',
+                    'name': 'root',
+                    'passwd': 'x',
+                    'shell': '/bin/bash',
+                    'uid': 0,
+                    'fullname': 'root',
+                    'roomnumber': '',
+                    'workphone': '',
+                    'homephone': '',
+                    'other': ''}]
+            with patch('salt.modules.useradd._format_info', MagicMock(return_value=self.mock_pwall)):
+                self.assertEqual(useradd.getent(), ret)
 
     # 'chuid' function tests: 1
 
@@ -354,6 +364,7 @@ class UserAddTestCase(TestCase):
 
     # 'info' function tests: 1
 
+    @skipIf(HAS_PWD is False, 'The pwd module is not available')
     def test_info(self):
         '''
         Test the user information
@@ -372,15 +383,16 @@ class UserAddTestCase(TestCase):
 
     # 'list_groups' function tests: 1
 
-    @patch('salt.utils.get_group_list', MagicMock(return_value='Salt'))
     def test_list_groups(self):
         '''
         Test if it return a list of groups the named user belongs to
         '''
-        self.assertEqual(useradd.list_groups('name'), 'Salt')
+        with patch('salt.utils.user.get_group_list', MagicMock(return_value='Salt')):
+            self.assertEqual(useradd.list_groups('name'), 'Salt')
 
     # 'list_users' function tests: 1
 
+    @skipIf(HAS_PWD is False, 'The pwd module is not available')
     def test_list_users(self):
         '''
         Test if it returns a list of all users
@@ -431,7 +443,3 @@ class UserAddTestCase(TestCase):
         test_gecos.pop('homephone')
         expected_gecos_fields = 'Testing'
         self.assertEqual(useradd._build_gecos(test_gecos), expected_gecos_fields)
-
-if __name__ == '__main__':
-    from integration import run_tests
-    run_tests(UserAddTestCase, needs_daemon=False)
