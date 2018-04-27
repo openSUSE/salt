@@ -477,7 +477,7 @@ def query(params=None, setname=None, requesturl=None, location=None,
 
             # check to see if we should retry the query
             err_code = data.get('Errors', {}).get('Error', {}).get('Code', '')
-            if attempts < MAX_RETRIES and err_code and err_code in AWS_RETRY_CODES:
+            if err_code in AWS_RETRY_CODES:
                 attempts += 1
                 LOG.error(
                     'AWS Response Status Code and Error: [{0} {1}] {2}; '
