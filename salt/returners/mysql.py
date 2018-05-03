@@ -17,6 +17,7 @@ config. These are the defaults:
     mysql.pass: 'salt'
     mysql.db: 'salt'
     mysql.port: 3306
+    mysql.unix_socket: '/tmp/mysql.sock'
 
 SSL is optional. The defaults are set to None. If you do not want to use SSL,
 either exclude these options or set them to None.
@@ -42,6 +43,7 @@ optional. The following ssl options are simply for illustration purposes:
     alternative.mysql.ssl_ca: '/etc/pki/mysql/certs/localhost.pem'
     alternative.mysql.ssl_cert: '/etc/pki/mysql/certs/localhost.crt'
     alternative.mysql.ssl_key: '/etc/pki/mysql/certs/localhost.key'
+    alternative.mysql.unix_socket: '/tmp/mysql.sock'
 
 Should you wish the returner data to be cleaned out every so often, set
 `keep_jobs` to the number of hours for the jobs to live in the tables.
@@ -196,6 +198,7 @@ def _get_options(ret=None):
         "ssl_ca": None,
         "ssl_cert": None,
         "ssl_key": None,
+        "unix_socket": "/tmp/mysql.sock",
     }
 
     attrs = {
@@ -207,6 +210,7 @@ def _get_options(ret=None):
         "ssl_ca": "ssl_ca",
         "ssl_cert": "ssl_cert",
         "ssl_key": "ssl_key",
+        "unix_socket": "unix_socket",
     }
 
     _options = salt.returners.get_returner_options(
@@ -265,6 +269,7 @@ def _get_serv(ret=None, commit=False):
                 db=_options.get("db"),
                 port=_options.get("port"),
                 ssl=ssl_options,
+                unix_socket=_options.get("unix_socket"),
             )
 
             try:
