@@ -1716,9 +1716,9 @@ def line(path, content=None, match=None, mode=None, location=None,
     if before is None and after is None and not match:
         match = content
 
-    with salt.utils.files.fopen(path, mode='r') as fp_:
-        body = salt.utils.stringutils.to_unicode(fp_.read())
-    body_before = hashlib.sha256(salt.utils.stringutils.to_bytes(body)).hexdigest()
+    with salt.utils.fopen(path, mode='r') as fp_:
+        body = fp_.read()
+    body_before = hashlib.sha256(salt.utils.to_bytes(body)).hexdigest()
     after = _regex_to_static(body, after)
     before = _regex_to_static(body, before)
     match = _regex_to_static(body, match)
@@ -1842,7 +1842,7 @@ def line(path, content=None, match=None, mode=None, location=None,
                                         "Unable to ensure line without knowing "
                                         "where to put it before and/or after.")
 
-    changed = body_before != hashlib.sha256(salt.utils.stringutils.to_bytes(body)).hexdigest()
+    changed = body_before != hashlib.sha256(salt.utils.to_bytes(body)).hexdigest()
 
     if backup and changed and __opts__['test'] is False:
         try:
@@ -1855,20 +1855,14 @@ def line(path, content=None, match=None, mode=None, location=None,
 
     if changed:
         if show_changes:
-            with salt.utils.files.fopen(path, 'r') as fp_:
-                path_content = [salt.utils.stringutils.to_unicode(x)
-                                for x in fp_.read().splitlines(True)]
-            changes_diff = ''.join(difflib.unified_diff(
-                path_content,
-                [salt.utils.stringutils.to_unicode(x)
-                 for x in body.splitlines(True)]
-            ))
+            with salt.utils.fopen(path, 'r') as fp_:
+                path_content = fp_.read().splitlines(True)
+            changes_diff = ''.join(difflib.unified_diff(path_content, body.splitlines(True)))
         if __opts__['test'] is False:
             fh_ = None
             try:
                 # Make sure we match the file mode from salt.utils.files.fopen
-                mode = 'wb' if six.PY2 and salt.utils.platform.is_windows() else 'w'
-                fh_ = salt.utils.atomicfile.atomic_open(path, mode)
+                fh_ = salt.utils.atomicfile.atomic_open(path, 'w')
                 fh_.write(body)
             finally:
                 if fh_:
