@@ -4,7 +4,7 @@ Minion side functions for salt-cp
 '''
 
 # Import python libs
-from __future__ import absolute_import
+from __future__ import absolute_import, unicode_literals
 import base64
 import errno
 import os

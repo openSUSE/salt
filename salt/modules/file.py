@@ -3545,7 +3545,7 @@ def source_list(source, source_hash, saltenv):
 
         salt '*' file.source_list salt://http/httpd.conf '{hash_type: 'md5', 'hsum': <md5sum>}' base
     '''
-    contextkey = '{0}_|-{1}_|-{2}'.format(source, source_hash, saltenv)
+    contextkey = u'{0}_|-{1}_|-{2}'.format(source, source_hash, saltenv)
     if contextkey in __context__:
         return __context__[contextkey]
 

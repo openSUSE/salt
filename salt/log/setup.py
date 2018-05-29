@@ -320,15 +320,16 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
             # If nothing else is in extra, make it None
             extra = None
 
+        salt_system_encoding = __salt_system_encoding__
+        if salt_system_encoding == 'ascii':
+            # Encoding detection most likely failed, let's use the utf-8
+            # value which we defaulted before __salt_system_encoding__ was
+            # implemented
+            salt_system_encoding = 'utf-8'
+
         # Let's try to make every logging message unicode
         if isinstance(msg, six.string_types) \
                 and not isinstance(msg, six.text_type):
-            salt_system_encoding = __salt_system_encoding__
-            if salt_system_encoding == 'ascii':
-                # Encoding detection most likely failed, let's use the utf-8
-                # value which we defaulted before __salt_system_encoding__ was
-                # implemented
-                salt_system_encoding = 'utf-8'
             try:
                 _msg = msg.decode(salt_system_encoding, 'replace')
             except UnicodeDecodeError:
@@ -336,12 +337,21 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
         else:
             _msg = msg
 
+        _args = []
+        for item in args:
+            if isinstance(item, six.string_types) and not isinstance(item, six.text_type):
+                try:
+                    _args.append(item.decode(salt_system_encoding, 'replace'))
+                except UnicodeDecodeError:
+                    _args.append(item.decode(salt_system_encoding, 'ignore'))
+            else:
+                _args.append(item)
+        _args = tuple(_args)
+
         if six.PY3:
-            logrecord = _LOG_RECORD_FACTORY(name, level, fn, lno, _msg, args,
-                                            exc_info, func, sinfo)
+            logrecord = _LOG_RECORD_FACTORY(name, level, fn, lno, _msg, _args, exc_info, func, sinfo)
         else:
-            logrecord = _LOG_RECORD_FACTORY(name, level, fn, lno, _msg, args,
-                                            exc_info, func)
+            logrecord = _LOG_RECORD_FACTORY(name, level, fn, lno, _msg, _args, exc_info, func)
 
         if extra is not None:
             for key in extra:
