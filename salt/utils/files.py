@@ -19,7 +19,6 @@ import time
 import urllib
 
 # Import Salt libs
-import salt.utils.validate.path
 import salt.utils.platform
 import salt.utils.stringutils
 import salt.modules.selinux
