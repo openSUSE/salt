@@ -458,7 +458,8 @@ def latest_version(*names, **kwargs):
     out = __salt__['cmd.run_all'](cmd,
                                   output_loglevel='trace',
                                   ignore_retcode=True,
-                                  python_shell=False)
+                                  python_shell=False,
+                                  env={"SALT_RUNNING": '1'})
     if out['retcode'] != 0:
         if out['stderr']:
             # Check first if this is just a matter of the packages being
@@ -773,7 +774,8 @@ def list_repo_pkgs(*args, **kwargs):
             yum_version = _LooseVersion(
                 __salt__['cmd.run'](
                     ['yum', '--version'],
-                    python_shell=False
+                    python_shell=False,
+                    env={"SALT_RUNNING": '1'}
                 ).splitlines()[0].strip()
             )
             return yum_version < _LooseVersion('3.4.3')
@@ -796,7 +798,8 @@ def list_repo_pkgs(*args, **kwargs):
                 cmd_prefix + [pkg_src],
                 output_loglevel='trace',
                 ignore_retcode=True,
-                python_shell=False
+                python_shell=False,
+                env={"SALT_RUNNING": '1'}
             )
             if out['retcode'] == 0:
                 _parse_output(out['stdout'], strict=True)
@@ -810,7 +813,8 @@ def list_repo_pkgs(*args, **kwargs):
             out = __salt__['cmd.run_all'](cmd,
                                           output_loglevel='trace',
                                           ignore_retcode=True,
-                                          python_shell=False)
+                                          python_shell=False,
+                                          env={"SALT_RUNNING": '1'})
             if out['retcode'] != 0 and 'Error:' in out['stdout']:
                 continue
             _parse_output(out['stdout'])
@@ -856,7 +860,8 @@ def list_upgrades(refresh=True, **kwargs):
     out = __salt__['cmd.run_all'](cmd,
                                   output_loglevel='trace',
                                   ignore_retcode=True,
-                                  python_shell=False)
+                                  python_shell=False,
+                                  env={"SALT_RUNNING": '1'})
     if out['retcode'] != 0 and 'Error:' in out:
         return {}
 
@@ -993,12 +998,13 @@ def refresh_db(**kwargs):
             clean_cmd.extend(args)
             update_cmd.extend(args)
 
-    __salt__['cmd.run'](clean_cmd, python_shell=False)
+    __salt__['cmd.run'](clean_cmd, python_shell=False, env={"SALT_RUNNING": '1'})
     if check_update_:
         result = __salt__['cmd.retcode'](update_cmd,
                                          output_loglevel='trace',
                                          ignore_retcode=True,
-                                         python_shell=False)
+                                         python_shell=False,
+                                         env={"SALT_RUNNING": '1'})
         return retcodes.get(result, False)
     return True
 
@@ -1466,7 +1472,8 @@ def install(name=None,
                 cmd,
                 output_loglevel='trace',
                 python_shell=False,
-                redirect_stderr=True
+                redirect_stderr=True,
+                env={"SALT_RUNNING": '1'}
             )
             if out['retcode'] != 0:
                 errors.append(out['stdout'])
@@ -1486,7 +1493,8 @@ def install(name=None,
                 cmd,
                 output_loglevel='trace',
                 python_shell=False,
-                redirect_stderr=True
+                redirect_stderr=True,
+                env={"SALT_RUNNING": '1'}
             )
             if out['retcode'] != 0:
                 errors.append(out['stdout'])
@@ -1506,7 +1514,8 @@ def install(name=None,
                 cmd,
                 output_loglevel='trace',
                 python_shell=False,
-                redirect_stderr=True
+                redirect_stderr=True,
+                env={"SALT_RUNNING": '1'}
             )
             if out['retcode'] != 0:
                 errors.append(out['stdout'])
@@ -1702,7 +1711,8 @@ def upgrade(name=None,
 
     result = __salt__['cmd.run_all'](cmd,
                                      output_loglevel='trace',
-                                     python_shell=False)
+                                     python_shell=False,
+                                     env={"SALT_RUNNING": '1'})
     __context__.pop('pkg.list_pkgs', None)
     new = list_pkgs()
     ret = salt.utils.compare_dicts(old, new)
@@ -1793,7 +1803,8 @@ def remove(name=None, pkgs=None, **kwargs):  # pylint: disable=W0613
     out = __salt__['cmd.run_all'](
         [_yum(), '-y', 'remove'] + targets,
         output_loglevel='trace',
-        python_shell=False
+        python_shell=False,
+        env={"SALT_RUNNING": '1'}
     )
 
     if out['retcode'] != 0 and out['stderr']:
@@ -1930,7 +1941,8 @@ def hold(name=None, pkgs=None, sources=None, normalize=True, **kwargs):  # pylin
             else:
                 out = __salt__['cmd.run_all'](
                     [_yum(), 'versionlock', target],
-                    python_shell=False
+                    python_shell=False,
+                    env={"SALT_RUNNING": '1'}
                 )
 
                 if out['retcode'] == 0:
@@ -2039,7 +2051,8 @@ def unhold(name=None, pkgs=None, sources=None, **kwargs):  # pylint: disable=W06
             else:
                 out = __salt__['cmd.run_all'](
                     [_yum(), 'versionlock', 'delete'] + search_locks,
-                    python_shell=False
+                    python_shell=False,
+                    env={"SALT_RUNNING": '1'}
                 )
 
                 if out['retcode'] == 0:
@@ -2090,7 +2103,8 @@ def list_holds(pattern=__HOLD_PATTERN, full=True):
     _check_versionlock()
 
     out = __salt__['cmd.run']([_yum(), 'versionlock', 'list'],
-                              python_shell=False)
+                              python_shell=False,
+                              env={"SALT_RUNNING": '1'})
     ret = []
     for line in salt.utils.itertools.split(out, '\n'):
         match = _get_hold(line, pattern=pattern, full=full)
@@ -2155,7 +2169,8 @@ def group_list():
     out = __salt__['cmd.run_stdout'](
         [_yum(), 'grouplist', 'hidden'],
         output_loglevel='trace',
-        python_shell=False
+        python_shell=False,
+        env={"SALT_RUNNING": '1'}
     )
     key = None
     for line in salt.utils.itertools.split(out, '\n'):
@@ -2222,7 +2237,8 @@ def group_info(name, expand=False):
     out = __salt__['cmd.run_stdout'](
         cmd,
         output_loglevel='trace',
-        python_shell=False
+        python_shell=False,
+        env={"SALT_RUNNING": '1'}
     )
 
     g_info = {}
@@ -2875,7 +2891,8 @@ def download(*packages):
     __salt__['cmd.run'](
         cmd,
         output_loglevel='trace',
-        python_shell=False
+        python_shell=False,
+        env={"SALT_RUNNING": '1'}
     )
     ret = {}
     for dld_result in os.listdir(CACHE_DIR):
@@ -2950,7 +2967,8 @@ def _get_patches(installed_only=False):
     cmd = [_yum(), '--quiet', 'updateinfo', 'list', 'all']
     ret = __salt__['cmd.run_stdout'](
         cmd,
-        python_shell=False
+        python_shell=False,
+        env={"SALT_RUNNING": '1'}
     )
     for line in salt.utils.itertools.split(ret, os.linesep):
         inst, advisory_id, sev, pkg = re.match(r'([i|\s]) ([^\s]+) +([^\s]+) +([^\s]+)',
