@@ -66,3 +66,11 @@ def config():
                 log.warning("Bad syntax in grains file! Skipping.")
                 return {}
     return {}
+
+
+def suse_backported_capabilities():
+    return {
+        '__suse_reserved_pkg_all_versions_support': True,
+        '__suse_reserved_pkg_patches_support': True,
+        '__suse_reserved_saltutil_states_support': True
+    }
