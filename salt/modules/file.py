@@ -2560,7 +2560,7 @@ def blockreplace(path,
 
                         # Trim any trailing new lines to avoid unwanted
                         # additional new lines
-                        while not split_content[-1]:
+                        while split_content and not split_content[-1]:
                             split_content.pop()
 
                         # push new block content in file
