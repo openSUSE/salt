@@ -55,7 +55,6 @@ import salt.utils.platform
 import salt.utils.stringutils
 import salt.utils.versions
 import salt.utils.vt
-import salt.utils.yaml
 from salt.utils.nb_popen import NonBlockingPopen
 from salt.utils.validate.path import is_writeable
 
@@ -74,6 +73,7 @@ from salt.exceptions import (
 from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin,W0611
 from jinja2 import Template
+import yaml
 
 # Let's import pwd and catch the ImportError. We'll raise it if this is not
 # Windows. This import has to be below where we import salt.utils.platform!
@@ -292,7 +292,7 @@ def salt_config_to_yaml(configuration, line_break='\n'):
     '''
     Return a salt configuration dictionary, master or minion, as a yaml dump
     '''
-    return salt.utils.yaml.safe_dump(
+    return yaml.safe_dump(
         configuration,
         line_break=line_break,
         default_flow_style=False)
@@ -2511,7 +2511,7 @@ def cachedir_index_add(minion_id, profile, driver, provider, base=None):
     if os.path.exists(index_file):
         mode = 'rb' if six.PY3 else 'r'
         with salt.utils.files.fopen(index_file, mode) as fh_:
-            index = salt.utils.data.decode(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
+            index = salt.utils.data.decode_dict(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
     else:
         index = {}
 
@@ -2545,7 +2545,7 @@ def cachedir_index_del(minion_id, base=None):
     if os.path.exists(index_file):
         mode = 'rb' if six.PY3 else 'r'
         with salt.utils.files.fopen(index_file, mode) as fh_:
-            index = salt.utils.data.decode(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
+            index = salt.utils.data.decode_dict(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
     else:
         return
 
@@ -2644,7 +2644,7 @@ def change_minion_cachedir(
     path = os.path.join(base, cachedir, fname)
 
     with salt.utils.files.fopen(path, 'r') as fh_:
-        cache_data = salt.utils.data.decode(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
+        cache_data = salt.utils.data.decode_dict(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
 
     cache_data.update(data)
 
@@ -2723,7 +2723,7 @@ def list_cache_nodes_full(opts=None, provider=None, base=None):
                 minion_id = fname[:-2]  # strip '.p' from end of msgpack filename
                 mode = 'rb' if six.PY3 else 'r'
                 with salt.utils.files.fopen(fpath, mode) as fh_:
-                    minions[driver][prov][minion_id] = salt.utils.data.decode(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
+                    minions[driver][prov][minion_id] = salt.utils.data.decode_dict(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
 
     return minions
 
@@ -3001,7 +3001,7 @@ def diff_node_cache(prov_dir, node, new_data, opts):
 
     with salt.utils.files.fopen(path, 'r') as fh_:
         try:
-            cache_data = salt.utils.data.decode(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
+            cache_data = salt.utils.data.decode_dict(msgpack.load(fh_, encoding=MSGPACK_ENCODING))
         except ValueError:
             log.warning('Cache for %s was corrupt: Deleting', node)
             cache_data = {}
