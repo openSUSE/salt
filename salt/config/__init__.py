@@ -1221,6 +1221,10 @@ VALID_OPTS = {
     # Allow raw_shell option when using the ssh
     # client via the Salt API
     'netapi_allow_raw_shell': bool,
+
+    # Use Adler32 hashing algorithm for server_id (default False until Sodium, "adler32" after)
+    # Possible values are: False, adler32, crc32
+    'server_id_use_crc': (bool, six.string_types),
 }
 
 # default configurations
@@ -1529,7 +1533,8 @@ DEFAULT_MINION_OPTS = {
     },
     'discovery': False,
     'schedule': {},
-    'ssh_merge_pillar': True
+    'ssh_merge_pillar': True,
+    'server_id_use_crc': False,
 }
 
 DEFAULT_MASTER_OPTS = {
