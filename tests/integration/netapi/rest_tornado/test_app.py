@@ -276,8 +276,8 @@ class TestSaltAPIHandler(_SaltnadoIntegrationTestCase):
         self.assertIn('jid', ret[0])  # the first 2 are regular returns
         self.assertIn('jid', ret[1])
         self.assertIn('Failed to authenticate', ret[2])  # bad auth
-        self.assertEqual(ret[0]['minions'], sorted(['minion', 'sub_minion']))
-        self.assertEqual(ret[1]['minions'], sorted(['minion', 'sub_minion']))
+        self.assertEqual(ret[0]['minions'], sorted(['minion', 'sub_minion', 'localhost']))
+        self.assertEqual(ret[1]['minions'], sorted(['minion', 'sub_minion', 'localhost']))
 
     def test_simple_local_async_post_no_tgt(self):
         low = [{'client': 'local_async',
