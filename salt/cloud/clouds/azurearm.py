@@ -25,6 +25,9 @@ The Azure cloud module is used to control access to Microsoft Azure
     * ``client_id``
     * ``secret``
 
+    if using MSI-style authentication:
+    * ``subscription_id``
+
 Example ``/etc/salt/cloud.providers`` or
 ``/etc/salt/cloud.providers.d/azure.conf`` configuration:
 
@@ -48,6 +51,10 @@ Example ``/etc/salt/cloud.providers`` or
       For example, this creates a service principal with 'owner' role for the whole subscription:
       az ad sp create-for-rbac -n "http://mysaltapp" --role owner --scopes /subscriptions/3287abc8-f98a-c678-3bde-326766fd3617
       *Note: review the details of Service Principals. Owner role is more than you normally need, and you can restrict scope to a resource group or individual resources.
+
+    Or my-azure-config with MSI-style authentication:
+      driver: azure
+      subscription_id: 3287abc8-f98a-c678-3bde-326766fd3617
 '''
 # pylint: disable=E0102
 
@@ -86,6 +93,7 @@ try:
         UserPassCredentials,
         ServicePrincipalCredentials,
     )
+    from msrestazure.azure_active_directory import MSIAuthentication
     from azure.mgmt.compute import ComputeManagementClient
     from azure.mgmt.compute.models import (
         CachingTypes,
@@ -166,19 +174,30 @@ def get_configured_provider():
     '''
     Return the first configured instance.
     '''
+    # check if using Service Principle style authentication...
     provider = config.is_provider_configured(
         __opts__,
         __active_provider_name__ or __virtualname__,
-        ('subscription_id', 'tenant', 'client_id', 'secret')
+        required_keys=('subscription_id', 'tenant', 'client_id', 'secret'),
+        log_message=False  #... allowed to fail so no need to log warnings
         )
     if provider is False:
-        return config.is_provider_configured(
+        # check if using username/password style authentication...
+        provider = config.is_provider_configured(
             __opts__,
             __active_provider_name__ or __virtualname__,
-            ('subscription_id', 'username', 'password')
+            required_keys=('subscription_id', 'username', 'password'),
+            log_message=False
         )
-    else:
-        return provider
+    if provider is False:
+        # check if using MSI style credentials...
+        provider = config.is_provider_configured(
+            __opts__,
+            __active_provider_name__ or __virtualname__,
+            required_keys=('subscription_id',),
+            log_message=False
+        )
+    return provider
 
 
 def get_dependencies():
@@ -210,6 +229,7 @@ def get_conn(Client=None):
         get_configured_provider(), __opts__, search_global=False
     )
     if tenant is not None:
+        # using Service Principle style authentication...
         client_id = config.get_cloud_config_value(
             'client_id',
             get_configured_provider(), __opts__, search_global=False
@@ -224,15 +244,20 @@ def get_conn(Client=None):
             'username',
             get_configured_provider(), __opts__, search_global=False
         )
-        password = config.get_cloud_config_value(
-            'password',
-            get_configured_provider(), __opts__, search_global=False
-        )
-        credentials = UserPassCredentials(username, password)
+        if username is not None:
+            # using username/password style authentication...
+            password = config.get_cloud_config_value(
+                'password',
+                get_configured_provider(), __opts__, search_global=False
+            )
+            credentials = UserPassCredentials(username, password)
+        else:
+            # using MSI style authentication ...
+            credentials = MSIAuthentication()
 
     client = Client(
         credentials=credentials,
-        subscription_id=subscription_id,
+        subscription_id=str(subscription_id),
     )
     client.config.add_user_agent('SaltCloud/{0}'.format(salt.version.__version__))
     return client
