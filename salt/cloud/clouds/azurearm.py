@@ -10,7 +10,6 @@ The Azure cloud module is used to control access to Microsoft Azure
 :depends:
     * `Microsoft Azure SDK for Python <https://pypi.python.org/pypi/azure>`_ >= 2.0rc5
     * `Microsoft Azure Storage SDK for Python <https://pypi.python.org/pypi/azure-storage>`_ >= 0.32
-    * `Microsoft Azure CLI <https://pypi.python.org/pypi/azure-cli>` >= 2.0.12
 :configuration:
     Required provider parameters:
 
@@ -117,9 +116,8 @@ try:
     from azure.mgmt.storage import StorageManagementClient
     from azure.mgmt.web import WebSiteManagementClient
     from msrestazure.azure_exceptions import CloudError
-    from azure.multiapi.storage.v2016_05_31 import CloudStorageAccount
-    from azure.cli import core
-    HAS_LIBS = LooseVersion(core.__version__) >= LooseVersion("2.0.12")
+    from azure.storage import CloudStorageAccount
+    HAS_LIBS = True
 except ImportError:
     pass
 # pylint: enable=wrong-import-position,wrong-import-order
@@ -152,8 +150,7 @@ def __virtual__():
             False,
             'The following dependencies are required to use the AzureARM driver: '
             'Microsoft Azure SDK for Python >= 2.0rc5, '
-            'Microsoft Azure Storage SDK for Python >= 0.32, '
-            'Microsoft Azure CLI >= 2.0.12'
+            'Microsoft Azure Storage SDK for Python >= 0.32'
         )
 
     global cache  # pylint: disable=global-statement,invalid-name
