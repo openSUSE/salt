@@ -671,7 +671,7 @@ def read_crl(crl):
     text = get_pem_entry(text, pem_type='X509 CRL')
 
     crltempfile = tempfile.NamedTemporaryFile()
-    crltempfile.write(text)
+    crltempfile.write(salt.utils.stringutils.to_str(text))
     crltempfile.flush()
     crlparsed = _parse_openssl_crl(crltempfile.name)
     crltempfile.close()
@@ -1378,9 +1378,9 @@ def create_certificate(
                 pem_type='CERTIFICATE REQUEST').replace('\n', '')
         if 'public_key' in kwargs:
             # Strip newlines to make passing through as cli functions easier
-            kwargs['public_key'] = get_public_key(
+            kwargs['public_key'] = salt.utils.stringutils.to_str(get_public_key(
                 kwargs['public_key'],
-                passphrase=kwargs['public_key_passphrase']).replace('\n', '')
+                passphrase=kwargs['public_key_passphrase'])).replace('\n', '')
 
         # Remove system entries in kwargs
         # Including listen_in and preqreuired because they are not included
@@ -1781,13 +1781,13 @@ def verify_crl(crl, cert):
     crltext = _text_or_file(crl)
     crltext = get_pem_entry(crltext, pem_type='X509 CRL')
     crltempfile = tempfile.NamedTemporaryFile()
-    crltempfile.write(crltext)
+    crltempfile.write(salt.utils.stringutils.to_str(crltext))
     crltempfile.flush()
 
     certtext = _text_or_file(cert)
     certtext = get_pem_entry(certtext, pem_type='CERTIFICATE')
     certtempfile = tempfile.NamedTemporaryFile()
-    certtempfile.write(certtext)
+    certtempfile.write(salt.utils.stringutils.to_str(certtext))
     certtempfile.flush()
 
     cmd = ('openssl crl -noout -in {0} -CAfile {1}'.format(
