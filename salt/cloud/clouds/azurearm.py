@@ -98,6 +98,7 @@ import importlib
 import logging
 import os
 import os.path
+import pkgutil
 import pprint
 import string
 import time
@@ -129,6 +130,11 @@ try:
     from azure.storage.blob.blockblobservice import BlockBlobService
     from msrestazure.azure_exceptions import CloudError
 
+    if pkgutil.find_loader("azure.multiapi"):
+        # use multiapi version if available
+        from azure.multiapi.storage.v2016_05_31 import CloudStorageAccount
+    else:
+        from azure.storage import CloudStorageAccount
     HAS_LIBS = True
 except ImportError:
     pass
