@@ -104,6 +104,7 @@ import time
 
 # Salt libs
 from salt.ext import six
+import pkgutil
 import salt.cache
 import salt.config as config
 import salt.loader
@@ -126,6 +127,11 @@ try:
     import azure.mgmt.network.models as network_models
     from azure.storage.blob.blockblobservice import BlockBlobService
     from msrestazure.azure_exceptions import CloudError
+    if pkgutil.find_loader('azure.multiapi'):
+        # use multiapi version if available
+        from azure.multiapi.storage.v2016_05_31 import CloudStorageAccount
+    else:
+        from azure.storage import CloudStorageAccount
     HAS_LIBS = True
 except ImportError:
     pass
