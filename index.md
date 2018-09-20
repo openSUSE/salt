@@ -1,7 +1,7 @@
 ---
 layout: main
-title:
 ---
+
 ### Available versions
 
 - 2018.3.2+diff
