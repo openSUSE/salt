@@ -1,4 +1,7 @@
 title: Salt package versions overview
 theme: minima
+markdown: redcarpet
+highlighter: pygments
 exclude:
     - Gemfile
+    - vendor
