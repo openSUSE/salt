@@ -1,0 +1,4 @@
+title: Salt package versions overview
+theme: minima
+exclude:
+    - Gemfile
