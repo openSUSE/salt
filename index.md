@@ -1,5 +1,6 @@
 ---
 layout: main
+title:
 ---
 ### Available versions
 
