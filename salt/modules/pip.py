@@ -97,6 +97,12 @@ import salt.utils.url
 import salt.utils.versions
 from salt.exceptions import CommandExecutionError, CommandNotFoundError
 
+try:
+    import pkg_resources
+except ImportError:
+    pkg_resources = None
+
+
 # This needs to be named logger so we don't shadow it in pip.install
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
@@ -115,7 +121,12 @@ def __virtual__():
     entire filesystem.  If it's not installed in a conventional location, the
     user is required to provide the location of pip each time it is used.
     """
-    return "pip"
+    if pkg_resources is None:
+        ret = False, 'Package dependency "pkg_resource" is missing'
+    else:
+        ret = "pip"
+
+    return ret
 
 
 def _pip_bin_env(cwd, bin_env):
