@@ -85,6 +85,17 @@ class NetapiClient(object):
         local = salt.client.get_local_client(mopts=self.opts)
         return local.run_job(*args, **kwargs)
 
+    def local_batch_async(self, *args, **kwargs):
+        '''
+        Run :ref:`execution modules <all-salt.modules>` asynchronously
+
+        Wraps :py:meth:`salt.client.LocalClient.run_job`.
+
+        :return: job ID
+        '''
+        local = salt.client.get_local_client(mopts=self.opts)
+        return local.run_job(*args, **kwargs)
+
     def local(self, *args, **kwargs):
         '''
         Run :ref:`execution modules <all-salt.modules>` synchronously
