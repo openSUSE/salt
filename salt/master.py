@@ -1977,6 +1977,33 @@ class ClearFuncs(object):
             return False
         return self.loadauth.get_tok(clear_load['token'])
 
+    def publish_batch(self, clear_load):
+        # with the current implementation this doesn't work. raise exception
+        raise NotImplemented
+
+        # >>>> code replicated from salt/client/__init__.py:cmd_batch
+
+        # Late import - not used anywhere else in this file
+        import salt.cli.batch
+        opts = salt.cli.batch._batch_get_opts(
+            clear_load['tgt'], clear_load['fun'], self.opts,
+            arg=clear_load['arg'],
+            tgt_type=clear_load['tgt_type'],
+            ret=clear_load['ret'],
+            kwarg=clear_load.get('kwarg'),
+            batch=clear_load['kwargs'].pop('batch'),
+            **clear_load['kwargs'])
+
+        eauth = salt.cli.batch._batch_get_eauth(opts, clear_load['kwargs'])
+
+        batch = salt.cli.batch.Batch(opts, eauth=eauth, quiet=True, client=self.local)
+        # <<<< code borrowed from salt/client/__init__.py:cmd_batch
+
+        callback = lambda fun: [it for it in fun()]
+        self.event.io_loop.add_callback(partial(callback, batch.run))
+
+        return None
+
     def publish(self, clear_load):
         '''
         This method sends out publications to the minions, it can only be used

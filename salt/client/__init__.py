@@ -1679,7 +1679,7 @@ class LocalClient(object):
         #   module
 
         # Generate the standard keyword args to feed to format_payload
-        payload_kwargs = {'cmd': 'publish',
+        payload_kwargs = {'cmd': 'publish_batch' if kwargs.get('batch') else 'publish',
                           'tgt': tgt,
                           'fun': fun,
                           'arg': arg,
@@ -1713,6 +1713,7 @@ class LocalClient(object):
             jid='',
             timeout=5,
             listen=False,
+            batch=None,
             **kwargs):
         '''
         Take the required arguments and publish the given command.
@@ -1762,6 +1763,7 @@ class LocalClient(object):
                 ret,
                 jid,
                 timeout,
+                batch=batch,
                 **kwargs)
 
         master_uri = 'tcp://' + salt.utils.zeromq.ip_bracket(self.opts['interface']) + \
