@@ -49,6 +49,8 @@ import salt.utils.path
 import salt.utils.platform
 import salt.utils.stringutils
 import salt.utils.versions
+import salt.utils.pkg.rpm
+
 from salt.ext import six
 from salt.ext.six.moves import range
 
@@ -1776,9 +1778,9 @@ def os_data():
     # architecture.
     if grains.get('os_family') == 'Debian':
         osarch = __salt__['cmd.run']('dpkg --print-architecture').strip()
-    elif grains.get('os_family') == 'RedHat':
-        osarch = __salt__['cmd.run']('rpm --eval %{_host_cpu}').strip()
-    elif grains.get('os_family') == 'NILinuxRT':
+    elif grains.get('os_family') in ['RedHat', 'Suse']:
+        osarch = salt.utils.pkg.rpm.get_osarch()
+    elif grains.get('os_family') in ('NILinuxRT', 'Poky'):
         archinfo = {}
         for line in __salt__['cmd.run']('opkg print-architecture').splitlines():
             if line.startswith('arch'):
