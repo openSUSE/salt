@@ -198,7 +198,7 @@ def _fulfills_version_spec(versions, oper, desired_version,
     return False
 
 
-def _find_unpurge_targets(desired):
+def _find_unpurge_targets(desired, **kwargs):
     '''
     Find packages which are marked to be purged but can't yet be removed
     because they are dependencies for other installed packages. These are the
@@ -207,7 +207,7 @@ def _find_unpurge_targets(desired):
     '''
     return [
         x for x in desired
-        if x in __salt__['pkg.list_pkgs'](purge_desired=True)
+        if x in __salt__['pkg.list_pkgs'](purge_desired=True, **kwargs)
     ]
 
 
@@ -222,7 +222,7 @@ def _find_download_targets(name=None,
     Inspect the arguments to pkg.downloaded and discover what packages need to
     be downloaded. Return a dict of packages to download.
     '''
-    cur_pkgs = __salt__['pkg.list_downloaded']()
+    cur_pkgs = __salt__['pkg.list_downloaded'](**kwargs)
     if pkgs:
         to_download = _repack_pkgs(pkgs, normalize=normalize)
 
@@ -343,7 +343,7 @@ def _find_advisory_targets(name=None,
     Inspect the arguments to pkg.patch_installed and discover what advisory
     patches need to be installed. Return a dict of advisory patches to install.
     '''
-    cur_patches = __salt__['pkg.list_installed_patches']()
+    cur_patches = __salt__['pkg.list_installed_patches'](**kwargs)
     if advisory_ids:
         to_download = advisory_ids
     else:
@@ -553,9 +553,7 @@ def _find_install_targets(name=None,
                     'comment': 'Invalidly formatted \'{0}\' parameter. See '
                                'minion log.'.format('pkgs' if pkgs
                                                     else 'sources')}
-
-        virtual_pkgs = _get_virtual(desired)
-        to_unpurge = _find_unpurge_targets(desired)
+        to_unpurge = _find_unpurge_targets(desired, **kwargs)
     else:
         if salt.utils.platform.is_windows():
             pkginfo = _get_package_info(name, saltenv=kwargs['saltenv'])
@@ -575,8 +573,7 @@ def _find_install_targets(name=None,
         else:
             desired = {name: version}
 
-        virtual_pkgs = _get_virtual(desired)
-        to_unpurge = _find_unpurge_targets(desired)
+        to_unpurge = _find_unpurge_targets(desired, **kwargs)
 
         # FreeBSD pkg supports `openjdk` and `java/openjdk7` package names
         origin = bool(re.search('/', name))
@@ -744,7 +741,8 @@ def _find_install_targets(name=None,
                         verify_result = __salt__['pkg.verify'](
                             key,
                             ignore_types=ignore_types,
-                            verify_options=verify_options
+                            verify_options=verify_options,
+                            **kwargs
                         )
                     except (CommandExecutionError, SaltInvocationError) as exc:
                         failed_verify = exc.strerror
@@ -781,12 +779,28 @@ def _find_install_targets(name=None,
                     to_reinstall[key] = val
                     altered_files[key] = verify_result
             else:
-                log.debug(
-                    'Current version (%s) did not match desired version '
-                    'specification (%s), adding to installation targets',
-                    cver, val
-                )
-                targets[key] = val
+                version_conditions = _parse_version_string(version_string)
+                if pkg_verify and any(oper == '==' for oper, version in version_conditions):
+                    try:
+                        verify_result = __salt__['pkg.verify'](
+                            package_name,
+                            ignore_types=ignore_types,
+                            verify_options=verify_options,
+                            **kwargs
+                        )
+                    except (CommandExecutionError, SaltInvocationError) as exc:
+                        failed_verify = exc.strerror
+                        continue
+                    if verify_result:
+                        to_reinstall[package_name] = version_string
+                        altered_files[package_name] = verify_result
+                else:
+                    log.debug(
+                        'Current version (%s) did not match desired version '
+                        'specification (%s), adding to installation targets',
+                        cver, version_string
+                    )
+                    targets[package_name] = version_string
 
     if failed_verify:
         problems.append(failed_verify)
@@ -1923,7 +1937,8 @@ def installed(
             # have caught invalid arguments earlier.
             verify_result = __salt__['pkg.verify'](reinstall_pkg,
                                                    ignore_types=ignore_types,
-                                                   verify_options=verify_options)
+                                                   verify_options=verify_options,
+                                                   **kwargs)
             if verify_result:
                 failed.append(reinstall_pkg)
                 altered_files[reinstall_pkg] = verify_result
@@ -2111,7 +2126,7 @@ def downloaded(name,
                              'package(s): {0}'.format(exc)
         return ret
 
-    new_pkgs = __salt__['pkg.list_downloaded']()
+    new_pkgs = __salt__['pkg.list_downloaded'](**kwargs)
     ok, failed = _verify_install(targets, new_pkgs, ignore_epoch=ignore_epoch)
 
     if failed:
@@ -2987,7 +3002,7 @@ def uptodate(name, refresh=False, pkgs=None, **kwargs):
         pkgs, refresh = _resolve_capabilities(pkgs, refresh=refresh, **kwargs)
         try:
             packages = __salt__['pkg.list_upgrades'](refresh=refresh, **kwargs)
-            expected = {pkgname: {'new': pkgver, 'old': __salt__['pkg.version'](pkgname)}
+            expected = {pkgname: {'new': pkgver, 'old': __salt__['pkg.version'](pkgname, **kwargs)}
                         for pkgname, pkgver in six.iteritems(packages)}
             if isinstance(pkgs, list):
                 packages = [pkg for pkg in packages if pkg in pkgs]
@@ -3169,7 +3184,7 @@ def group_installed(name, skip=None, include=None, **kwargs):
                               .format(name, exc))
         return ret
 
-    failed = [x for x in targets if x not in __salt__['pkg.list_pkgs']()]
+    failed = [x for x in targets if x not in __salt__['pkg.list_pkgs'](**kwargs)]
     if failed:
         ret['comment'] = (
             'Failed to install the following packages: {0}'
