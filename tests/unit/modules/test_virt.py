@@ -4063,7 +4063,7 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             "44454c4c-3400-105a-8033-b3c04f4b344a", caps["host"]["host"]["uuid"]
         )
         self.assertEqual(
-            {"qemu", "kvm"}, {domainCaps["domain"] for domainCaps in caps["domains"]},
+            {"qemu", "kvm"}, {domainCaps["domain"] for domainCaps in caps["domains"]}
         )
 
     def test_network_tag(self):
