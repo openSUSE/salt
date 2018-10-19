@@ -23,6 +23,7 @@ import salt.utils.yaml
 
 log = logging.getLogger(__name__)
 
+from salt.utils.odict import OrderedDict
 
 if six.PY3:
     KWARG_REGEX = re.compile(r'^([^\d\W][\w.-]*)=(?!=)(.*)$', re.UNICODE)
@@ -423,7 +424,7 @@ def format_call(fun,
     ret = initial_ret is not None and initial_ret or {}
 
     ret['args'] = []
-    ret['kwargs'] = {}
+    ret['kwargs'] = OrderedDict()
 
     aspec = get_function_argspec(fun, is_class_method=is_class_method)
 
