@@ -1276,6 +1276,7 @@ def install(name=None,
             skip_verify=False,
             version=None,
             ignore_repo_failure=False,
+            no_recommends=False,
             root=None,
             **kwargs):
     '''
@@ -1364,6 +1365,9 @@ def install(name=None,
     ignore_repo_failure
         Zypper returns error code 106 if one of the repositories are not available for various reasons.
         In case to set strict check, this parameter needs to be set to True. Default: False.
+
+    no_recommends
+        Do not install recommended packages, only required ones.
 
     root
         operate on a different root directory.
@@ -1471,6 +1475,8 @@ def install(name=None,
         cmd_install.append('--download-only')
     if fromrepo:
         cmd_install.extend(fromrepoopt)
+    if no_recommends:
+        cmd_install.append('--no-recommends')
 
     errors = []
     if pkg_type == 'advisory':
@@ -1513,6 +1519,7 @@ def upgrade(refresh=True,
             fromrepo=None,
             novendorchange=False,
             skip_verify=False,
+            no_recommends=False,
             root=None,
             **kwargs):  # pylint: disable=unused-argument
     '''
@@ -1552,6 +1559,9 @@ def upgrade(refresh=True,
 
     skip_verify
         Skip the GPG verification check (e.g., ``--no-gpg-checks``)
+
+    no_recommends
+        Do not install recommended packages, only required ones.
 
     root
         Operate on a different root directory.
@@ -1596,6 +1606,10 @@ def upgrade(refresh=True,
                 log.info('Disabling vendor changes')
             else:
                 log.warning('Disabling vendor changes is not supported on this Zypper version')
+
+        if no_recommends:
+            cmd_update.append('--no-recommends')
+            log.info('Disabling recommendations')
 
         if dryrun:
             # Creates a solver test case for debugging.
