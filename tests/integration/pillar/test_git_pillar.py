@@ -1388,6 +1388,51 @@ class TestPygit2SSH(GitPillarSSHTestBase):
                         'nested_dict': {'master': True}}}
         )
 
+
+@skipIf(NO_MOCK, NO_MOCK_REASON)
+@skipIf(_windows_or_mac(), 'minion is windows or mac')
+@skip_if_not_root
+@skipIf(not HAS_PYGIT2, 'pygit2 >= {0} and libgit2 >= {1} required'.format(PYGIT2_MINVER, LIBGIT2_MINVER))
+@skipIf(not HAS_NGINX, 'nginx not present')
+@skipIf(not HAS_VIRTUALENV, 'virtualenv not present')
+class TestPygit2HTTP(GitPillarHTTPTestBase):
+    '''
+    Test git_pillar with pygit2 using SSH authentication
+    '''
+    def test_single_source(self):
+        '''
+        Test with git_pillar_includes enabled and using "__env__" as the branch
+        name for the configured repositories.
+        The "gitinfo" repository contains top.sls file with a local reference
+        and also referencing external "nowhere.foo" which is provided by "webinfo"
+        repository mounted as "nowhere".
+        '''
+        ret = self.get_pillar('''\
+            file_ignore_regex: []
+            file_ignore_glob: []
+            git_pillar_provider: pygit2
+            git_pillar_pubkey: {pubkey_nopass}
+            git_pillar_privkey: {privkey_nopass}
+            cachedir: {cachedir}
+            extension_modules: {extmods}
+            ext_pillar:
+              - git:
+                - __env__ {url_extra_repo}:
+                  - name: gitinfo
+                - __env__ {url}:
+                  - name: webinfo
+                  - mountpoint: nowhere
+            ''')
+        self.assertEqual(
+            ret,
+            {'branch': 'master',
+             'motd': 'The force will be with you. Always.',
+             'mylist': ['master'],
+             'mydict': {'master': True,
+                        'nested_list': ['master'],
+                        'nested_dict': {'master': True}}}
+        )
+
     @requires_system_grains
     def test_root_parameter(self, grains):
         '''
