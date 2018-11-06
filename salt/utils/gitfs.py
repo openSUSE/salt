@@ -2956,7 +2956,7 @@ class GitPillar(GitBase):
                     env = repo.env
                 else:
                     base_branch = self.opts['{0}_base'.format(self.role)]
-                    env = 'base' if repo.branch == base_branch else repo.branch
+                    env = 'base' if repo.branch == base_branch else repo.get_checkout_target()
                 if repo._mountpoint:
                     if self.link_mountpoint(repo):
                         self.pillar_dirs[repo.linkdir] = env
