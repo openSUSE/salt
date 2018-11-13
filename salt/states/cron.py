@@ -606,6 +606,7 @@ def file(name,
             user,
             group,
             mode,
+            [],           # No attrs for cron
             __env__,
             context,
             defaults,
@@ -634,6 +635,7 @@ def file(name,
             user,
             group,
             mode,
+            [],    # No attrs for cron
             __env__,
             backup
         )
@@ -643,14 +645,13 @@ def file(name,
         ret['comment'] = 'Unable to manage file: {0}'.format(exc)
         return ret
 
-    cron_ret = None
     if "diff" in ret['changes']:
         cron_ret = __salt__['cron.write_cron_file_verbose'](user, cron_path)
         # Check cmd return code and show success or failure
         if cron_ret['retcode'] == 0:
             ret['comment'] = 'Crontab for user {0} was updated'.format(user)
             ret['result'] = True
-            ret['changes'] = ret['changes']['diff']
+            ret['changes'] = {'diff': ret['changes']['diff']}
         else:
             ret['comment'] = 'Unable to update user {0} crontab {1}.' \
                              ' Error: {2}'.format(user, cron_path, cron_ret['stderr'])
