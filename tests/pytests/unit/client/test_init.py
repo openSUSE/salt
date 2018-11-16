@@ -79,6 +79,7 @@ def test_prep_pub(local_client):
         "ret": "",
         "tgt": "*",
         "tgt_type": "glob",
+        "timeout": 7,
         "user": local_client.salt_user,
     }
     assert result == expected
@@ -104,6 +105,7 @@ def test_prep_pub_kwargs(local_client):
         "ret": "",
         "tgt": "*",
         "tgt_type": "glob",
+        "timeout": 7,
         "user": local_client.salt_user,
         "kwargs": {
             "some_kwarg": "spongebob",
@@ -133,6 +135,7 @@ def test_prep_pub_order_masters(master_opts):
         "ret": "",
         "tgt": "*",
         "tgt_type": "glob",
+        "timeout": 7,
         "to": 7,
         "user": local_client.salt_user,
     }
@@ -164,6 +167,7 @@ def test_prep_pub_nodegroup(master_opts):
         "ret": "",
         "tgt": "L@spongebob,patrick",
         "tgt_type": "compound",
+        "timeout": 7,
         "user": local_client.salt_user,
     }
     assert result == expected
@@ -188,6 +192,7 @@ def test_prep_pub_compound(local_client):
         "ret": "",
         "tgt": "spongebob,patrick",
         "tgt_type": "compound",
+        "timeout": 7,
         "user": local_client.salt_user,
     }
     assert result == expected
@@ -218,6 +223,7 @@ def test_prep_pub_compound_nodegroup(master_opts):
         "ret": "",
         "tgt": "L@spongebob,patrick",
         "tgt_type": "compound",
+        "timeout": 7,
         "user": local_client.salt_user,
     }
     assert result == expected
@@ -244,6 +250,7 @@ def test_prep_pub_ext_job_cache(master_opts):
         "ret": "mysql",
         "tgt": "spongebob,patrick",
         "tgt_type": "glob",
+        "timeout": 7,
         "user": local_client.salt_user,
     }
     assert result == expected
@@ -270,6 +277,7 @@ def test_prep_pub_ext_job_cache_existing(master_opts):
         "ret": "postgres,mysql",
         "tgt": "spongebob,patrick",
         "tgt_type": "glob",
+        "timeout": 7,
         "user": local_client.salt_user,
     }
     assert result == expected
