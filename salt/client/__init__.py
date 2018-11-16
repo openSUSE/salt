@@ -543,6 +543,20 @@ class LocalClient:
         # Late import - not used anywhere else in this file
         import salt.cli.batch
 
+        opts = salt.cli.batch.batch_get_opts(
+            tgt,
+            fun,
+            batch,
+            self.opts,
+            arg=arg,
+            tgt_type=tgt_type,
+            ret=ret,
+            kwarg=kwarg,
+            **kwargs
+        )
+
+        eauth = salt.cli.batch.batch_get_eauth(kwargs)
+
         arg = salt.utils.args.condition_input(arg, kwarg)
         opts = {
             "tgt": tgt,

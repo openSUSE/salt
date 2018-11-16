@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 Execute batch runs
 """
 
-# Import python libs
-from __future__ import absolute_import, print_function, unicode_literals
 
 import copy
 
@@ -17,11 +14,8 @@ from datetime import datetime, timedelta
 import salt.client
 import salt.exceptions
 import salt.output
-
-# Import salt libs
 import salt.utils.stringutils
 
-# Import 3rd-party libs
 # pylint: disable=import-error,no-name-in-module,redefined-builtin
 from salt.ext import six
 from salt.ext.six.moves import range
@@ -29,7 +23,77 @@ from salt.ext.six.moves import range
 log = logging.getLogger(__name__)
 
 
-class Batch(object):
+def get_bnum(opts, minions, quiet):
+    """
+    Return the active number of minions to maintain
+    """
+    partition = lambda x: float(x) / 100.0 * len(minions)
+    try:
+        if isinstance(opts["batch"], str) and "%" in opts["batch"]:
+            res = partition(float(opts["batch"].strip("%")))
+            if res < 1:
+                return int(math.ceil(res))
+            else:
+                return int(res)
+        else:
+            return int(opts["batch"])
+    except ValueError:
+        if not quiet:
+            salt.utils.stringutils.print_cli(
+                "Invalid batch data sent: {}\nData must be in the "
+                "form of %10, 10% or 3".format(opts["batch"])
+            )
+
+
+def batch_get_opts(
+    tgt, fun, batch, parent_opts, arg=(), tgt_type="glob", ret="", kwarg=None, **kwargs
+):
+    # We need to re-import salt.utils.args here
+    # even though it has already been imported.
+    # when cmd_batch is called via the NetAPI
+    # the module is unavailable.
+    import salt.utils.args
+
+    arg = salt.utils.args.condition_input(arg, kwarg)
+    opts = {
+        "tgt": tgt,
+        "fun": fun,
+        "arg": arg,
+        "tgt_type": tgt_type,
+        "ret": ret,
+        "batch": batch,
+        "failhard": kwargs.get("failhard", parent_opts.get("failhard", False)),
+        "raw": kwargs.get("raw", False),
+    }
+
+    if "timeout" in kwargs:
+        opts["timeout"] = kwargs["timeout"]
+    if "gather_job_timeout" in kwargs:
+        opts["gather_job_timeout"] = kwargs["gather_job_timeout"]
+    if "batch_wait" in kwargs:
+        opts["batch_wait"] = int(kwargs["batch_wait"])
+
+    for key, val in parent_opts.items():
+        if key not in opts:
+            opts[key] = val
+
+    return opts
+
+
+def batch_get_eauth(kwargs):
+    eauth = {}
+    if "eauth" in kwargs:
+        eauth["eauth"] = kwargs.pop("eauth")
+    if "username" in kwargs:
+        eauth["username"] = kwargs.pop("username")
+    if "password" in kwargs:
+        eauth["password"] = kwargs.pop("password")
+    if "token" in kwargs:
+        eauth["token"] = kwargs.pop("token")
+    return eauth
+
+
+class Batch:
     """
     Manage the execution of batch runs
     """
@@ -75,7 +139,7 @@ class Batch(object):
                 continue
             else:
                 try:
-                    m = next(six.iterkeys(ret))
+                    m = next(iter(ret.keys()))
                 except StopIteration:
                     if not self.quiet:
                         salt.utils.stringutils.print_cli(
@@ -87,28 +151,7 @@ class Batch(object):
         return (list(fret), ping_gen, nret.difference(fret))
 
     def get_bnum(self):
-        """
-        Return the active number of minions to maintain
-        """
-        partition = lambda x: float(x) / 100.0 * len(self.minions)
-        try:
-            if (
-                isinstance(self.opts["batch"], six.string_types)
-                and "%" in self.opts["batch"]
-            ):
-                res = partition(float(self.opts["batch"].strip("%")))
-                if res < 1:
-                    return int(math.ceil(res))
-                else:
-                    return int(res)
-            else:
-                return int(self.opts["batch"])
-        except ValueError:
-            if not self.quiet:
-                salt.utils.stringutils.print_cli(
-                    "Invalid batch data sent: {0}\nData must be in the "
-                    "form of %10, 10% or 3".format(self.opts["batch"])
-                )
+        return get_bnum(self.opts, self.minions, self.quiet)
 
     def __update_wait(self, wait):
         now = datetime.now()
@@ -161,7 +204,7 @@ class Batch(object):
             # the user we won't be attempting to run a job on them
             for down_minion in self.down_minions:
                 salt.utils.stringutils.print_cli(
-                    "Minion {0} did not respond. No job will be sent.".format(
+                    "Minion {} did not respond. No job will be sent.".format(
                         down_minion
                     )
                 )
@@ -190,7 +233,7 @@ class Batch(object):
             if next_:
                 if not self.quiet:
                     salt.utils.stringutils.print_cli(
-                        "\nExecuting run on {0}\n".format(sorted(next_))
+                        "\nExecuting run on {}\n".format(sorted(next_))
                     )
                 # create a new iterator for this batch of minions
                 return_value = self.opts.get("return", self.opts.get("ret", ""))
@@ -218,7 +261,7 @@ class Batch(object):
             for ping_ret in self.ping_gen:
                 if ping_ret is None:
                     break
-                m = next(six.iterkeys(ping_ret))
+                m = next(iter(ping_ret.keys()))
                 if m not in self.minions:
                     self.minions.append(m)
                     to_run.append(m)
@@ -243,7 +286,7 @@ class Batch(object):
                                 )
                             else:
                                 salt.utils.stringutils.print_cli(
-                                    "minion {0} was already deleted from tracker, probably a duplicate key".format(
+                                    "minion {} was already deleted from tracker, probably a duplicate key".format(
                                         part["id"]
                                     )
                                 )
@@ -254,7 +297,7 @@ class Batch(object):
                                     minion_tracker[queue]["minions"].remove(id)
                                 else:
                                     salt.utils.stringutils.print_cli(
-                                        "minion {0} was already deleted from tracker, probably a duplicate key".format(
+                                        "minion {} was already deleted from tracker, probably a duplicate key".format(
                                             id
                                         )
                                     )
@@ -274,7 +317,7 @@ class Batch(object):
                                 parts[minion] = {}
                                 parts[minion]["ret"] = {}
 
-            for minion, data in six.iteritems(parts):
+            for minion, data in parts.items():
                 if minion in active:
                     active.remove(minion)
                     if bwait:

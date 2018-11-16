@@ -3,7 +3,6 @@ This module contains all of the routines needed to set up a master server, this
 involves preparing the three listeners and the workers needed by the master.
 """
 
-# Import python libs
 
 import collections
 import copy
@@ -21,10 +20,9 @@ import time
 
 import salt.acl
 import salt.auth
+import salt.cli.batch_async
 import salt.client
 import salt.client.ssh.client
-
-# Import salt libs
 import salt.crypt
 import salt.daemons.masterapi
 import salt.defaults.exitcodes
@@ -89,7 +87,6 @@ except ImportError:
     # resource is not available on windows
     HAS_RESOURCE = False
 
-# Import halite libs
 try:
     import halite  # pylint: disable=import-error
 
@@ -2232,6 +2229,24 @@ class ClearFuncs(TransportMethods):
             return False
         return self.loadauth.get_tok(clear_load["token"])
 
+    def publish_batch(self, clear_load, minions, missing):
+        batch_load = {}
+        batch_load.update(clear_load)
+        import salt.cli.batch_async
+
+        batch = salt.cli.batch_async.BatchAsync(
+            self.local.opts,
+            functools.partial(self._prep_jid, clear_load, {}),
+            batch_load,
+        )
+        ioloop = tornado.ioloop.IOLoop.current()
+        ioloop.add_callback(batch.start)
+
+        return {
+            "enc": "clear",
+            "load": {"jid": batch.batch_jid, "minions": minions, "missing": missing},
+        }
+
     def publish(self, clear_load):
         """
         This method sends out publications to the minions, it can only be used
@@ -2349,6 +2364,9 @@ class ClearFuncs(TransportMethods):
                         ),
                     },
                 }
+        if extra.get("batch", None):
+            return self.publish_batch(clear_load, minions, missing)
+
         jid = self._prep_jid(clear_load, extra)
         if jid is None:
             return {"enc": "clear", "load": {"error": "Master failed to assign jid"}}
