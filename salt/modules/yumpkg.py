@@ -65,6 +65,8 @@ log = logging.getLogger(__name__)
 
 __HOLD_PATTERN = r'[\w+]+(?:[.-][^-]+)*'
 
+PKG_ARCH_SEPARATOR = '.'
+
 # Define the module's virtual name
 __virtualname__ = 'pkg'
 
@@ -397,7 +399,7 @@ def normalize_name(name):
         salt '*' pkg.normalize_name zsh.x86_64
     '''
     try:
-        arch = name.rsplit('.', 1)[-1]
+        arch = name.rsplit(PKG_ARCH_SEPARATOR, 1)[-1]
         if arch not in salt.utils.pkg.rpm.ARCHES + ('noarch',):
             return name
     except ValueError:
@@ -406,6 +408,30 @@ def normalize_name(name):
             or salt.utils.pkg.rpm.check_32(arch, osarch=__grains__['osarch']):
         return name[:-(len(arch) + 1)]
     return name
+
+
+def parse_arch_from_name(name):
+    '''
+    Parse name and architecture from the specified package name.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' pkg.parse_arch_from_name zsh.x86_64
+    '''
+    _name, _arch = None, None
+    try:
+        _name, _arch = name.rsplit(PKG_ARCH_SEPARATOR, 1)
+    except ValueError:
+        pass
+    if _arch not in salt.utils.pkg.rpm.ARCHES + ('noarch',):
+        _name = name
+        _arch = None
+    return {
+        'name': _name,
+        'arch': _arch
+    }
 
 
 def latest_version(*names, **kwargs):
@@ -647,8 +673,8 @@ def list_pkgs(versions_as_list=False, **kwargs):
             if pkginfo is not None:
                 # see rpm version string rules available at https://goo.gl/UGKPNd
                 pkgver = pkginfo.version
-                epoch = ''
-                release = ''
+                epoch = None
+                release = None
                 if ':' in pkgver:
                     epoch, pkgver = pkgver.split(":", 1)
                 if '-' in pkgver:
