@@ -107,7 +107,7 @@ class YumTestCase(TestCase, LoaderModuleMockMixin):
              patch.dict(yumpkg.__salt__, {'pkg_resource.add_pkg': _add_data}), \
              patch.dict(yumpkg.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
              patch.dict(yumpkg.__salt__, {'pkg_resource.stringify': MagicMock()}), \
-             patch.dict(pkg_resource.__salt__, {'pkg.parse_arch': yumpkg.parse_arch}):
+             patch.dict(pkg_resource.__salt__, {'pkg.parse_arch_from_name': yumpkg.parse_arch_from_name}):
             pkgs = yumpkg.list_pkgs(versions_as_list=True)
             for pkg_name, pkg_version in {
                 'python-urlgrabber': '3.10-8.el7',
@@ -155,7 +155,7 @@ class YumTestCase(TestCase, LoaderModuleMockMixin):
              patch.dict(yumpkg.__salt__, {'pkg_resource.add_pkg': _add_data}), \
              patch.dict(yumpkg.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
              patch.dict(yumpkg.__salt__, {'pkg_resource.stringify': MagicMock()}), \
-             patch.dict(pkg_resource.__salt__, {'pkg.parse_arch': yumpkg.parse_arch}):
+             patch.dict(pkg_resource.__salt__, {'pkg.parse_arch_from_name': yumpkg.parse_arch_from_name}):
             pkgs = yumpkg.list_pkgs(attr=['epoch', 'release', 'arch', 'install_date_time_t'])
             for pkg_name, pkg_attr in {
                 'python-urlgrabber': {
@@ -273,7 +273,7 @@ class YumTestCase(TestCase, LoaderModuleMockMixin):
              patch.dict(yumpkg.__salt__, {'pkg_resource.add_pkg': _add_data}), \
              patch.dict(yumpkg.__salt__, {'pkg_resource.format_pkg_list': pkg_resource.format_pkg_list}), \
              patch.dict(yumpkg.__salt__, {'pkg_resource.stringify': MagicMock()}), \
-             patch.dict(pkg_resource.__salt__, {'pkg.parse_arch': yumpkg.parse_arch}):
+             patch.dict(pkg_resource.__salt__, {'pkg.parse_arch_from_name': yumpkg.parse_arch_from_name}):
             pkgs = yumpkg.list_pkgs(attr=['epoch', 'release', 'arch', 'install_date_time_t'])
             expected_pkg_list = {
                 'glibc': [
@@ -314,51 +314,6 @@ class YumTestCase(TestCase, LoaderModuleMockMixin):
                     self.assertCountEqual(pkginfo, expected_pkg_list[pkgname])
                 else:
                     self.assertItemsEqual(pkginfo, expected_pkg_list[pkgname])
-
-    def test_list_patches(self):
-        '''
-        Test patches listing.
-
-        :return:
-        '''
-        yum_out = [
-            'i my-fake-patch-not-installed-1234 recommended    spacewalk-usix-2.7.5.2-2.2.noarch',
-            '  my-fake-patch-not-installed-1234 recommended    spacewalksd-5.0.26.2-21.2.x86_64',
-            'i my-fake-patch-not-installed-1234 recommended    suseRegisterInfo-3.1.1-18.2.x86_64',
-            'i my-fake-patch-installed-1234 recommended        my-package-one-1.1-0.1.x86_64',
-            'i my-fake-patch-installed-1234 recommended        my-package-two-1.1-0.1.x86_64',
-        ]
-
-        expected_patches = {
-            'my-fake-patch-not-installed-1234': {
-                'installed': False,
-                'summary': [
-                    'spacewalk-usix-2.7.5.2-2.2.noarch',
-                    'spacewalksd-5.0.26.2-21.2.x86_64',
-                    'suseRegisterInfo-3.1.1-18.2.x86_64',
-                ]
-            },
-            'my-fake-patch-installed-1234': {
-                'installed': True,
-                'summary': [
-                    'my-package-one-1.1-0.1.x86_64',
-                    'my-package-two-1.1-0.1.x86_64',
-                ]
-            }
-        }
-
-        with patch.dict(yumpkg.__grains__, {'osarch': 'x86_64'}), \
-             patch.dict(yumpkg.__salt__, {'cmd.run_stdout': MagicMock(return_value=os.linesep.join(yum_out))}):
-            patches = yumpkg.list_patches()
-            self.assertFalse(patches['my-fake-patch-not-installed-1234']['installed'])
-            self.assertTrue(len(patches['my-fake-patch-not-installed-1234']['summary']) == 3)
-            for _patch in expected_patches['my-fake-patch-not-installed-1234']['summary']:
-                self.assertTrue(_patch in patches['my-fake-patch-not-installed-1234']['summary'])
-
-            self.assertTrue(patches['my-fake-patch-installed-1234']['installed'])
-            self.assertTrue(len(patches['my-fake-patch-installed-1234']['summary']) == 2)
-            for _patch in expected_patches['my-fake-patch-installed-1234']['summary']:
-                self.assertTrue(_patch in patches['my-fake-patch-installed-1234']['summary'])
 
     def test_latest_version_with_options(self):
         with patch.object(yumpkg, 'list_pkgs', MagicMock(return_value={})):
