@@ -206,7 +206,7 @@ def normalize_name(name):
     return name
 
 
-def parse_arch(name):
+def parse_arch_from_name(name):
     '''
     Parse name and architecture from the specified package name.
 
@@ -214,7 +214,7 @@ def parse_arch(name):
 
     .. code-block:: bash
 
-        salt '*' pkg.parse_arch zsh:amd64
+        salt '*' pkg.parse_arch_from_name zsh:amd64
     '''
     try:
         _name, _arch = name.rsplit(PKG_ARCH_SEPARATOR, 1)
