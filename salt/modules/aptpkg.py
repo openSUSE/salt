@@ -69,6 +69,8 @@ except ImportError:
     HAS_SOFTWAREPROPERTIES = False
 # pylint: enable=import-error
 
+PKG_ARCH_SEPARATOR = ':'
+
 # Source format for urllib fallback on PPA handling
 LP_SRC_FORMAT = 'deb http://ppa.launchpad.net/{0}/{1}/ubuntu {2} main'
 LP_PVT_SRC_FORMAT = 'deb https://{0}private-ppa.launchpad.net/{1}/{2}/ubuntu' \
@@ -199,6 +201,43 @@ def _warn_software_properties(repo):
                 'For more accurate support of PPA repositories, you should '
                 'install this package.')
     log.warning('Best guess at ppa format: {0}'.format(repo))
+
+
+def normalize_name(name):
+    '''
+    Strips the architecture from the specified package name, if necessary.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' pkg.normalize_name zsh:amd64
+    '''
+    try:
+        name, arch = name.rsplit(PKG_ARCH_SEPARATOR, 1)
+    except ValueError:
+        return name
+    return name
+
+
+def parse_arch_from_name(name):
+    '''
+    Parse name and architecture from the specified package name.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' pkg.parse_arch_from_name zsh:amd64
+    '''
+    try:
+        _name, _arch = name.rsplit(PKG_ARCH_SEPARATOR, 1)
+    except ValueError:
+        _name, _arch = name, None
+    return {
+        'name': _name,
+        'arch': _arch
+    }
 
 
 def latest_version(*names, **kwargs):
