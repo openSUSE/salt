@@ -311,21 +311,31 @@ def format_pkg_list(packages, versions_as_list, attr):
     '''
     ret = copy.deepcopy(packages)
     if attr:
-        requested_attr = {'epoch', 'version', 'release', 'arch', 'install_date', 'install_date_time_t'}
+        ret_attr = {}
+        requested_attr = set(['epoch', 'version', 'release', 'arch',
+                              'install_date', 'install_date_time_t'])
 
         if attr != 'all':
-            requested_attr &= set(attr + ['version'])
+            requested_attr &= set(attr + ['version'] + ['arch'])
 
         for name in ret:
+            _parse_arch_from_name = __salt__.get('pkg.parse_arch_from_name', lambda pkgname: {'name': pkgname, 'arch': None})
+            name_arch_d = _parse_arch_from_name(name)
+            _name = name_arch_d['name']
+            _arch = name_arch_d['arch']
+
             versions = []
+            pkgname = None
             for all_attr in ret[name]:
                 filtered_attr = {}
                 for key in requested_attr:
-                    if all_attr[key]:
+                    if key in all_attr:
                         filtered_attr[key] = all_attr[key]
                 versions.append(filtered_attr)
-            ret[name] = versions
-        return ret
+                if _name and filtered_attr.get('arch', None) == _arch:
+                    pkgname = _name
+            ret_attr.setdefault(pkgname or name, []).extend(versions)
+        return ret_attr
 
     for name in ret:
         ret[name] = [format_version(d['epoch'], d['version'], d['release'])
