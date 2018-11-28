@@ -93,12 +93,6 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-fh = logging.FileHandler('/tmp/log.log')
-formatter = logging.Formatter('%(asctime)s - %(module)s.%(funcName)s - %(message)s')
-fh.setFormatter(formatter)
-mylogger = logging.getLogger('loglog')
-mylogger.addHandler(fh)
-
 
 class SMaster(object):
     '''
@@ -1551,7 +1545,6 @@ class AESFuncs(object):
 
         :param dict load: The minion payload
         '''
-        mylogger.debug("{jid} {id} {fun}".format(**load))
         if self.opts['require_minion_sign_messages'] and 'sig' not in load:
             log.critical(
                 '_return: Master is requiring minions to sign their '
@@ -1984,16 +1977,6 @@ class ClearFuncs(object):
             return False
         return self.loadauth.get_tok(clear_load['token'])
 
-    @tornado.gen.coroutine
-    def _timestamp(self, ioloop, lasttime, times, name):
-        if times >= 50:
-            raise tornado.gen.Return()
-        import random
-        # yield tornado.gen.sleep(random.randint(1, 50) / 100.0)
-        yield tornado.gen.sleep(0.1)
-        mylogger.info("%s %s", name, time.time() - lasttime)
-        ioloop.add_callback(self._timestamp, ioloop, time.time(), times + 1, name)
-
     def publish_batch(self, batch, clear_load):
         batch_load = {}
         batch_load.update(clear_load)
@@ -2006,9 +1989,6 @@ class ClearFuncs(object):
         )
         ioloop = tornado.ioloop.IOLoop.current()
         ioloop.add_callback(batch.start)
-        # ioloop.add_callback(self._timestamp, ioloop, time.time(), 0, ' 1     ')
-        # ioloop.add_callback(self._timestamp, ioloop, time.time(), 0, '   2   ')
-        # ioloop.add_callback(self._timestamp, ioloop, time.time(), 0, '     3 ')
 
         return {
             'enc': 'clear',
@@ -2117,7 +2097,6 @@ class ClearFuncs(object):
                 return {'enc': 'clear',
                         'load': {'error': 'Master failed to assign jid'}}
             payload = self._prep_pub(minions, jid, clear_load, extra, missing)
-            mylogger.debug("{jid} {fun} {tgt} {arg}".format(**payload))
 
             # Send it!
             self._send_ssh_pub(payload, ssh_minions=ssh_minions)
