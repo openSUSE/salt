@@ -25,6 +25,7 @@ import salt.utils.path
 import salt.modules.network as network
 from salt.exceptions import CommandExecutionError
 from salt._compat import ipaddress
+from salt.ext import six
 
 
 @skipIf(NO_MOCK, NO_MOCK_REASON)
@@ -357,3 +358,20 @@ class NetworkTestCase(TestCase, LoaderModuleMockMixin):
 
             with patch.dict(network.__grains__, {'kernel': 'Linux'}):
                 self.assertListEqual(network.default_route('inet'), [])
+
+    ipv6_route_data = '''
+anycast ff00::/8 dev wlan0  table local  metric 256  pref medium
+unreachable default dev lo  table unspec  proto kernel  metric 4294967295  error -101 pref medium
+'''
+    @patch('salt.modules.network.__salt__', {'cmd.run': MagicMock(side_effect=['', ipv6_route_data.strip()])})
+    def test_ip_route_linux(self):
+        '''
+        test ip_route_linux
+
+        :return:
+        '''
+        out = network._ip_route_linux()[0]
+        for k, v in six.iteritems({'destination': 'ff00::/8', 'gateway': '::', 'netmask': '',
+                                   'addr_family': 'inet6', 'flags': 'U', 'interface': ''}):
+            assert k in out
+            assert out[k] == v
