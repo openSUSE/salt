@@ -562,6 +562,18 @@ def _ip_route_linux():
                 'netmask': '',
                 'flags': 'U',
                 'interface': ip_interface})
+        elif comps[0] == "anycast":
+            ip_interface = ''
+            if comps[1] == "dev":
+                ip_interface = comps[2]
+
+            ret.append({
+                'addr_family': 'inet6',
+                'destination': comps[1],
+                'gateway': '::',
+                'netmask': '',
+                'flags': 'U',
+                'interface': ip_interface})
         else:
             address_mask = convert_cidr(comps[0])
             ip_interface = ''
