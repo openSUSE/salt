@@ -23,10 +23,11 @@ log = logging.getLogger(__name__)
 # Import Salt Testing libs
 from tests.support.case import ModuleCase
 from tests.support.unit import skipIf
-from tests.support.paths import FILES, TMP, TMP_STATE_TREE
+from tests.support.paths import BASE_FILES, FILES, TMP, TMP_STATE_TREE
 from tests.support.helpers import (
     skip_if_not_root,
     with_system_user_and_group,
+    with_tempfile,
     Webserver,
 )
 from tests.support.mixins import SaltReturnAssertsMixin
@@ -54,7 +55,6 @@ from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-b
 
 IS_WINDOWS = salt.utils.platform.is_windows()
 
-STATE_DIR = os.path.join(FILES, 'file', 'base')
 if IS_WINDOWS:
     FILEPILLAR = 'C:\\Windows\\Temp\\filepillar-python'
     FILEPILLARDEF = 'C:\\Windows\\Temp\\filepillar-defaultvalue'
@@ -70,7 +70,7 @@ def _test_managed_file_mode_keep_helper(testcase, local=False):
     DRY helper function to run the same test with a local or remote path
     '''
     name = os.path.join(TMP, 'scene33')
-    grail_fs_path = os.path.join(FILES, 'file', 'base', 'grail', 'scene33')
+    grail_fs_path = os.path.join(BASE_FILES, 'grail', 'scene33')
     grail = 'salt://grail/scene33' if not local else grail_fs_path
 
     # Get the current mode so that we can put the file back the way we
@@ -230,9 +230,7 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
         ret = self.run_state(
             'file.managed', name=name, source='salt://grail/scene33'
         )
-        src = os.path.join(
-            FILES, 'file', 'base', 'grail', 'scene33'
-        )
+        src = os.path.join(BASE_FILES, 'grail', 'scene33')
         with salt.utils.files.fopen(src, 'r') as fp_:
             master_data = fp_.read()
         with salt.utils.files.fopen(name, 'r') as fp_:
@@ -446,11 +444,11 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
         funny_file = tempfile.mkstemp(prefix='?f!le? n@=3&', suffix='.file type')[1]
         funny_file_name = os.path.split(funny_file)[1]
         funny_url = 'salt://|' + funny_file_name
-        funny_url_path = os.path.join(STATE_DIR, funny_file_name)
+        funny_url_path = os.path.join(BASE_FILES, funny_file_name)
 
         state_name = 'funny_file'
         state_file_name = state_name + '.sls'
-        state_file = os.path.join(STATE_DIR, state_file_name)
+        state_file = os.path.join(BASE_FILES, state_file_name)
         state_key = 'file_|-{0}_|-{0}_|-managed'.format(funny_file)
 
         try:
@@ -479,7 +477,7 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
         '''
         state_name = 'file-FileTest-test_managed_contents'
         state_filename = state_name + '.sls'
-        state_file = os.path.join(STATE_DIR, state_filename)
+        state_file = os.path.join(BASE_FILES, state_filename)
 
         managed_files = {}
         state_keys = {}
@@ -574,7 +572,7 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
         Make sure that we enforce the source_hash even with local files
         '''
         name = os.path.join(TMP, 'local_source_with_source_hash')
-        local_path = os.path.join(FILES, 'file', 'base', 'grail', 'scene33')
+        local_path = os.path.join(BASE_FILES, 'grail', 'scene33')
         actual_hash = '567fd840bf1548edc35c48eb66cdd78bfdfcccff'
         # Reverse the actual hash
         bad_hash = actual_hash[::-1]
@@ -630,7 +628,7 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
         Make sure that we exit gracefully when a local source doesn't exist
         '''
         name = os.path.join(TMP, 'local_source_does_not_exist')
-        local_path = os.path.join(FILES, 'file', 'base', 'grail', 'scene99')
+        local_path = os.path.join(BASE_FILES, 'grail', 'scene99')
 
         for proto in ('file://', ''):
             source = proto + local_path
@@ -646,6 +644,29 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
             # Check that we identified a hash mismatch
             self.assertIn(
                 'does not exist', ret['comment'])
+
+    @with_tempfile
+    def test_managed_latin1_diff(self, name):
+        '''
+        Tests that latin-1 file contents are represented properly in the diff
+        '''
+        # Lay down the initial file
+        ret = self.run_state(
+            'file.managed',
+            name=name,
+            source='salt://issue-48777/old.html')
+        ret = ret[next(iter(ret))]
+        assert ret['result'] is True, ret
+
+        # Replace it with the new file and check the diff
+        ret = self.run_state(
+            'file.managed',
+            name=name,
+            source='salt://issue-48777/new.html')
+        ret = ret[next(iter(ret))]
+        assert ret['result'] is True, ret
+        diff_lines = ret['changes']['diff'].split('\n')
+        assert '+räksmörgås' in diff_lines, diff_lines
 
     def test_directory(self):
         '''
@@ -863,7 +884,7 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
         '''
         state_name = 'file-FileTest-test_directory_clean_require_in'
         state_filename = state_name + '.sls'
-        state_file = os.path.join(STATE_DIR, state_filename)
+        state_file = os.path.join(BASE_FILES, state_filename)
 
         directory = tempfile.mkdtemp()
         self.addCleanup(lambda: shutil.rmtree(directory))
@@ -898,7 +919,7 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
         '''
         state_name = 'file-FileTest-test_directory_clean_require_in_with_id'
         state_filename = state_name + '.sls'
-        state_file = os.path.join(STATE_DIR, state_filename)
+        state_file = os.path.join(BASE_FILES, state_filename)
 
         directory = tempfile.mkdtemp()
         self.addCleanup(lambda: shutil.rmtree(directory))
@@ -934,7 +955,7 @@ class FileTest(ModuleCase, SaltReturnAssertsMixin):
         '''
         state_name = 'file-FileTest-test_directory_clean_require_in_with_id'
         state_filename = state_name + '.sls'
-        state_file = os.path.join(STATE_DIR, state_filename)
+        state_file = os.path.join(BASE_FILES, state_filename)
 
         directory = tempfile.mkdtemp()
         self.addCleanup(lambda: shutil.rmtree(directory))
