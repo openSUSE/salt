@@ -18,6 +18,9 @@ STR = BYTES = UNICODE.encode('utf-8')
 # code points. Do not modify it.
 EGGS = '\u044f\u0438\u0306\u0446\u0430'
 
+LATIN1_UNICODE = 'räksmörgås'
+LATIN1_BYTES = LATIN1_UNICODE.encode('latin-1')
+
 
 class StringutilsTestCase(TestCase):
     def test_contains_whitespace(self):
@@ -111,6 +114,13 @@ class StringutilsTestCase(TestCase):
             'яйца'
         )
 
+        self.assertEqual(
+            salt.utils.stringutils.to_unicode(
+                LATIN1_BYTES, encoding='latin-1'
+            ),
+            LATIN1_UNICODE
+        )
+
         if six.PY3:
             self.assertEqual(salt.utils.stringutils.to_unicode('plugh'), 'plugh')
             self.assertEqual(salt.utils.stringutils.to_unicode('áéíóúý'), 'áéíóúý')
@@ -123,6 +133,10 @@ class StringutilsTestCase(TestCase):
             # Test utf-8 fallback with ascii default encoding
             with patch.object(builtins, '__salt_system_encoding__', 'ascii'):
                 self.assertEqual(salt.utils.stringutils.to_unicode(u'Ψ'.encode('utf-8')), u'Ψ')
+
+    def test_to_unicode_multi_encoding(self):
+        result = salt.utils.stringutils.to_unicode(LATIN1_BYTES, encoding=('utf-8', 'latin1'))
+        assert result == LATIN1_UNICODE
 
     def test_build_whitespace_split_regex(self):
         expected_regex = '(?m)^(?:[\\s]+)?Lorem(?:[\\s]+)?ipsum(?:[\\s]+)?dolor(?:[\\s]+)?sit(?:[\\s]+)?amet\\,' \
