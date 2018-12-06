@@ -41,6 +41,7 @@ import salt.utils.pkg
 import salt.utils.pkg.rpm
 import salt.utils.stringutils
 import salt.utils.systemd
+import salt.utils.versions
 from salt.utils.versions import LooseVersion
 import salt.utils.environment
 from salt.exceptions import CommandExecutionError, MinionError, SaltInvocationError
@@ -1742,6 +1743,46 @@ def clean_locks():
     return out
 
 
+def unhold(name=None, pkgs=None, **kwargs):
+    '''
+    Remove specified package lock.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' pkg.remove_lock <package name>
+        salt '*' pkg.remove_lock <package1>,<package2>,<package3>
+        salt '*' pkg.remove_lock pkgs='["foo", "bar"]'
+    '''
+    ret = {}
+    if (not name and not pkgs) or (name and pkgs):
+        raise CommandExecutionError('Name or packages must be specified.')
+    elif name:
+        pkgs = [name]
+
+    locks = list_locks()
+    try:
+        pkgs = list(__salt__['pkg_resource.parse_targets'](pkgs)[0].keys())
+    except MinionError as exc:
+        raise CommandExecutionError(exc)
+
+    removed = []
+    missing = []
+    for pkg in pkgs:
+        if locks.get(pkg):
+            removed.append(pkg)
+            ret[pkg]['comment'] = 'Package {0} is no longer held.'.format(pkg)
+        else:
+            missing.append(pkg)
+            ret[pkg]['comment'] = 'Package {0} unable to be unheld.'.format(pkg)
+
+    if removed:
+        __zypper__.call('rl', *removed)
+
+    return ret
+
+
 def remove_lock(packages, **kwargs):  # pylint: disable=unused-argument
     '''
     Remove specified package lock.
@@ -1754,7 +1795,7 @@ def remove_lock(packages, **kwargs):  # pylint: disable=unused-argument
         salt '*' pkg.remove_lock <package1>,<package2>,<package3>
         salt '*' pkg.remove_lock pkgs='["foo", "bar"]'
     '''
-
+    salt.utils.versions.warn_until('Sodium', 'This function is deprecated. Please use unhold() instead.')
     locks = list_locks()
     try:
         packages = list(__salt__['pkg_resource.parse_targets'](packages)[0].keys())
@@ -1775,6 +1816,50 @@ def remove_lock(packages, **kwargs):  # pylint: disable=unused-argument
     return {'removed': len(removed), 'not_found': missing}
 
 
+def hold(name=None, pkgs=None, **kwargs):
+    '''
+    Add a package lock. Specify packages to lock by exact name.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' pkg.add_lock <package name>
+        salt '*' pkg.add_lock <package1>,<package2>,<package3>
+        salt '*' pkg.add_lock pkgs='["foo", "bar"]'
+
+    :param name:
+    :param pkgs:
+    :param kwargs:
+    :return:
+    '''
+    ret = {}
+    if (not name and not pkgs) or (name and pkgs):
+        raise CommandExecutionError('Name or packages must be specified.')
+    elif name:
+        pkgs = [name]
+
+    locks = list_locks()
+    added = []
+    try:
+        pkgs = list(__salt__['pkg_resource.parse_targets'](pkgs)[0].keys())
+    except MinionError as exc:
+        raise CommandExecutionError(exc)
+
+    for pkg in pkgs:
+        ret[pkg] = {'name': pkg, 'changes': {}, 'result': False, 'comment': ''}
+        if not locks.get(pkg):
+            added.append(pkg)
+            ret[pkg]['comment'] = 'Package {0} is now being held.'.format(pkg)
+        else:
+            ret[pkg]['comment'] = 'Package {0} is already set to be held.'.format(pkg)
+
+    if added:
+        __zypper__.call('al', *added)
+
+    return ret
+
+
 def add_lock(packages, **kwargs):  # pylint: disable=unused-argument
     '''
     Add a package lock. Specify packages to lock by exact name.
@@ -1787,6 +1872,7 @@ def add_lock(packages, **kwargs):  # pylint: disable=unused-argument
         salt '*' pkg.add_lock <package1>,<package2>,<package3>
         salt '*' pkg.add_lock pkgs='["foo", "bar"]'
     '''
+    salt.utils.versions.warn_until('Sodium', 'This function is deprecated. Please use hold() instead.')
     locks = list_locks()
     added = []
     try:
