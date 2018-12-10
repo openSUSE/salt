@@ -6,7 +6,7 @@ Module to provide SAP HANA functionality to Salt
 
 :maintainer:    Xabier Arbulu Insausti <xarbulu@suse.com>
 :maturity:      alpha
-:depends:       shaptools
+:depends:       ``shaptools`` Python module
 :platform:      all
 
 :configuration: This module requires the shaptools python module and uses the
@@ -54,6 +54,13 @@ def _init(
         password=None):
     '''
     Returns an instance of the hana instance
+
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
     '''
     if sid is None:
         sid = __salt__['config.option']('hana.sid', None)
@@ -75,10 +82,12 @@ def is_installed(
     '''
     Check if SAP HANA platform is installed
 
-    Parameters:
-        sid (str): HANA system id (PRD for example)
-        inst (str): HANA instance number (00 for example)
-        password (str): HANA instance password
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     Returns:
         bool: True if installed, False otherwise
@@ -101,11 +110,14 @@ def create_conf_file(
     '''
     Create SAP HANA configuration template file
 
-    Parameters:
-        software_path (str): Path where SAP HANA software is downloaded
-        conf_file (str): Path where configuration file will be created
-        root_user (str): Root user name
-        root_password (str): Root user password
+    software_path
+        Path where SAP HANA software is downloaded
+    conf_file
+        Path where configuration file will be created
+    root_user
+        Root user name
+    root_password
+        Root user password
 
     Returns:
         str: Configuration file path
@@ -129,10 +141,10 @@ def update_conf_file(
     '''
     Update SAP HANA installation configuration file
 
-    Parameters:
-        conf_file (str): Path to the existing configuration file
-        extra_parameters (dict): Dictionary with the values to be updated. Use the exact
-            name of the SAP configuration file for the key
+    conf_file
+        Path to the existing configuration file
+    extra_parameters (dict): Dictionary with the values to be updated. Use the exact
+        name of the SAP configuration file for the key
 
     Returns:
         str: Configuration file path
@@ -157,11 +169,14 @@ def install(
     '''
     Install SAP HANA with configuration file
 
-    Parameters:
-        software_path (str): Path where SAP HANA software is downloaded
-        conf_file (str): Path where configuration file will be created
-        root_user (str): Root user name
-        root_password (str): Root user password
+    software_path
+        Path where SAP HANA software is downloaded
+    conf_file
+        Path where configuration file will be created
+    root_user
+        Root user name
+    root_password
+        Root user password
 
     CLI Example:
 
@@ -186,10 +201,18 @@ def uninstall(
     '''
     Uninstall SAP HANA platform
 
-    Parameters:
-        root_user (str): Root user name
-        root_password (str): Root user password
-        installation_folder (str): Path where SAP HANA is installed (/hana/shared by default)
+    root_user
+        Root user name
+    root_password
+        Root user password
+    installation_folder
+        Path where SAP HANA is installed (/hana/shared by default)
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -214,6 +237,13 @@ def is_running(
     '''
     Check if SAP HANA daemon is running
 
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
+
     Returns:
         bool: True if running, False otherwise
 
@@ -235,6 +265,13 @@ def get_version(
     '''
     Get SAP HANA version
 
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
+
     CLI Example:
 
     .. code-block:: bash
@@ -254,6 +291,13 @@ def start(
         password=None):
     '''
     Start hana instance
+
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -275,6 +319,13 @@ def stop(
     '''
     Stop hana instance
 
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
+
     CLI Example:
 
     .. code-block:: bash
@@ -294,6 +345,13 @@ def get_sr_state(
         password=None):
     '''
     Get system replication status in th current node
+
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     Returns:
         SrStates: System replication state
@@ -319,8 +377,14 @@ def sr_enable_primary(
     '''
     Enable SAP HANA system replication as primary node
 
-    Parameters:
-        name (str): Name to give to the node
+    name
+        Name to give to the node
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -341,6 +405,13 @@ def sr_disable_primary(
         password=None):
     '''
     Disable SAP HANA system replication as primary node
+
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -367,12 +438,22 @@ def sr_register_secondary(
     '''
     Register SAP HANA system replication as secondary node
 
-    Parameters:
-        name (str): Name to give to the node
-        remote_host (str): Primary node hostname
-        remote_instance (str): Primary node instance
-        replication_mode (str): Replication mode
-        operation_mode (str): Operation mode
+    name
+        Name to give to the node
+    remote_host
+        Primary node hostname
+    remote_instance
+        Primary node instance
+    replication_mode
+        Replication mode
+    operation_mode
+        Operation mode
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -397,8 +478,14 @@ def sr_changemode_secondary(
     '''
     Change secondary synchronization mode
 
-    Parameters:
-        new_mode (str): New mode between sync|syncmem|async
+    new_mode
+        New mode between sync|syncmem|async
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -421,8 +508,14 @@ def sr_unregister_secondary(
     '''
     Unegister SAP HANA system replication from primary node
 
-    Parameters:
-        name (str): Name to give to the node
+    name
+        Name to give to the node
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -445,8 +538,14 @@ def check_user_key(
     '''
     Check the use key existance
 
-    Parameters:
-        key (str): User key name
+    key
+        User key name
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     Returns:
         bool: True if it exists, False otherwise
@@ -476,12 +575,22 @@ def create_user_key(
     '''
     Create user key entry for the database
 
-    Parameters:
-        key (str): User key
-        environment (str): Key environment
-        user (srt): User name
-        user_password (str): User password
-        database (str, opt): Database name
+    key
+        User key
+    environment
+        Key environment
+    user
+        User name
+    user_password
+        User password
+    database
+        Database name
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -508,11 +617,20 @@ def create_backup(
     '''
     Create the primary node backup
 
-    Parameters:
-        user_key (str): User key name
-        user_password (str): User key password
-        database (str): Database name
-        back_name (str): Backup name
+    user_key
+        User key name
+    user_password
+        User key password
+    database
+        Database name
+    back_name
+        Backup name
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
@@ -536,8 +654,14 @@ def sr_cleanup(
     '''
     Clean system replication state
 
-    Parameters:
-        force (bool): Force cleanup
+    force
+        Force cleanup
+    sid
+        HANA system id (PRD for example)
+    inst
+        HANA instance number (00 for example)
+    password
+        HANA instance password
 
     CLI Example:
 
