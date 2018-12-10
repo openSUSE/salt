@@ -89,8 +89,16 @@ def _parse_dict(dict_params):
 
 
 def installed(
-        sid, inst, password,
-        software_path, root_user, root_password, **kwargs):
+        sid,
+        inst,
+        password,
+        software_path,
+        root_user,
+        root_password,
+        config_file=None,
+        sapadm_password=None,
+        system_user_password=None,
+        extra_parameters={}):
     """
     Install SAP HANA if the platform is not installed yet. There are two ways of
     using in. The configuration file might be imported from the master to the minions
@@ -129,7 +137,10 @@ def installed(
            'result': False,
            'comment': ''}
 
-    if __salt__['hana.is_installed'](sid, inst, password):
+    if __salt__['hana.is_installed'](
+            sid=sid,
+            inst=inst,
+            password=password):
         ret['result'] = True
         ret['comment'] = 'HANA is already installed'
         return ret
@@ -142,29 +153,40 @@ def installed(
 
     try:
         #  Here starts the actual process
-        if 'config_file' in kwargs:
-            config_file = kwargs.get('config_file')
-            __salt__['cp.get_file'](config_file, TMP_CONFIG_FILE)
+        if config_file:
+            __salt__['cp.get_file'](
+                path=config_file,
+                dest=TMP_CONFIG_FILE)
             ret['changes']['config_file'] = config_file
             config_file = TMP_CONFIG_FILE
+        elif system_user_password is None or sapadm_password is None:
+            raise exceptions.CommandExecutionError(
+                'If config_file is not provided system_user_password and'
+                ' sapadm_password are mandatory')
         else:
             config_file = __salt__['hana.create_conf_file'](
-                software_path, TMP_CONFIG_FILE, root_user, root_password)
+                software_path=software_path,
+                conf_file=TMP_CONFIG_FILE,
+                root_user=root_user,
+                root_password=root_password)
             config_file = __salt__['hana.update_conf_file'](
                 config_file,
                 sid=sid.upper(), password=password, number=inst,
                 root_user=root_user,
                 root_password=root_password,
-                sapadm_password=kwargs.get('sapadm_password', password),
-                system_user_password=kwargs.get('system_user_password'))
+                sapadm_password=sapadm_password,
+                system_user_password=system_user_password)
             ret['changes']['config_file'] = 'new'
-        if 'extra_parameters' in kwargs:
-            extra_parameters = _parse_dict(kwargs.get('extra_parameters'))
+        if extra_parameters:
+            extra_parameters = _parse_dict(extra_parameters)
             config_file = __salt__['hana.update_conf_file'](
-                config_file, **extra_parameters)
+                conf_file=config_file, extra_parameters=extra_parameters)
 
         __salt__['hana.install'](
-            software_path, config_file, root_user, root_password)
+            software_path=software_path,
+            conf_file=config_file,
+            root_user=root_user,
+            root_password=root_password)
         ret['changes']['sid'] = sid
         ret['comment'] = 'HANA installed'
         ret['result'] = True
@@ -178,7 +200,13 @@ def installed(
         __salt__['file.remove']('{}.xml'.format(TMP_CONFIG_FILE))
 
 
-def uninstalled(sid, inst, password, root_user, root_password, **kwargs):
+def uninstalled(
+        sid,
+        inst,
+        password,
+        root_user,
+        root_password,
+        installation_folder=None):
     '''
     Uninstall SAP HANA from node
 
@@ -200,7 +228,10 @@ def uninstalled(sid, inst, password, root_user, root_password, **kwargs):
            'result': False,
            'comment': ''}
 
-    if not __salt__['hana.is_installed'](sid, inst, password):
+    if not __salt__['hana.is_installed'](
+            sid=sid,
+            ints=inst,
+            password=password):
         ret['result'] = True
         ret['comment'] = 'HANA already not installed'
         return ret
@@ -213,9 +244,12 @@ def uninstalled(sid, inst, password, root_user, root_password, **kwargs):
 
     try:
         #  Here starts the actual process
-        installation_folder = kwargs.get('installation_folder', None)
         __salt__['hana.uninstall'](
-            root_user, root_password, sid=sid, inst=inst, password=password,
+            root_user=root_user,
+            root_password=root_password,
+            sid=sid,
+            inst=inst,
+            password=password,
             installation_folder=installation_folder)
         ret['changes']['sid'] = sid
         ret['comment'] = 'HANA uninstalled'
@@ -227,7 +261,13 @@ def uninstalled(sid, inst, password, root_user, root_password, **kwargs):
         return ret
 
 
-def sr_primary_enabled(name, sid, inst, password, **kwargs):
+def sr_primary_enabled(
+        name,
+        sid,
+        inst,
+        password,
+        backup=None,
+        userkey=None):
     '''
     Set the node as a primary hana node and in running state
 
@@ -272,8 +312,14 @@ def sr_primary_enabled(name, sid, inst, password, **kwargs):
         ret['comment'] = 'HANA is not installed properly with the provided data'
         return ret
 
-    current_state = __salt__['hana.get_sr_state'](sid, inst, password)
-    running = __salt__['hana.is_running'](sid, inst, password)
+    current_state = __salt__['hana.get_sr_state'](
+        sid=sid,
+        inst=inst,
+        password=password)
+    running = __salt__['hana.is_running'](
+        sid=sid,
+        inst=inst,
+        password=password)
     #  Improve that comparison
     if running and current_state.value == 1:
         ret['result'] = True
@@ -284,35 +330,49 @@ def sr_primary_enabled(name, sid, inst, password, **kwargs):
         ret['result'] = None
         ret['comment'] = '{} would be enabled as a primary node'.format(name)
         ret['changes']['primary'] = name
-        ret['changes']['backup'] = kwargs.get('backup', False)
-        ret['changes']['userkey'] = kwargs.get('userkey', False)
+        ret['changes']['backup'] = backup
+        ret['changes']['userkey'] = userkey
         return ret
 
     try:
         #  Here starts the actual process
         if not running:
-            __salt__['hana.start'](sid, inst, password)
-        if 'userkey' in kwargs:
-            userkey_data = _parse_dict(kwargs.get('userkey'))
+            __salt__['hana.start'](
+                sid=sid,
+                inst=inst,
+                password=password)
+        if userkey:
+            userkey_data = _parse_dict(userkey)
             __salt__['hana.create_user_key'](
-                userkey_data.get('key'),
-                userkey_data.get('environment'),
-                userkey_data.get('user'),
-                userkey_data.get('password'),
-                userkey_data.get('database', None),
-                sid, inst, password)
+                key=userkey_data.get('key'),
+                environment=userkey_data.get('environment'),
+                user=userkey_data.get('user'),
+                user_password=userkey_data.get('password'),
+                database=userkey_data.get('database', None),
+                sid=sid,
+                insd=inst,
+                password=password)
             ret['changes']['userkey'] = userkey_data.get('key')
-        if 'backup' in kwargs:
-            backup_data = _parse_dict(kwargs.get('backup'))
+        if backup:
+            backup_data = _parse_dict(backup)
             __salt__['hana.create_backup'](
-                backup_data.get('user'),
-                backup_data.get('password'),
-                backup_data.get('database'),
-                backup_data.get('file'),
-                sid, inst, password)
+                user_key=backup_data.get('user'),
+                user_password=backup_data.get('password'),
+                database=backup_data.get('database'),
+                backup_name=backup_data.get('file'),
+                sid=sid,
+                inst=inst,
+                password=password)
             ret['changes']['backup'] = backup_data.get('file')
-        __salt__['hana.sr_enable_primary'](name, sid, inst, password)
-        new_state = __salt__['hana.get_sr_state'](sid, inst, password)
+        __salt__['hana.sr_enable_primary'](
+            name=name,
+            sid=sid,
+            inst=inst,
+            password=password)
+        new_state = __salt__['hana.get_sr_state'](
+            sid=sid,
+            inst=inst,
+            password=password)
         ret['changes']['primary'] = name
         ret['comment'] = 'HANA node set as {}'.format(new_state.name)
         ret['result'] = True
@@ -324,8 +384,14 @@ def sr_primary_enabled(name, sid, inst, password, **kwargs):
 
 
 def sr_secondary_registered(
-        name, remote_host, remote_instance,
-        replication_mode, operation_mode, sid, inst, password, **kwargs):
+        name,
+        remote_host,
+        remote_instance,
+        replication_mode,
+        operation_mode,
+        sid,
+        inst,
+        password):
     '''
     Register a secondary node to an already enabled primary node
 
@@ -352,12 +418,21 @@ def sr_secondary_registered(
            'result': False,
            'comment': ''}
 
-    if not __salt__['hana.is_installed'](sid, inst, password):
+    if not __salt__['hana.is_installed'](
+            sid=sid,
+            inst=inst,
+            password=password):
         ret['comment'] = 'HANA is not installed properly with the provided data'
         return ret
 
-    current_state = __salt__['hana.get_sr_state'](sid, inst, password)
-    running = __salt__['hana.is_running'](sid, inst, password)
+    current_state = __salt__['hana.get_sr_state'](
+        sid=sid,
+        inst=inst,
+        password=password)
+    running = __salt__['hana.is_running'](
+        sid=sid,
+        inst=inst,
+        password=password)
     #  Improve that comparison
     if running and current_state.value == 2:
         ret['result'] = True
@@ -373,12 +448,27 @@ def sr_secondary_registered(
     try:
         #  Here starts the actual process
         if running:
-            __salt__['hana.stop'](sid, inst, password)
+            __salt__['hana.stop'](
+                sid=sid,
+                inst=inst,
+                password=password)
         __salt__['hana.sr_register_secondary'](
-            name, remote_host, remote_instance,
-            replication_mode, operation_mode, sid, inst, password)
-        __salt__['hana.start'](sid, inst, password)
-        new_state = __salt__['hana.get_sr_state'](sid, inst, password)
+            name=name,
+            remote_host=remote_host,
+            remote_instance=remote_instance,
+            replication_mode=replication_mode,
+            operation_mode=operation_mode,
+            sid=sid,
+            inst=inst,
+            password=password)
+        __salt__['hana.start'](
+            sid=sid,
+            inst=inst,
+            password=password)
+        new_state = __salt__['hana.get_sr_state'](
+            sid=sid,
+            inst=inst,
+            password=password)
         ret['changes']['secondary'] = name
         ret['comment'] = 'HANA node set as {}'.format(new_state.name)
         ret['result'] = True
@@ -389,7 +479,12 @@ def sr_secondary_registered(
         return ret
 
 
-def sr_clean(name, force, sid, inst, password):
+def sr_clean(
+        name,
+        force,
+        sid,
+        inst,
+        password):
     '''
     Clean the current node system replication mode
     name:
@@ -409,12 +504,21 @@ def sr_clean(name, force, sid, inst, password):
            'result': False,
            'comment': ''}
 
-    if not __salt__['hana.is_installed'](sid, inst, password):
+    if not __salt__['hana.is_installed'](
+            sid=sid,
+            inst=inst,
+            password=password):
         ret['comment'] = 'HANA is not installed properly with the provided data'
         return ret
 
-    current_state = __salt__['hana.get_sr_state'](sid, inst, password)
-    running = __salt__['hana.is_running'](sid, inst, password)
+    current_state = __salt__['hana.get_sr_state'](
+        sid=sid,
+        inst=inst,
+        password=password)
+    running = __salt__['hana.is_running'](
+        sid=sid,
+        inst=inst,
+        password=password)
     #  Improve that comparison
     if current_state.value == 0:
         ret['result'] = True
@@ -430,9 +534,19 @@ def sr_clean(name, force, sid, inst, password):
     try:
         #  Here starts the actual process
         if running:
-            __salt__['hana.stop'](sid, inst, password)
-        __salt__['hana.sr_cleanup'](force, sid, inst, password)
-        new_state = __salt__['hana.get_sr_state'](sid, inst, password)
+            __salt__['hana.stop'](
+                sid=sid,
+                inst=inst,
+                password=password)
+        __salt__['hana.sr_cleanup'](
+            force=force,
+            sid=sid,
+            inst=inst,
+            password=password)
+        new_state = __salt__['hana.get_sr_state'](
+            sid=sid,
+            inst=inst,
+            password=password)
         ret['changes']['disabled'] = name
         ret['comment'] = 'HANA node set as {}'.format(new_state.name)
         ret['result'] = True

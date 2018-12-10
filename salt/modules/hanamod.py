@@ -48,7 +48,10 @@ def __virtual__():  # pragma: no cover
         ' library is not available.')
 
 
-def _init(sid=None, inst=None, password=None):
+def _init(
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Returns an instance of the hana instance
     '''
@@ -65,7 +68,10 @@ def _init(sid=None, inst=None, password=None):
         raise exceptions.SaltInvocationError(str(err))
 
 
-def is_installed(sid=None, inst=None, password=None):
+def is_installed(
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Check if SAP HANA platform is installed
 
@@ -87,7 +93,11 @@ def is_installed(sid=None, inst=None, password=None):
     return hana_inst.is_installed()
 
 
-def create_conf_file(software_path, conf_file, root_user, root_password):
+def create_conf_file(
+        software_path,
+        conf_file,
+        root_user,
+        root_password):
     '''
     Create SAP HANA configuration template file
 
@@ -113,13 +123,15 @@ def create_conf_file(software_path, conf_file, root_user, root_password):
         raise exceptions.CommandExecutionError(str(err))
 
 
-def update_conf_file(conf_file, **kwargs):
+def update_conf_file(
+        conf_file,
+        extra_parameters):
     '''
     Update SAP HANA installation configuration file
 
     Parameters:
         conf_file (str): Path to the existing configuration file
-        kwargs (dict): Dictionary with the values to be updated. Use the exact
+        extra_parameters (dict): Dictionary with the values to be updated. Use the exact
             name of the SAP configuration file for the key
 
     Returns:
@@ -132,12 +144,16 @@ def update_conf_file(conf_file, **kwargs):
         salt '*' hana.update_conf_file /home/myuser /home/myuser/hana.conf sid=PRD
     '''
     try:
-        return hana.HanaInstance.update_conf_file(conf_file, **kwargs)
+        return hana.HanaInstance.update_conf_file(conf_file, **extra_parameters)
     except IOError as err:
         raise exceptions.CommandExecutionError(str(err))
 
 
-def install(software_path, conf_file, root_user, root_password):
+def install(
+        software_path,
+        conf_file,
+        root_user,
+        root_password):
     '''
     Install SAP HANA with configuration file
 
@@ -161,8 +177,12 @@ def install(software_path, conf_file, root_user, root_password):
 
 
 def uninstall(
-        root_user, root_password, installation_folder=None,
-        sid=None, inst=None, password=None):
+        root_user,
+        root_password,
+        installation_folder=None,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Uninstall SAP HANA platform
 
@@ -187,7 +207,10 @@ def uninstall(
         raise exceptions.CommandExecutionError(str(err))
 
 
-def is_running(sid=None, inst=None, password=None):
+def is_running(
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Check if SAP HANA daemon is running
 
@@ -205,7 +228,10 @@ def is_running(sid=None, inst=None, password=None):
 
 
 # pylint:disable=W1401
-def get_version(sid=None, inst=None, password=None):
+def get_version(
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Get SAP HANA version
 
@@ -222,7 +248,10 @@ def get_version(sid=None, inst=None, password=None):
         raise exceptions.CommandExecutionError(str(err))
 
 
-def start(sid=None, inst=None, password=None):
+def start(
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Start hana instance
 
@@ -239,7 +268,10 @@ def start(sid=None, inst=None, password=None):
         raise exceptions.CommandExecutionError(str(err))
 
 
-def stop(sid=None, inst=None, password=None):
+def stop(
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Stop hana instance
 
@@ -256,7 +288,10 @@ def stop(sid=None, inst=None, password=None):
         raise exceptions.CommandExecutionError(str(err))
 
 
-def get_sr_state(sid=None, inst=None, password=None):
+def get_sr_state(
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Get system replication status in th current node
 
@@ -276,7 +311,11 @@ def get_sr_state(sid=None, inst=None, password=None):
         raise exceptions.CommandExecutionError(str(err))
 
 
-def sr_enable_primary(name, sid=None, inst=None, password=None):
+def sr_enable_primary(
+        name,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Enable SAP HANA system replication as primary node
 
@@ -296,7 +335,10 @@ def sr_enable_primary(name, sid=None, inst=None, password=None):
         raise exceptions.CommandExecutionError(str(err))
 
 
-def sr_disable_primary(sid=None, inst=None, password=None):
+def sr_disable_primary(
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Disable SAP HANA system replication as primary node
 
@@ -314,8 +356,14 @@ def sr_disable_primary(sid=None, inst=None, password=None):
 
 
 def sr_register_secondary(
-        name, remote_host, remote_instance,
-        replication_mode, operation_mode, sid=None, inst=None, password=None):
+        name,
+        remote_host,
+        remote_instance,
+        replication_mode,
+        operation_mode,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Register SAP HANA system replication as secondary node
 
@@ -341,7 +389,11 @@ def sr_register_secondary(
         raise exceptions.CommandExecutionError(str(err))
 
 
-def sr_changemode_secondary(new_mode, sid=None, inst=None, password=None):
+def sr_changemode_secondary(
+        new_mode,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Change secondary synchronization mode
 
@@ -361,7 +413,11 @@ def sr_changemode_secondary(new_mode, sid=None, inst=None, password=None):
         raise exceptions.CommandExecutionError(str(err))
 
 
-def sr_unregister_secondary(primary_name, sid=None, inst=None, password=None):
+def sr_unregister_secondary(
+        primary_name,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Unegister SAP HANA system replication from primary node
 
@@ -381,7 +437,11 @@ def sr_unregister_secondary(primary_name, sid=None, inst=None, password=None):
         raise exceptions.CommandExecutionError(str(err))
 
 
-def check_user_key(key, sid=None, inst=None, password=None):
+def check_user_key(
+        key,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Check the use key existance
 
@@ -405,7 +465,14 @@ def check_user_key(key, sid=None, inst=None, password=None):
 
 
 def create_user_key(
-        key, environment, user, user_password, database=None, sid=None, inst=None, password=None):
+        key,
+        environment,
+        user,
+        user_password,
+        database=None,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Create user key entry for the database
 
@@ -431,7 +498,13 @@ def create_user_key(
 
 
 def create_backup(
-        user_key, user_password, database, backup_name, sid=None, inst=None, password=None):
+        user_key,
+        user_password,
+        database,
+        backup_name,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Create the primary node backup
 
@@ -455,7 +528,11 @@ def create_backup(
         raise exceptions.CommandExecutionError(str(err))
 
 
-def sr_cleanup(force=False, sid=None, inst=None, password=None):
+def sr_cleanup(
+        force=False,
+        sid=None,
+        inst=None,
+        password=None):
     '''
     Clean system replication state
 
