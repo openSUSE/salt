@@ -70,7 +70,7 @@ def _init(
     try:
         return hana.HanaInstance(sid, inst, password)
     except TypeError as err:
-        raise exceptions.SaltInvocationError(str(err))
+        raise exceptions.SaltInvocationError(err)
 
 
 def is_installed(
@@ -130,7 +130,7 @@ def create_conf_file(
         return hana.HanaInstance.create_conf_file(
             software_path, conf_file, root_user, root_password)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def update_conf_file(
@@ -156,7 +156,7 @@ def update_conf_file(
     try:
         return hana.HanaInstance.update_conf_file(conf_file, **extra_parameters)
     except IOError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def install(
@@ -186,7 +186,7 @@ def install(
         hana.HanaInstance.install(
             software_path, conf_file, root_user, root_password)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def uninstall(
@@ -225,7 +225,7 @@ def uninstall(
     try:
         hana_inst.uninstall(root_user, root_password, **kwargs)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def is_running(
@@ -280,7 +280,7 @@ def get_version(
     try:
         return hana_inst.get_version()
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def start(
@@ -307,7 +307,7 @@ def start(
     try:
         hana_inst.start()
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def stop(
@@ -334,7 +334,7 @@ def stop(
     try:
         hana_inst.stop()
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def get_sr_state(
@@ -364,7 +364,7 @@ def get_sr_state(
     try:
         return hana_inst.get_sr_state()
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def sr_enable_primary(
@@ -394,7 +394,7 @@ def sr_enable_primary(
     try:
         hana_inst.sr_enable_primary(name)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def sr_disable_primary(
@@ -421,7 +421,7 @@ def sr_disable_primary(
     try:
         hana_inst.sr_disable_primary()
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def sr_register_secondary(
@@ -465,7 +465,7 @@ def sr_register_secondary(
             name, remote_host, remote_instance,
             replication_mode, operation_mode)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def sr_changemode_secondary(
@@ -495,7 +495,7 @@ def sr_changemode_secondary(
     try:
         hana_inst.sr_changemode_secondary(new_mode)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def sr_unregister_secondary(
@@ -525,7 +525,7 @@ def sr_unregister_secondary(
     try:
         hana_inst.sr_unregister_secondary(primary_name)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def check_user_key(
@@ -558,7 +558,7 @@ def check_user_key(
     try:
         return hana_inst.check_user_key(key)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def create_user_key(
@@ -601,7 +601,7 @@ def create_user_key(
         hana_inst.create_user_key(
             key, environment, user, user_password, database)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def create_backup(
@@ -641,7 +641,7 @@ def create_backup(
         hana_inst.create_backup(
             user_key, user_password, database, backup_name)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
 
 
 def sr_cleanup(
@@ -671,4 +671,4 @@ def sr_cleanup(
     try:
         hana_inst.sr_cleanup(force)
     except hana.HanaError as err:
-        raise exceptions.CommandExecutionError(str(err))
+        raise exceptions.CommandExecutionError(err)
