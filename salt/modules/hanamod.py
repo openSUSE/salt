@@ -19,8 +19,6 @@ Module to provide SAP HANA functionality to Salt
     hana.password: 'Qwerty1234'
 '''
 
-# TODO: Add parameters description in methods docstring, using :param format
-
 # Import Python libs
 from __future__ import absolute_import, unicode_literals, print_function
 
@@ -137,7 +135,7 @@ def create_conf_file(
 
 def update_conf_file(
         conf_file,
-        extra_parameters):
+        **extra_parameters):
     '''
     Update SAP HANA installation configuration file
 

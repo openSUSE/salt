@@ -63,6 +63,13 @@ from __future__ import absolute_import, unicode_literals, print_function
 from salt import exceptions
 from salt.ext import six
 
+# Import third party libs
+try:
+    from shaptools import hana
+    HAS_HANA = True
+except ImportError:  # pragma: no cover
+    HAS_HANA = False
+
 __virtualname__ = 'hana'
 
 TMP_CONFIG_FILE = '/tmp/hana.conf'
@@ -72,7 +79,7 @@ def __virtual__():  # pragma: no cover
     '''
     Only load if the hana module is in __salt__
     '''
-    if 'hana.is_installed' in __salt__:
+    if 'hana.is_installed' in __salt__ and HAS_HANA:
         return __virtualname__
     return False
 
@@ -160,9 +167,9 @@ def installed(
             ret['changes']['config_file'] = config_file
             config_file = TMP_CONFIG_FILE
         elif system_user_password is None or sapadm_password is None:
-            raise exceptions.CommandExecutionError(
-                'If config_file is not provided system_user_password and'
-                ' sapadm_password are mandatory')
+            ret['comment'] = 'If config_file is not provided '\
+                'system_user_password and sapadm_password are mandatory'
+            return ret
         else:
             config_file = __salt__['hana.create_conf_file'](
                 software_path=software_path,
@@ -170,8 +177,10 @@ def installed(
                 root_user=root_user,
                 root_password=root_password)
             config_file = __salt__['hana.update_conf_file'](
-                config_file,
-                sid=sid.upper(), password=password, number=inst,
+                conf_file=config_file,
+                sid=sid.upper(),
+                password=password,
+                number=inst,
                 root_user=root_user,
                 root_password=root_password,
                 sapadm_password=sapadm_password,
@@ -180,7 +189,8 @@ def installed(
         if extra_parameters:
             extra_parameters = _parse_dict(extra_parameters)
             config_file = __salt__['hana.update_conf_file'](
-                conf_file=config_file, extra_parameters=extra_parameters)
+                conf_file=config_file,
+                extra_parameters=extra_parameters)
 
         __salt__['hana.install'](
             software_path=software_path,
@@ -320,8 +330,8 @@ def sr_primary_enabled(
         sid=sid,
         inst=inst,
         password=password)
-    #  Improve that comparison
-    if running and current_state.value == 1:
+
+    if running and current_state == hana.SrStates.PRIMARY:
         ret['result'] = True
         ret['comment'] = 'HANA node already set as primary and running'
         return ret
@@ -350,7 +360,7 @@ def sr_primary_enabled(
                 user_password=userkey_data.get('password'),
                 database=userkey_data.get('database', None),
                 sid=sid,
-                insd=inst,
+                inst=inst,
                 password=password)
             ret['changes']['userkey'] = userkey_data.get('key')
         if backup:
@@ -433,8 +443,8 @@ def sr_secondary_registered(
         sid=sid,
         inst=inst,
         password=password)
-    #  Improve that comparison
-    if running and current_state.value == 2:
+
+    if running and current_state == hana.SrStates.SECONDARY:
         ret['result'] = True
         ret['comment'] = 'HANA node already set as secondary and running'
         return ret
@@ -519,8 +529,8 @@ def sr_clean(
         sid=sid,
         inst=inst,
         password=password)
-    #  Improve that comparison
-    if current_state.value == 0:
+
+    if current_state == hana.SrStates.DISABLED:
         ret['result'] = True
         ret['comment'] = 'HANA node already clean'
         return ret
