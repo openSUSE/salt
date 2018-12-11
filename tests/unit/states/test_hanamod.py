@@ -45,8 +45,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
 
         mock_installed = MagicMock(return_value=True)
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed}):
-            self.assertDictEqual(hanamod.installed(
-                'prd', '00', 'pass', '/software', 'root', 'pass'), ret)
+            assert hanamod.installed(
+                'prd', '00', 'pass', '/software', 'root', 'pass') == ret
 
     def test_installed_test(self):
         '''
@@ -61,8 +61,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
         mock_installed = MagicMock(return_value=False)
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed}):
             with patch.dict(hanamod.__opts__, {'test': True}):
-                self.assertDictEqual(hanamod.installed(
-                    'prd', '00', 'pass', '/software', 'root', 'pass'), ret)
+                assert hanamod.installed(
+                    'prd', '00', 'pass', '/software', 'root', 'pass') == ret
 
     def test_installed_config_file(self):
         '''
@@ -84,10 +84,10 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.update_conf_file': mock_update,
                                            'hana.install': mock_install,
                                            'file.remove': mock_remove}):
-            self.assertDictEqual(hanamod.installed(
+            assert hanamod.installed(
                 'prd', '00', 'pass', '/software',
                 'root', 'pass', config_file='hana.conf',
-                extra_parameters=[{'hostname': 'hana01'}]), ret)
+                extra_parameters=[{'hostname': 'hana01'}]) == ret
 
             mock_cp.assert_called_once_with(
                 path='hana.conf',
@@ -125,12 +125,12 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.update_conf_file': mock_update,
                                            'hana.install': mock_install,
                                            'file.remove': mock_remove}):
-            self.assertDictEqual(hanamod.installed(
+            assert hanamod.installed(
                 'prd', '00', 'pass', '/software',
                 'root', 'pass',
                 system_user_password='sys_pass',
                 sapadm_password='pass',
-                extra_parameters=[{'hostname': 'hana01'}]), ret)
+                extra_parameters=[{'hostname': 'hana01'}]) == ret
 
             mock_create.assert_called_once_with(
                 software_path='/software',
@@ -165,17 +165,17 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
         ret = {'name': 'prd',
                'changes': {},
                'result': False,
-               'comment': 'If config_file is not provided '\
-                   'system_user_password and sapadm_password are mandatory'}
+               'comment': 'If config_file is not provided '
+                          'system_user_password and sapadm_password are mandatory'}
 
         mock_installed = MagicMock(return_value=False)
 
         mock_remove = MagicMock()
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed,
                                            'file.remove': mock_remove}):
-            self.assertDictEqual(hanamod.installed(
+            assert hanamod.installed(
                 'prd', '00', 'pass', '/software',
-                'root', 'pass'), ret)
+                'root', 'pass') == ret
 
             mock_remove.assert_has_calls([
                 mock.call(hanamod.TMP_CONFIG_FILE),
@@ -203,11 +203,11 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.update_conf_file': mock_update,
                                            'hana.install': mock_install,
                                            'file.remove': mock_remove}):
-            self.assertDictEqual(hanamod.installed(
+            assert hanamod.installed(
                 'prd', '00', 'pass', '/software',
                 'root', 'pass',
                 sapadm_password='pass',
-                system_user_password='sys_pass'), ret)
+                system_user_password='sys_pass') == ret
 
             mock_create.assert_called_once_with(
                 software_path='/software',
@@ -243,8 +243,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
 
         mock_installed = MagicMock(return_value=False)
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed}):
-            self.assertDictEqual(hanamod.uninstalled(
-                'prd', '00', 'pass', 'root', 'pass'), ret)
+            assert hanamod.uninstalled(
+                'prd', '00', 'pass', 'root', 'pass') == ret
 
     def test_uninstalled_test(self):
         '''
@@ -259,8 +259,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
         mock_installed = MagicMock(return_value=True)
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed}):
             with patch.dict(hanamod.__opts__, {'test': True}):
-                self.assertDictEqual(hanamod.uninstalled(
-                    'prd', '00', 'pass', 'root', 'pass'), ret)
+                assert hanamod.uninstalled(
+                    'prd', '00', 'pass', 'root', 'pass') == ret
 
     def test_uninstalled(self):
         '''
@@ -276,8 +276,9 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
         mock_uninstall = MagicMock()
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_is_installed,
                                            'hana.uninstall': mock_uninstall}):
-            self.assertDictEqual(hanamod.uninstalled(
-                'prd', '00', 'pass', 'root', 'pass', installation_folder='/hana'), ret)
+            assert hanamod.uninstalled(
+                'prd', '00', 'pass', 'root', 'pass',
+                installation_folder='/hana') == ret
             mock_uninstall.assert_called_once_with(
                 root_user='root', root_password='pass',
                 sid='prd', inst='00', password='pass',
@@ -298,8 +299,9 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
             side_effect=exceptions.CommandExecutionError('hana command error'))
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed,
                                            'hana.uninstall': mock_uninstall}):
-            self.assertDictEqual(hanamod.uninstalled(
-                'prd', '00', 'pass', 'root', 'pass', installation_folder='/hana'), ret)
+            assert hanamod.uninstalled(
+                'prd', '00', 'pass', 'root', 'pass',
+                installation_folder='/hana') == ret
             mock_uninstall.assert_called_once_with(
                 root_user='root', root_password='pass',
                 sid='prd', inst='00', password='pass',
@@ -320,8 +322,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
 
         mock_installed = MagicMock(return_value=False)
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed}):
-            self.assertDictEqual(hanamod.sr_primary_enabled(
-                name, 'pdr', '00', 'pass'), ret)
+            assert hanamod.sr_primary_enabled(
+                name, 'pdr', '00', 'pass') == ret
 
     @patch('salt.modules.hanamod.hana.SrStates.PRIMARY')
     def test_sr_primary_enabled(self, mock_primary):
@@ -343,8 +345,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
 
             with patch.dict(hanamod.__salt__, {'hana.is_running': mock_running,
                                                'hana.get_sr_state': mock_state}):
-                self.assertDictEqual(hanamod.sr_primary_enabled(
-                    name, 'pdr', '00', 'pass'), ret)
+                assert hanamod.sr_primary_enabled(
+                    name, 'pdr', '00', 'pass') == ret
 
     def test_sr_primary_enabled_test(self):
         '''
@@ -368,8 +370,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.is_running': mock_running,
                                            'hana.get_sr_state': mock_state}):
             with patch.dict(hanamod.__opts__, {'test': True}):
-                self.assertDictEqual(hanamod.sr_primary_enabled(
-                    name, 'pdr', '00', 'pass'), ret)
+                assert hanamod.sr_primary_enabled(
+                    name, 'pdr', '00', 'pass') == ret
 
     def test_sr_primary_enabled_basic(self):
         '''
@@ -396,8 +398,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.is_running': mock_running,
                                            'hana.get_sr_state': mock_state,
                                            'hana.sr_enable_primary': mock_enable}):
-            self.assertDictEqual(hanamod.sr_primary_enabled(
-                name, 'pdr', '00', 'pass'), ret)
+            assert hanamod.sr_primary_enabled(
+                name, 'pdr', '00', 'pass') == ret
             mock_enable.assert_called_once_with(
                 name=name,
                 sid='pdr',
@@ -452,8 +454,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.sr_enable_primary': mock_enable,
                                            'hana.create_user_key': mock_userkey,
                                            'hana.create_backup': mock_backup}):
-            self.assertDictEqual(hanamod.sr_primary_enabled(
-                name, 'pdr', '00', 'pass', userkey=userkey, backup=backup), ret)
+            assert hanamod.sr_primary_enabled(
+                name, 'pdr', '00', 'pass', userkey=userkey, backup=backup) == ret
             mock_start.assert_called_once_with(
                 sid='pdr',
                 inst='00',
@@ -507,8 +509,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.get_sr_state': mock_state,
                                            'hana.start': mock_start,
                                            'hana.sr_enable_primary': mock_enable}):
-            self.assertDictEqual(hanamod.sr_primary_enabled(
-                name, 'pdr', '00', 'pass'), ret)
+            assert hanamod.sr_primary_enabled(
+                name, 'pdr', '00', 'pass') == ret
             mock_start.assert_called_once_with(
                 sid='pdr',
                 inst='00',
@@ -534,9 +536,9 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
 
         mock_installed = MagicMock(return_value=False)
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed}):
-            self.assertDictEqual(hanamod.sr_secondary_registered(
-                name, 'pdr', '00', 'pass', 'hana01', '00', 'sync', 'logreplay'),
-                ret)
+            assert hanamod.sr_secondary_registered(
+                name, 'pdr', '00', 'pass', 'hana01', '00', 'sync',
+                'logreplay') == ret
 
     @patch('salt.modules.hanamod.hana.SrStates.SECONDARY')
     def test_sr_secondary_registered(self, mock_secondary):
@@ -558,9 +560,9 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
 
             with patch.dict(hanamod.__salt__, {'hana.is_running': mock_running,
                                                'hana.get_sr_state': mock_state}):
-                self.assertDictEqual(hanamod.sr_secondary_registered(
+                assert hanamod.sr_secondary_registered(
                     name, 'pdr', '00', 'pass', 'hana01', '00', 'sync',
-                    'logreplay'), ret)
+                    'logreplay') == ret
 
     def test_sr_secondary_registered_test(self):
         '''
@@ -584,9 +586,9 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.is_running': mock_running,
                                            'hana.get_sr_state': mock_state}):
             with patch.dict(hanamod.__opts__, {'test': True}):
-                self.assertDictEqual(hanamod.sr_secondary_registered(
+                assert hanamod.sr_secondary_registered(
                     name, 'pdr', '00', 'pass', 'hana01', '00', 'sync',
-                    'logreplay'), ret)
+                    'logreplay') == ret
 
     def test_sr_secondary_registered_basic(self):
         '''
@@ -617,9 +619,9 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.stop': mock_stop,
                                            'hana.start': mock_start,
                                            'hana.sr_register_secondary': mock_register}):
-            self.assertDictEqual(hanamod.sr_secondary_registered(
+            assert hanamod.sr_secondary_registered(
                 name, 'hana01', '00', 'sync',
-                'logreplay', 'pdr', '00', 'pass'), ret)
+                'logreplay', 'pdr', '00', 'pass') == ret
             mock_stop.assert_called_once_with(
                 sid='pdr',
                 inst='00',
@@ -660,9 +662,9 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.is_running': mock_running,
                                            'hana.get_sr_state': mock_state,
                                            'hana.sr_register_secondary': mock_register}):
-            self.assertDictEqual(hanamod.sr_secondary_registered(
+            assert hanamod.sr_secondary_registered(
                 name, 'hana01', '00', 'sync',
-                'logreplay', 'pdr', '00', 'pass'), ret)
+                'logreplay', 'pdr', '00', 'pass') == ret
             mock_register.assert_called_once_with(
                 name=name,
                 remote_host='hana01',
@@ -688,8 +690,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
 
         mock_installed = MagicMock(return_value=False)
         with patch.dict(hanamod.__salt__, {'hana.is_installed': mock_installed}):
-            self.assertDictEqual(hanamod.sr_clean(
-                name, True, 'pdr', '00', 'pass'), ret)
+            assert hanamod.sr_clean(
+                name, True, 'pdr', '00', 'pass') == ret
 
     @patch('salt.modules.hanamod.hana.SrStates.DISABLED')
     def test_sr_clean(self, mock_disabled):
@@ -712,8 +714,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
 
             with patch.dict(hanamod.__salt__, {'hana.is_running': mock_running,
                                                'hana.get_sr_state': mock_state}):
-                self.assertDictEqual(hanamod.sr_clean(
-                    name, True, 'pdr', '00', 'pass'), ret)
+                assert hanamod.sr_clean(
+                    name, True, 'pdr', '00', 'pass') == ret
 
     @patch('salt.modules.hanamod.hana.SrStates.DISABLED')
     def test_sr_clean_test(self, mock_disabled):
@@ -739,8 +741,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.is_running': mock_running,
                                            'hana.get_sr_state': mock_state}):
             with patch.dict(hanamod.__opts__, {'test': True}):
-                self.assertDictEqual(hanamod.sr_clean(
-                    name, True, 'pdr', '00', 'pass'), ret)
+                assert hanamod.sr_clean(
+                    name, True, 'pdr', '00', 'pass') == ret
 
     @patch('salt.modules.hanamod.hana.SrStates.DISABLED')
     def test_sr_clean_basic(self, mock_disabled):
@@ -771,8 +773,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.get_sr_state': mock_state,
                                            'hana.stop': mock_stop,
                                            'hana.sr_cleanup': mock_clean}):
-            self.assertDictEqual(hanamod.sr_clean(
-                name, True, 'pdr', '00', 'pass'), ret)
+            assert hanamod.sr_clean(
+                name, True, 'pdr', '00', 'pass') == ret
             mock_stop.assert_called_once_with(
                 sid='pdr',
                 inst='00',
@@ -807,8 +809,8 @@ class HanamodTestCase(TestCase, LoaderModuleMockMixin):
                                            'hana.is_running': mock_running,
                                            'hana.get_sr_state': mock_state,
                                            'hana.sr_cleanup': mock_clean}):
-            self.assertDictEqual(hanamod.sr_clean(
-                name, True, 'pdr', '00', 'pass'), ret)
+            assert hanamod.sr_clean(
+                name, True, 'pdr', '00', 'pass') == ret
             mock_clean.assert_called_once_with(
                 force=True,
                 sid='pdr',
