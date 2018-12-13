@@ -70,9 +70,10 @@ def get_osarch():
             stderr=subprocess.PIPE,
         ).communicate()[0]
     else:
-        ret = "".join([x for x in platform.uname()[-2:] if x][-1:])
-
-    return salt.utils.stringutils.to_str(ret).strip() or "unknown"
+        ret = "".join(list(filter(None, platform.uname()[-2:]))[-1:])
+    ret = salt.utils.stringutils.to_str(ret).strip() or "unknown"
+    ARCH_FIXES_MAPPING = {"powerpc64le": "ppc64le"}
+    return ARCH_FIXES_MAPPING.get(ret, ret)
 
 
 def check_32(arch, osarch=None):
