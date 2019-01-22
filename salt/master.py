@@ -8,6 +8,7 @@ involves preparing the three listeners and the workers needed by the master.
 from __future__ import absolute_import, with_statement, print_function, unicode_literals
 import copy
 import ctypes
+import functools
 import os
 import re
 import sys
