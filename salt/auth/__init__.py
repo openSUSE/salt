@@ -12,6 +12,7 @@ so that any external authentication system can be used inside of Salt
 # 5. Cache auth token with relative data opts['token_dir']
 # 6. Interface to verify tokens
 
+
 import getpass
 import logging
 import random
@@ -42,6 +43,8 @@ AUTH_INTERNAL_KEYWORDS = frozenset(
         "gather_job_timeout",
         "kwarg",
         "match",
+        "id_",
+        "force",
         "metadata",
         "print_event",
         "raw",
