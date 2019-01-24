@@ -46,6 +46,8 @@ AUTH_INTERNAL_KEYWORDS = frozenset([
     'gather_job_timeout',
     'kwarg',
     'match',
+    "id_",
+    "force",
     'metadata',
     'print_event',
     'raw',
