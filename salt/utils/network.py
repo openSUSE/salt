@@ -1819,3 +1819,15 @@ def dns_check(addr, port, safe=False, ipv6=None):
             raise SaltClientError()
         raise SaltSystemExit(code=42, msg=err)
     return resolved
+
+
+def is_fqdn(hostname):
+    """
+    Verify if hostname conforms to be a FQDN.
+
+    :param hostname: text string with the name of the host
+    :return: bool, True if hostname is correct FQDN, False otherwise
+    """
+
+    compliant = re.compile(r"(?!-)[A-Z\d\-\_]{1,63}(?<!-)$", re.IGNORECASE)
+    return "." in hostname and len(hostname) < 0xff and all(compliant.match(x) for x in hostname.rstrip(".").split("."))
