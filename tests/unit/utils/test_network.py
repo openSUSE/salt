@@ -493,3 +493,22 @@ class NetworkTestCase(TestCase):
         self.assertRaises(ValueError, network.mac_str_to_bytes, 'a0:b0:c0:d0:e0:fg')
         self.assertEqual(b'\x10\x08\x06\x04\x02\x00', network.mac_str_to_bytes('100806040200'))
         self.assertEqual(b'\xf8\xe7\xd6\xc5\xb4\xa3', network.mac_str_to_bytes('f8e7d6c5b4a3'))
+
+    def test_is_fqdn(self):
+        """
+        Test is_fqdn function passes possible FQDN names.
+
+        :return: None
+        """
+        for fqdn in ["host.domain.com", "something.with.the.dots.still.ok", "UPPERCASE.ALSO.SHOULD.WORK",
+                     "MiXeD.CaSe.AcCePtAbLe", "123.host.com", "host123.com", "some_underscore.com", "host-here.com"]:
+            assert network.is_fqdn(fqdn)
+
+    def test_is_not_fqdn(self):
+        """
+        Test is_fqdn function rejects FQDN names.
+
+        :return: None
+        """
+        for fqdn in ["hostname", "/some/path", "$variable.here", "verylonghostname.{}".format("domain" * 45)]:
+            assert not network.is_fqdn(fqdn)
