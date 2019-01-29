@@ -701,3 +701,27 @@ class NetworkTestCase(TestCase):
             # An exception is raised if unicode is passed to socket.getfqdn
             minion_id = network.generate_minion_id()
         assert minion_id != '', minion_id
+
+    def test_netlink_tool_remote_on(self):
+        with patch('subprocess.check_output', return_value=NETLINK_SS):
+            remotes = network._netlink_tool_remote_on('4505', 'remote')
+            self.assertEqual(remotes, set(['127.0.0.1', '::ffff:1.2.3.4']))
+
+    def test_is_fqdn(self):
+        """
+        Test is_fqdn function passes possible FQDN names.
+
+        :return: None
+        """
+        for fqdn in ["host.domain.com", "something.with.the.dots.still.ok", "UPPERCASE.ALSO.SHOULD.WORK",
+                     "MiXeD.CaSe.AcCePtAbLe", "123.host.com", "host123.com", "some_underscore.com", "host-here.com"]:
+            assert network.is_fqdn(fqdn)
+
+    def test_is_not_fqdn(self):
+        """
+        Test is_fqdn function rejects FQDN names.
+
+        :return: None
+        """
+        for fqdn in ["hostname", "/some/path", "$variable.here", "verylonghostname.{}".format("domain" * 45)]:
+            assert not network.is_fqdn(fqdn)
