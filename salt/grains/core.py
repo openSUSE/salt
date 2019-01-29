@@ -1733,29 +1733,31 @@ def _parse_cpe_name(cpe):
 
 
 def _parse_cpe_name(cpe):
-    '''
+    """
     Parse CPE_NAME data from the os-release
 
     Info: https://csrc.nist.gov/projects/security-content-automation-protocol/scap-specifications/cpe
 
     :param cpe:
     :return:
-    '''
+    """
     part = {
-        'o': 'operating system',
-        'h': 'hardware',
-        'a': 'application',
+        "o": "operating system",
+        "h": "hardware",
+        "a": "application",
     }
     ret = {}
-    cpe = (cpe or '').split(':')
-    if len(cpe) > 4 and cpe[0] == 'cpe':
-        if cpe[1].startswith('/'):  # WFN to URI
-            ret['vendor'], ret['product'], ret['version'] = cpe[2:5]
-            ret['phase'] = cpe[5] if len(cpe) > 5 else None
-            ret['part'] = part.get(cpe[1][1:])
-        elif len(cpe) == 13 and cpe[1] == '2.3':  # WFN to a string
-            ret['vendor'], ret['product'], ret['version'], ret['phase'] = [x if x != '*' else None for x in cpe[3:7]]
-            ret['part'] = part.get(cpe[2])
+    cpe = (cpe or "").split(":")
+    if len(cpe) > 4 and cpe[0] == "cpe":
+        if cpe[1].startswith("/"):  # WFN to URI
+            ret["vendor"], ret["product"], ret["version"] = cpe[2:5]
+            ret["phase"] = cpe[5] if len(cpe) > 5 else None
+            ret["part"] = part.get(cpe[1][1:])
+        elif len(cpe) == 13 and cpe[1] == "2.3":  # WFN to a string
+            ret["vendor"], ret["product"], ret["version"], ret["phase"] = [
+                x if x != "*" else None for x in cpe[3:7]
+            ]
+            ret["part"] = part.get(cpe[2])
 
     return ret
 
@@ -2396,15 +2398,36 @@ def fqdns():
     """
     # Provides:
     # fqdns
-    opt = {"fqdns": []}
-    if __opts__.get(
-        "enable_fqdns_grains",
-        False
-        if salt.utils.platform.is_windows() or salt.utils.platform.is_proxy()
-        else True,
-    ):
-        opt = __salt__["network.fqdns"]()
-    return opt
+
+    grains = {}
+    fqdns = set()
+
+    addresses = salt.utils.network.ip_addrs(
+        include_loopback=False, interface_data=_get_interfaces()
+    )
+    addresses.extend(
+        salt.utils.network.ip_addrs6(
+            include_loopback=False, interface_data=_get_interfaces()
+        )
+    )
+    err_message = "Exception during resolving address: %s"
+    for ip in addresses:
+        try:
+            name, aliaslist, addresslist = socket.gethostbyaddr(ip)
+            fqdns.update(
+                [socket.getfqdn(name)]
+                + [als for als in aliaslist if salt.utils.network.is_fqdn(als)]
+            )
+        except socket.herror as err:
+            if err.errno in (0, HOST_NOT_FOUND, NO_DATA):
+                # No FQDN for this IP address, so we don't need to know this all the time.
+                log.debug("Unable to resolve address %s: %s", ip, err)
+            else:
+                log.error(err_message, ip, err)
+        except (OSError, socket.gaierror, socket.timeout) as err:
+            log.error(err_message, ip, err)
+
+    return {"fqdns": sorted(list(fqdns))}
 
 
 def ip_fqdn():
