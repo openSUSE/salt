@@ -1714,7 +1714,6 @@ class Minion(MinionBase):
                 )
                 ret['return'] = 'ERROR: {0}'.format(exc)
                 ret['out'] = 'nested'
-                ret['retcode'] = salt.defaults.exitcodes.EX_GENERIC
             except SaltInvocationError as exc:
                 log.error(
                     'Problem executing \'%s\': %s',
