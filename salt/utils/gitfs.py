@@ -2952,7 +2952,12 @@ class GitPillar(GitBase):
             cachedir = self.do_checkout(repo)
             if cachedir is not None:
                 # Figure out which environment this remote should be assigned
-                if repo.env:
+                if repo.branch == '__env__':
+                    env = self.opts.get('pillarenv') \
+                        or self.opts.get('saltenv') \
+                        or self.opts['{0}_base'.format(self.role)] \
+                        or 'base'
+                elif repo.env:
                     env = repo.env
                 else:
                     base_branch = self.opts['{0}_base'.format(self.role)]
