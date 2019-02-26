@@ -1448,6 +1448,27 @@ class TestPygit2HTTP(GitPillarHTTPTestBase):
             ''')
         self.assertEqual(ret, expected)
 
+    def test__env___with_pillarenv_base(self):
+        ret = self.get_pillar('''\
+            file_ignore_regex: []
+            file_ignore_glob: []
+            git_pillar_provider: pygit2
+            cachedir: {cachedir}
+            extension_modules: {extmods}
+            pillarenv: base
+            ext_pillar:
+              - git:
+                - __env__ {url}
+            ''')
+        self.assertEqual(
+            ret,
+            {'branch': 'master',
+             'mylist': ['master'],
+             'mydict': {'master': True,
+                        'nested_list': ['master'],
+                        'nested_dict': {'master': True}}}
+        )
+
     def test_includes_enabled(self):
         '''
         Test with git_pillar_includes enabled. The top_only branch references
