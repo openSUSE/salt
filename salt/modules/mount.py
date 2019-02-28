@@ -1218,7 +1218,8 @@ def mount(name, device, mkmnt=False, fstype='', opts='defaults', user=None, util
         if fstype:
             args += ' -v {0}'.format(fstype)
     else:
-        args += ' -t {0}'.format(fstype)
+        if fstype:
+            args += ' -t {0}'.format(fstype)
     cmd = 'mount {0} {1} {2} '.format(args, device, name)
     out = __salt__['cmd.run_all'](cmd, runas=user, python_shell=False)
     if out['retcode']:
