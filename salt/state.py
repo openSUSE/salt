@@ -1921,6 +1921,8 @@ class State(object):
 
         if 'provider' in low:
             self.load_modules()
+        else:
+            self.load_modules()
 
         if low.get('__prereq__'):
             low['__prereq__'] = False
