@@ -30,6 +30,9 @@ from tests.support.mock import MagicMock
 from tests.support.paths import TMP
 from tests.support.unit import skipIf
 
+import pytest
+import threading
+
 log = logging.getLogger(__name__)
 
 

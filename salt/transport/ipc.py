@@ -625,6 +625,7 @@ class IPCMessageSubscriber(IPCClient):
         except tornado.gen.TimeoutError:
             raise tornado.gen.Return(None)
 
+        log.debug('IPC Subscriber is starting reading')
         exc_to_raise = None
         ret = None
         try:
@@ -696,7 +697,7 @@ class IPCMessageSubscriber(IPCClient):
             self.io_loop.spawn_callback(callback, raw)
 
     @tornado.gen.coroutine
-    def read_async(self):
+    def read_async(self, callback):
         '''
         Asynchronously read messages and invoke a callback when they are ready.
 
