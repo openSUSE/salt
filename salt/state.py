@@ -1919,10 +1919,7 @@ class State(object):
         if 'warnings' in cdata:
             ret.setdefault('warnings', []).extend(cdata['warnings'])
 
-        if 'provider' in low:
-            self.load_modules()
-        else:
-            self.load_modules()
+        self.load_modules()
 
         if low.get('__prereq__'):
             low['__prereq__'] = False
