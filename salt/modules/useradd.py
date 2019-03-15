@@ -414,7 +414,7 @@ def chgroups(name, groups, append=False, root=None):
 
     if __grains__['kernel'] != 'OpenBSD':
         if append and __grains__['kernel'] != 'AIX':
-            if __grains__['osfullname'] == 'SLES' and __grains__['osmajorrelease'] == 11:
+            if __grains__['osfullname'] == 'SLES' and __grains__['osmajorrelease'] == '11':
                 # SLE11 doesn't support "-a" and "-G" together with the for usermod
                 # See https://bugzilla.suse.com/show_bug.cgi?id=1117017
                 cmd.append('-A')
