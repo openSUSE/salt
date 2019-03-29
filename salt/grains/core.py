@@ -2451,6 +2451,17 @@ def _hw_data(osdata):
                 grains['product'] = res.group(1).strip().replace("'", "")
                 break
 
+    # on XEN PV there is no bios, let's try to read at least the machine UUID if not set before
+    if grains.get('uuid') is None and os.path.exists('/sys/hypervisor/uuid'):
+        try:
+            with salt.utils.files.fopen('/sys/hypervisor/uuid', 'r') as fhr:
+                xen_uuid = _clean_value('uuid', salt.utils.stringutils.to_unicode(fhr.read().strip(), errors='replace'))
+                nil_id = uuid.UUID('00000000-0000-0000-0000-000000000000')
+                if uuid.UUID(xen_uuid) != nil_id:
+                    grains['uuid'] = xen_uuid
+        except (IOError, OSError, KeyError):
+            pass
+
     return grains
 
 
