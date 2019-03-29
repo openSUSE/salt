@@ -2265,9 +2265,9 @@ def _hw_data(osdata):
             'uuid': __salt__['smbios.get']('system-uuid')
         }
         grains = dict([(key, val) for key, val in grains.items() if val is not None])
-        uuid = __salt__['smbios.get']('system-uuid')
-        if uuid is not None:
-            grains['uuid'] = uuid.lower()
+        system_uuid = __salt__['smbios.get']('system-uuid')
+        if system_uuid is not None:
+            grains['uuid'] = system_uuid.lower()
         for serial in ('system-serial-number', 'chassis-serial-number', 'baseboard-serial-number'):
             serial = __salt__['smbios.get'](serial)
             if serial is not None:
