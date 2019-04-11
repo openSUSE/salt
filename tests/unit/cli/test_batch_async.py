@@ -75,8 +75,8 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
             self.batch.local.run_job_async.call_args[0],
             ('*', 'test.ping', [], 'glob')
         )
-        # assert down_minions == all minions matched by tgt
-        self.assertEqual(self.batch.down_minions, set(['foo', 'bar']))
+        # assert targeted_minions == all minions matched by tgt
+        self.assertEqual(self.batch.targeted_minions, set(['foo', 'bar']))
 
     @tornado.testing.gen_test
     def test_batch_start_on_gather_job_timeout(self):
@@ -121,7 +121,10 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.assertEqual(len(self.batch.schedule_next.mock_calls), 1)
 
     def test_batch_fire_done_event(self):
+        self.batch.targeted_minions = {'foo', 'baz', 'bar'}
         self.batch.minions = set(['foo', 'bar'])
+        self.batch.done_minions = {'foo'}
+        self.batch.timedout_minions = {'bar'}
         self.batch.event = MagicMock()
         self.batch.metadata = {'mykey': 'myvalue'}
         self.batch.end_batch()
@@ -130,9 +133,9 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
             (
                 {
                     'available_minions': set(['foo', 'bar']),
-                    'done_minions': set(),
-                    'down_minions': set(),
-                    'timedout_minions': set(),
+                    'done_minions': self.batch.done_minions,
+                    'down_minions': {'baz'},
+                    'timedout_minions': self.batch.timedout_minions,
                     'metadata': self.batch.metadata
                 },
                 "salt/batch/1235/done"
@@ -212,7 +215,7 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.assertEqual(self.batch._get_next(), set())
 
     def test_batch__event_handler_ping_return(self):
-        self.batch.down_minions = {'foo'}
+        self.batch.targeted_minions = {'foo'}
         self.batch.event = MagicMock(
             unpack=MagicMock(return_value=('salt/job/1234/ret/foo', {'id': 'foo'})))
         self.batch.start()
@@ -222,7 +225,7 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.assertEqual(self.batch.done_minions, set())
 
     def test_batch__event_handler_call_start_batch_when_all_pings_return(self):
-        self.batch.down_minions = {'foo'}
+        self.batch.targeted_minions = {'foo'}
         self.batch.event = MagicMock(
             unpack=MagicMock(return_value=('salt/job/1234/ret/foo', {'id': 'foo'})))
         self.batch.start()
@@ -232,7 +235,7 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
             (self.batch.start_batch,))
 
     def test_batch__event_handler_not_call_start_batch_when_not_all_pings_return(self):
-        self.batch.down_minions = {'foo', 'bar'}
+        self.batch.targeted_minions = {'foo', 'bar'}
         self.batch.event = MagicMock(
             unpack=MagicMock(return_value=('salt/job/1234/ret/foo', {'id': 'foo'})))
         self.batch.start()
@@ -260,20 +263,10 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.assertEqual(self.batch.find_job_returned, {'foo'})
 
     @tornado.testing.gen_test
-    def test_batch__event_handler_end_batch(self):
-        self.batch.event = MagicMock(
-            unpack=MagicMock(return_value=('salt/job/not-my-jid/ret/foo', {'id': 'foo'})))
-        future = tornado.gen.Future()
-        future.set_result({'minions': ['foo', 'bar', 'baz']})
-        self.batch.local.run_job_async.return_value = future
-        self.batch.start()
-        self.batch.initialized = True
-        self.assertEqual(self.batch.down_minions, {'foo', 'bar', 'baz'})
+    def test_batch_schedule_next_end_batch_when_no_next(self):
         self.batch.end_batch = MagicMock()
-        self.batch.minions = {'foo', 'bar', 'baz'}
-        self.batch.done_minions = {'foo', 'bar'}
-        self.batch.timedout_minions = {'baz'}
-        self.batch._BatchAsync__event_handler(MagicMock())
+        self.batch._get_next = MagicMock(return_value={})
+        self.batch.schedule_next()
         self.assertEqual(len(self.batch.end_batch.mock_calls), 1)
 
     @tornado.testing.gen_test
