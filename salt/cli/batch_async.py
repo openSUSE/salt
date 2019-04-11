@@ -32,14 +32,14 @@ class BatchAsync:
          - tag: salt/batch/<batch-jid>/start
          - data: {
              "available_minions": self.minions,
-             "down_minions": self.down_minions
+             "down_minions": targeted_minions - presence_ping_minions
            }
 
     When the batch ends, an `done` event is fired:
         - tag: salt/batch/<batch-jid>/done
         - data: {
              "available_minions": self.minions,
-             "down_minions": self.down_minions,
+             "down_minions": targeted_minions - presence_ping_minions
              "done_minions": self.done_minions,
              "timedout_minions": self.timedout_minions
          }
@@ -68,7 +68,7 @@ class BatchAsync:
         self.eauth = batch_get_eauth(clear_load["kwargs"])
         self.metadata = clear_load["kwargs"].get("metadata", {})
         self.minions = set()
-        self.down_minions = set()
+        self.targeted_minions = set()
         self.timedout_minions = set()
         self.done_minions = set()
         self.active = set()
@@ -110,8 +110,7 @@ class BatchAsync:
                 minion = data["id"]
                 if op == "ping_return":
                     self.minions.add(minion)
-                    self.down_minions.remove(minion)
-                    if not self.down_minions:
+                    if self.targeted_minions == self.minions:
                         self.event.io_loop.spawn_callback(self.start_batch)
                 elif op == "find_job_return":
                     self.find_job_returned.add(minion)
@@ -123,11 +122,6 @@ class BatchAsync:
                         self.event.io_loop.call_later(
                             self.batch_delay, self.schedule_next
                         )
-
-        if self.initialized and self.done_minions == self.minions.difference(
-            self.timedout_minions
-        ):
-            self.end_batch()
 
     def _get_next(self):
         to_run = (
@@ -142,20 +136,17 @@ class BatchAsync:
         return set(list(to_run)[:next_batch_size])
 
     @tornado.gen.coroutine
-    def check_find_job(self, minions):
-        did_not_return = minions.difference(self.find_job_returned)
-        if did_not_return:
-            for minion in did_not_return:
-                if minion in self.find_job_returned:
-                    self.find_job_returned.remove(minion)
-                if minion in self.active:
-                    self.active.remove(minion)
-                self.timedout_minions.add(minion)
-        running = (
-            minions.difference(did_not_return)
-            .difference(self.done_minions)
-            .difference(self.timedout_minions)
+    def check_find_job(self, batch_minions):
+        timedout_minions = batch_minions.difference(self.find_job_returned).difference(
+            self.done_minions
         )
+        self.timedout_minions = self.timedout_minions.union(timedout_minions)
+        self.active = self.active.difference(self.timedout_minions)
+        running = batch_minions.difference(self.done_minions).difference(
+            self.timedout_minions
+        )
+        if timedout_minions:
+            self.event.io_loop.call_later(self.batch_delay, self.schedule_next)
         if running:
             self.event.io_loop.add_callback(self.find_job, running)
 
@@ -193,7 +184,7 @@ class BatchAsync:
             metadata=self.metadata,
             **self.eauth
         )
-        self.down_minions = set(ping_return["minions"])
+        self.targeted_minions = set(ping_return["minions"])
 
     @tornado.gen.coroutine
     def start_batch(self):
@@ -202,39 +193,48 @@ class BatchAsync:
             self.initialized = True
             data = {
                 "available_minions": self.minions,
-                "down_minions": self.down_minions,
+                "down_minions": self.targeted_minions.difference(self.minions),
                 "metadata": self.metadata,
             }
             self.event.fire_event(data, "salt/batch/{}/start".format(self.batch_jid))
             yield self.schedule_next()
 
     def end_batch(self):
-        data = {
-            "available_minions": self.minions,
-            "down_minions": self.down_minions,
-            "done_minions": self.done_minions,
-            "timedout_minions": self.timedout_minions,
-            "metadata": self.metadata,
-        }
-        self.event.fire_event(data, "salt/batch/{}/done".format(self.batch_jid))
-        self.event.remove_event_handler(self.__event_handler)
+        left = self.minions.symmetric_difference(
+            self.done_minions.union(self.timedout_minions)
+        )
+        if not left:
+            data = {
+                "available_minions": self.minions,
+                "down_minions": self.targeted_minions.difference(self.minions),
+                "done_minions": self.done_minions,
+                "timedout_minions": self.timedout_minions,
+                "metadata": self.metadata,
+            }
+            self.event.fire_event(data, "salt/batch/{}/done".format(self.batch_jid))
+            self.event.remove_event_handler(self.__event_handler)
 
     @tornado.gen.coroutine
     def schedule_next(self):
         next_batch = self._get_next()
         if next_batch:
-            yield self.local.run_job_async(
-                next_batch,
-                self.opts["fun"],
-                self.opts["arg"],
-                "list",
-                raw=self.opts.get("raw", False),
-                ret=self.opts.get("return", ""),
-                gather_job_timeout=self.opts["gather_job_timeout"],
-                jid=self.batch_jid,
-                metadata=self.metadata,
-            )
-            self.event.io_loop.call_later(
-                self.opts["timeout"], self.find_job, set(next_batch)
-            )
             self.active = self.active.union(next_batch)
+            try:
+                yield self.local.run_job_async(
+                    next_batch,
+                    self.opts["fun"],
+                    self.opts["arg"],
+                    "list",
+                    raw=self.opts.get("raw", False),
+                    ret=self.opts.get("return", ""),
+                    gather_job_timeout=self.opts["gather_job_timeout"],
+                    jid=self.batch_jid,
+                    metadata=self.metadata,
+                )
+                self.event.io_loop.call_later(
+                    self.opts["timeout"], self.find_job, set(next_batch)
+                )
+            except Exception as ex:
+                self.active = self.active.difference(next_batch)
+        else:
+            self.end_batch()
