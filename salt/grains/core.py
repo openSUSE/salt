@@ -20,11 +20,14 @@ import platform
 import logging
 import locale
 import uuid
+import time
 import zlib
 from errno import EACCES, EPERM
 import datetime
 import warnings
 import time
+
+from multiprocessing.dummy import Pool as ThreadPool
 
 # pylint: disable=import-error
 try:
@@ -2275,13 +2278,10 @@ def fqdns():
     grains = {}
     fqdns = set()
 
-    addresses = salt.utils.network.ip_addrs(include_loopback=False, interface_data=_get_interfaces())
-    addresses.extend(salt.utils.network.ip_addrs6(include_loopback=False, interface_data=_get_interfaces()))
-    err_message = 'Exception during resolving address: %s'
-    for ip in addresses:
+    def _lookup_fqdn(ip):
         try:
             name, aliaslist, addresslist = socket.gethostbyaddr(ip)
-            fqdns.update([socket.getfqdn(name)] + [als for als in aliaslist if salt.utils.network.is_fqdn(als)])
+            return [socket.getfqdn(name)] + [als for als in aliaslist if salt.utils.network.is_fqdn(als)]
         except socket.herror as err:
             if err.errno in (0, HOST_NOT_FOUND, NO_DATA):
                 # No FQDN for this IP address, so we don't need to know this all the time.
@@ -2290,6 +2290,27 @@ def fqdns():
                 log.error(err_message, ip, err)
         except (socket.error, socket.gaierror, socket.timeout) as err:
             log.error(err_message, ip, err)
+
+    start = time.time()
+
+    addresses = salt.utils.network.ip_addrs(include_loopback=False, interface_data=_get_interfaces())
+    addresses.extend(salt.utils.network.ip_addrs6(include_loopback=False, interface_data=_get_interfaces()))
+    err_message = 'Exception during resolving address: %s'
+
+    # Create a ThreadPool to process the underlying calls to 'socket.gethostbyaddr' in parallel.
+    # This avoid blocking the execution when the "fqdn" is not defined for certains IP addresses, which was causing
+    # that "socket.timeout" was reached multiple times secuencially, blocking execution for several seconds.
+    pool = ThreadPool(8)
+    results = pool.map(_lookup_fqdn, addresses)
+    pool.close()
+    pool.join()
+
+    for item in results:
+        if item:
+            fqdns.update(item)
+
+    elapsed = time.time() - start
+    log.debug('Elapsed time getting FQDNs: {} seconds'.format(elapsed))
 
     return {"fqdns": sorted(list(fqdns))}
 
