@@ -112,17 +112,20 @@ def __mount_device(action):
             'comment': ['Some error happends during the operation.'],
         }
         try:
-            dest = _mount(device)
-            if not dest:
-                msg = 'Device {} cannot be mounted'.format(device)
-                ret['comment'].append(msg)
-            kwargs['__dest'] = dest
+            if device:
+                dest = _mount(device)
+                if not dest:
+                    msg = 'Device {} cannot be mounted'.format(device)
+                    ret['comment'].append(msg)
+                kwargs['__dest'] = dest
             ret = action(*args, **kwargs)
         except Exception as e:
-            log.error('''Traceback: {}'''.format(traceback.format_exc()))
-            ret['comment'].append(e)
+            tb = six.text_type(traceback.format_exc())
+            log.exception('Exception captured in wrapper %s', tb)
+            ret['comment'].append(tb)
         finally:
-            _umount(dest)
+            if device:
+                _umount(dest)
         return ret
     return wrapper
 
