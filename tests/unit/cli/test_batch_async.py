@@ -111,14 +111,14 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
 
     @tornado.testing.gen_test
     def test_start_batch_calls_next(self):
-        self.batch.schedule_next = MagicMock(return_value=MagicMock())
+        self.batch.run_next = MagicMock(return_value=MagicMock())
         self.batch.event = MagicMock()
         future = tornado.gen.Future()
         future.set_result(None)
-        self.batch.schedule_next = MagicMock(return_value=future)
+        self.batch.run_next = MagicMock(return_value=future)
         self.batch.start_batch()
         self.assertEqual(self.batch.initialized, True)
-        self.assertEqual(len(self.batch.schedule_next.mock_calls), 1)
+        self.assertEqual(len(self.batch.run_next.mock_calls), 1)
 
     def test_batch_fire_done_event(self):
         self.batch.targeted_minions = {'foo', 'baz', 'bar'}
@@ -154,7 +154,7 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         future = tornado.gen.Future()
         future.set_result({'minions': ['foo', 'bar']})
         self.batch.local.run_job_async.return_value = future
-        ret = self.batch.schedule_next().result()
+        ret = self.batch.run_next().result()
         self.assertEqual(
             self.batch.local.run_job_async.call_args[0],
             ({'foo', 'bar'}, 'my.fun', [], 'list')
@@ -253,7 +253,7 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.assertEqual(self.batch.done_minions, {'foo'})
         self.assertEqual(
             self.batch.event.io_loop.call_later.call_args[0],
-            (self.batch.batch_delay, self.batch.schedule_next))
+            (self.batch.batch_delay, self.batch.run_next))
 
     def test_batch__event_handler_find_job_return(self):
         self.batch.event = MagicMock(
@@ -263,10 +263,10 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.assertEqual(self.batch.find_job_returned, {'foo'})
 
     @tornado.testing.gen_test
-    def test_batch_schedule_next_end_batch_when_no_next(self):
+    def test_batch_run_next_end_batch_when_no_next(self):
         self.batch.end_batch = MagicMock()
         self.batch._get_next = MagicMock(return_value={})
-        self.batch.schedule_next()
+        self.batch.run_next()
         self.assertEqual(len(self.batch.end_batch.mock_calls), 1)
 
     @tornado.testing.gen_test
@@ -342,3 +342,9 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
             self.batch.event.io_loop.add_callback.call_args[0],
             (self.batch.find_job, {'foo'})
         )
+
+    def test_only_on_run_next_is_scheduled(self):
+        self.batch.event = MagicMock()
+        self.batch.scheduled = True
+        self.batch.schedule_next()
+        self.assertEqual(len(self.batch.event.io_loop.call_later.mock_calls), 0)
