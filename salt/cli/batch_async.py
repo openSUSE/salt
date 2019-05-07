@@ -84,6 +84,7 @@ class BatchAsync(object):
             listen=True,
             io_loop=ioloop,
             keep_loop=True)
+        self.scheduled = False
 
     def __set_event_handler(self):
         ping_return_pattern = 'salt/job/{0}/ret/*'.format(self.ping_jid)
@@ -116,8 +117,7 @@ class BatchAsync(object):
                     if minion in self.active:
                         self.active.remove(minion)
                         self.done_minions.add(minion)
-                        # call later so that we maybe gather more returns
-                        self.event.io_loop.call_later(self.batch_delay, self.schedule_next)
+                        self.schedule_next()
 
     def _get_next(self):
         to_run = self.minions.difference(
@@ -137,7 +137,7 @@ class BatchAsync(object):
         self.active = self.active.difference(self.timedout_minions)
         running = batch_minions.difference(self.done_minions).difference(self.timedout_minions)
         if timedout_minions:
-            self.event.io_loop.call_later(self.batch_delay, self.schedule_next)
+            self.schedule_next()
         if running:
             self.event.io_loop.add_callback(self.find_job, running)
 
@@ -189,7 +189,7 @@ class BatchAsync(object):
                 "metadata": self.metadata
             }
             self.event.fire_event(data, "salt/batch/{0}/start".format(self.batch_jid))
-            yield self.schedule_next()
+            yield self.run_next()
 
     def end_batch(self):
         left = self.minions.symmetric_difference(self.done_minions.union(self.timedout_minions))
@@ -204,8 +204,14 @@ class BatchAsync(object):
             self.event.fire_event(data, "salt/batch/{0}/done".format(self.batch_jid))
             self.event.remove_event_handler(self.__event_handler)
 
-    @tornado.gen.coroutine
     def schedule_next(self):
+        if not self.scheduled:
+            self.scheduled = True
+            # call later so that we maybe gather more returns
+            self.event.io_loop.call_later(self.batch_delay, self.run_next)
+
+    @tornado.gen.coroutine
+    def run_next(self):
         next_batch = self._get_next()
         if next_batch:
             self.active = self.active.union(next_batch)
@@ -225,3 +231,4 @@ class BatchAsync(object):
                 self.active = self.active.difference(next_batch)
         else:
             self.end_batch()
+        self.scheduled = False
