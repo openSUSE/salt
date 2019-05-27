@@ -3010,7 +3010,7 @@ def _get_patches(installed_only=False):
                 patches[advisory_id]['installed'] = False
 
     if installed_only:
-        patches = {k: v for k, v in patches.items() if v['installed']}
+        patches = dict((k, v) for k, v in patches.items() if v['installed'])
     return patches
 
 
