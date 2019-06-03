@@ -1118,6 +1118,7 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
             })
 
     @skipIf(not salt.utils.platform.is_linux(), 'System is not Linux')
+    @skipIf(six.PY2, 'UnicodeDecodeError is throw in Python 3')
     @patch('os.path.exists')
     @patch('salt.utils.platform.is_proxy')
     def test__hw_data_linux_unicode_error(self, is_proxy, exists):
