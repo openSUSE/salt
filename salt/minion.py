@@ -98,6 +98,7 @@ from salt.utils.odict import OrderedDict
 from salt.utils.process import (default_signals,
                                 SignalHandlingProcess,
                                 ProcessManager)
+from salt.utils.versions import warn_until
 from salt.exceptions import (
     CommandExecutionError,
     CommandNotFoundError,
@@ -1002,6 +1003,14 @@ class MinionManager(MinionBase):
         masters = self.opts['master']
         if (self.opts['master_type'] in ('failover', 'distributed')) or not isinstance(self.opts['master'], list):
             masters = [masters]
+
+        if not self.opts.get('server_id_use_crc'):
+            warn_until(
+                'Sodium',
+                'This server_id is computed nor by Adler32 neither by CRC32. '
+                 'Please use "server_id_use_crc" option and define algorithm you'
+                 'prefer (default "Adler32"). The server_id will be computed with'
+                 'Adler32 by default.')
 
         beacons_leader = True
         for master in masters:
