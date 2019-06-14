@@ -82,6 +82,7 @@ from salt.utils.event import tagify
 from salt.utils.network import parse_host_port
 from salt.utils.odict import OrderedDict
 from salt.utils.process import ProcessManager, SignalHandlingProcess, default_signals
+from salt.utils.versions import warn_until
 from salt.utils.zeromq import ZMQ_VERSION_INFO, ZMQDefaultLoop, install_zmq, zmq
 
 HAS_PSUTIL = False
@@ -1095,6 +1096,15 @@ class MinionManager(MinionBase):
             self.opts["master"], list
         ):
             masters = [masters]
+
+        if not self.opts.get("server_id_use_crc"):
+            warn_until(
+                "Sodium",
+                "This server_id is computed nor by Adler32 neither by CRC32. "
+                'Please use "server_id_use_crc" option and define algorithm you'
+                'prefer (default "Adler32"). The server_id will be computed with'
+                "Adler32 by default.",
+            )
 
         beacons_leader = True
         for master in masters:
