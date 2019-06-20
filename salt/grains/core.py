@@ -109,6 +109,10 @@ if not hasattr(os, 'uname'):
 
 _INTERFACES = {}
 
+# Possible value for h_errno defined in netdb.h
+HOST_NOT_FOUND = 1
+NO_DATA = 4
+
 
 def _windows_cpudata():
     '''
@@ -2263,7 +2267,7 @@ def fqdns():
             name, aliaslist, addresslist = socket.gethostbyaddr(ip)
             return [socket.getfqdn(name)] + [als for als in aliaslist if salt.utils.network.is_fqdn(als)]
         except socket.herror as err:
-            if err.errno == 0:
+            if err.errno in (0, HOST_NOT_FOUND, NO_DATA):
                 # No FQDN for this IP address, so we don't need to know this all the time.
                 log.debug("Unable to resolve address %s: %s", ip, err)
             else:
@@ -2584,6 +2588,10 @@ def _hw_data(osdata):
                         grains[key] = salt.utils.stringutils.to_unicode(ifile.read().strip(), errors='replace')
                         if key == 'uuid':
                             grains['uuid'] = grains['uuid'].lower()
+                except UnicodeDecodeError:
+                    # Some firmwares provide non-valid 'product_name'
+                    # files, ignore them
+                    pass
                 except (IOError, OSError) as err:
                     # PermissionError is new to Python 3, but corresponds to the EACESS and
                     # EPERM error numbers. Use those instead here for PY2 compatibility.
@@ -2798,26 +2806,6 @@ def _hw_data(osdata):
     elif osdata['kernel'] == 'AIX':
         cmd = salt.utils.path.which('prtconf')
         if cmd:
-            data = __salt__['cmd.run']('{0}'.format(cmd)) + os.linesep
-            for dest, regstring in (('serialnumber', r'(?im)^\s*Machine\s+Serial\s+Number:\s+(\S+)'),
-                                    ('systemfirmware', r'(?im)^\s*Firmware\s+Version:\s+(.*)')):
-                for regex in [re.compile(r) for r in [regstring]]:
-                    res = regex.search(data)
-                    if res and len(res.groups()) >= 1:
-                        grains[dest] = res.group(1).strip().replace("'", '')
-
-            product_regexes = [re.compile(r'(?im)^\s*System\s+Model:\s+(\S+)')]
-            for regex in product_regexes:
-                res = regex.search(data)
-                if res and len(res.groups()) >= 1:
-                    grains['manufacturer'], grains['productname'] = res.group(1).strip().replace("'", "").split(",")
-                    break
-        else:
-            log.error('The \'prtconf\' binary was not found in $PATH.')
-
-    elif osdata['kernel'] == 'AIX':
-        cmd = salt.utils.path.which('prtconf')
-        if data:
             data = __salt__['cmd.run']('{0}'.format(cmd)) + os.linesep
             for dest, regstring in (('serialnumber', r'(?im)^\s*Machine\s+Serial\s+Number:\s+(\S+)'),
                                     ('systemfirmware', r'(?im)^\s*Firmware\s+Version:\s+(.*)')):
