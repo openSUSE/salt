@@ -208,6 +208,7 @@ execution modules
     keystone
     keystoneng
     kmod
+    kubeadm
     kubernetes
     launchctl_service
     layman
