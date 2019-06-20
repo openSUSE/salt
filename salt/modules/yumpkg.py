@@ -619,7 +619,7 @@ def version(*names, **kwargs):
     return __salt__['pkg_resource.version'](*names, **kwargs)
 
 
-def version_cmp(pkg1, pkg2, ignore_epoch=False):
+def version_cmp(pkg1, pkg2, ignore_epoch=False, **kwargs):
     '''
     .. versionadded:: 2015.5.4
 
@@ -1012,7 +1012,7 @@ def list_upgrades(refresh=True, **kwargs):
 list_updates = salt.utils.functools.alias_function(list_upgrades, 'list_updates')
 
 
-def list_downloaded():
+def list_downloaded(**kwargs):
     '''
     .. versionadded:: 2017.7.0
 
@@ -1948,13 +1948,13 @@ def upgrade(name=None,
 
 
 def update(name=None,
-            pkgs=None,
-            refresh=True,
-            skip_verify=False,
-            normalize=True,
-            minimal=False,
-            obsoletes=False,
-            **kwargs):
+           pkgs=None,
+           refresh=True,
+           skip_verify=False,
+           normalize=True,
+           minimal=False,
+           obsoletes=False,
+           **kwargs):
     '''
     .. versionadded:: 2019.2.0
 
@@ -2647,7 +2647,7 @@ def group_install(name,
 groupinstall = salt.utils.functools.alias_function(group_install, 'groupinstall')
 
 
-def list_repos(basedir=None):
+def list_repos(basedir=None, **kwargs):
     '''
     Lists all repos in <basedir> (default: all dirs in `reposdir` yum option).
 
@@ -2969,7 +2969,7 @@ def _parse_repo_file(filename):
     return (headers, salt.utils.data.decode(config))
 
 
-def file_list(*packages):
+def file_list(*packages, **kwargs):
     '''
     .. versionadded:: 2014.1.0
 
@@ -2988,7 +2988,7 @@ def file_list(*packages):
     return __salt__['lowpkg.file_list'](*packages)
 
 
-def file_dict(*packages):
+def file_dict(*packages, **kwargs):
     '''
     .. versionadded:: 2014.1.0
 
@@ -3007,7 +3007,7 @@ def file_dict(*packages):
     return __salt__['lowpkg.file_dict'](*packages)
 
 
-def owner(*paths):
+def owner(*paths, **kwargs):
     '''
     .. versionadded:: 2014.7.0
 
@@ -3095,7 +3095,7 @@ def modified(*packages, **flags):
 
 
 @salt.utils.decorators.path.which('yumdownloader')
-def download(*packages):
+def download(*packages, **kwargs):
     '''
     .. versionadded:: 2015.5.0
 
@@ -3168,7 +3168,7 @@ def download(*packages):
     return ret
 
 
-def diff(*paths):
+def diff(*paths, **kwargs):
     '''
     Return a formatted diff between current files and original in a package.
     NOTE: this function includes all files (configuration and not), but does
@@ -3235,7 +3235,7 @@ def _get_patches(installed_only=False):
     return patches
 
 
-def list_patches(refresh=False):
+def list_patches(refresh=False, **kwargs):
     '''
     .. versionadded:: 2017.7.0
 
@@ -3258,7 +3258,7 @@ def list_patches(refresh=False):
     return _get_patches()
 
 
-def list_installed_patches():
+def list_installed_patches(**kwargs):
     '''
     .. versionadded:: 2017.7.0
 
