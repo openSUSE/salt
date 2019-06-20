@@ -1,27 +1,45 @@
+#
+# Author: Alberto Planas <aplanas@suse.com>
+#
+# Copyright 2018 SUSE LINUX GmbH, Nuernberg, Germany.
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """
 :maintainer:    Alberto Planas <aplanas@suse.com>
 :platform:      Linux
 """
-
 import pytest
 import salt.states.btrfs as btrfs
-import salt.utils.platform
 from salt.exceptions import CommandExecutionError
-
-# Import Salt Testing Libs
 from tests.support.mixins import LoaderModuleMockMixin
-from tests.support.mock import MagicMock, patch
+from tests.support.mock import NO_MOCK, NO_MOCK_REASON, MagicMock, patch
 from tests.support.unit import TestCase, skipIf
 
 
-@skipIf(salt.utils.platform.is_windows(), "Non-Windows feature")
+@skipIf(NO_MOCK, NO_MOCK_REASON)
 class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
     """
     Test cases for salt.states.btrfs
     """
 
     def setup_loader_modules(self):
-        return {btrfs: {"__salt__": {}, "__states__": {}, "__utils__": {}}}
+        return {btrfs: {"__salt__": {}, "__states__": {}, "__utils__": {},}}
 
     @patch("salt.states.btrfs._umount")
     @patch("tempfile.mkdtemp")
@@ -112,9 +130,9 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
         """
         salt_mock = {
             "btrfs.subvolume_show": MagicMock(
-                return_value={"@/var": {"subvolume id": "256"}}
+                return_value={"@/var": {"subvolume id": "256"},}
             ),
-            "btrfs.subvolume_get_default": MagicMock(return_value={"id": "5"}),
+            "btrfs.subvolume_get_default": MagicMock(return_value={"id": "5",}),
         }
         with patch.dict(btrfs.__salt__, salt_mock):
             assert not btrfs._is_default("/tmp/xxx/@/var", "/tmp/xxx", "@/var")
@@ -127,9 +145,9 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
         """
         salt_mock = {
             "btrfs.subvolume_show": MagicMock(
-                return_value={"@/var": {"subvolume id": "256"}}
+                return_value={"@/var": {"subvolume id": "256"},}
             ),
-            "btrfs.subvolume_get_default": MagicMock(return_value={"id": "256"}),
+            "btrfs.subvolume_get_default": MagicMock(return_value={"id": "256",}),
         }
         with patch.dict(btrfs.__salt__, salt_mock):
             assert btrfs._is_default("/tmp/xxx/@/var", "/tmp/xxx", "@/var")
@@ -142,7 +160,7 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
         """
         salt_mock = {
             "btrfs.subvolume_show": MagicMock(
-                return_value={"@/var": {"subvolume id": "256"}}
+                return_value={"@/var": {"subvolume id": "256"},}
             ),
             "btrfs.subvolume_set_default": MagicMock(return_value=True),
         }
@@ -158,7 +176,7 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
         Test if the subvolume is copy on write.
         """
         salt_mock = {
-            "file.lsattr": MagicMock(return_value={"/tmp/xxx/@/var": ["C"]}),
+            "file.lsattr": MagicMock(return_value={"/tmp/xxx/@/var": ["C"],}),
         }
         with patch.dict(btrfs.__salt__, salt_mock):
             assert not btrfs._is_cow("/tmp/xxx/@/var")
@@ -169,7 +187,7 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
         Test if the subvolume is copy on write.
         """
         salt_mock = {
-            "file.lsattr": MagicMock(return_value={"/tmp/xxx/@/var": []}),
+            "file.lsattr": MagicMock(return_value={"/tmp/xxx/@/var": [],}),
         }
         with patch.dict(btrfs.__salt__, salt_mock):
             assert btrfs._is_cow("/tmp/xxx/@/var")
@@ -188,7 +206,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
                 "/tmp/xxx/@/var", operator="add", attributes="C"
             )
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._umount")
     @patch("salt.states.btrfs._mount")
     def test_subvolume_created_exists(self, mount, umount):
@@ -215,34 +232,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
-    @patch("salt.states.btrfs._umount")
-    @patch("salt.states.btrfs._mount")
-    def test_subvolume_created_exists_decorator(self, mount, umount):
-        """
-        Test creating a subvolume using a non-kwargs call
-        """
-        mount.return_value = "/tmp/xxx"
-        salt_mock = {
-            "btrfs.subvolume_exists": MagicMock(return_value=True),
-        }
-        opts_mock = {
-            "test": False,
-        }
-        with patch.dict(btrfs.__salt__, salt_mock), patch.dict(
-            btrfs.__opts__, opts_mock
-        ):
-            assert btrfs.subvolume_created("@/var", "/dev/sda1") == {
-                "name": "@/var",
-                "result": True,
-                "changes": {},
-                "comment": ["Subvolume @/var already present"],
-            }
-            salt_mock["btrfs.subvolume_exists"].assert_called_with("/tmp/xxx/@/var")
-            mount.assert_called_once()
-            umount.assert_called_once()
-
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._umount")
     @patch("salt.states.btrfs._mount")
     def test_subvolume_created_exists_test(self, mount, umount):
@@ -269,7 +258,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._is_default")
     @patch("salt.states.btrfs._umount")
     @patch("salt.states.btrfs._mount")
@@ -300,7 +288,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._set_default")
     @patch("salt.states.btrfs._is_default")
     @patch("salt.states.btrfs._umount")
@@ -335,7 +322,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._set_default")
     @patch("salt.states.btrfs._is_default")
     @patch("salt.states.btrfs._umount")
@@ -373,7 +359,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._is_cow")
     @patch("salt.states.btrfs._umount")
     @patch("salt.states.btrfs._mount")
@@ -404,7 +389,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._unset_cow")
     @patch("salt.states.btrfs._is_cow")
     @patch("salt.states.btrfs._umount")
@@ -437,7 +421,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._umount")
     @patch("salt.states.btrfs._mount")
     def test_subvolume_created(self, mount, umount):
@@ -469,7 +452,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._umount")
     @patch("salt.states.btrfs._mount")
     def test_subvolume_created_fails_directory(self, mount, umount):
@@ -499,7 +481,6 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             mount.assert_called_once()
             umount.assert_called_once()
 
-    @skipIf(salt.utils.platform.is_windows(), "Skip on Windows")
     @patch("salt.states.btrfs._umount")
     @patch("salt.states.btrfs._mount")
     def test_subvolume_created_fails(self, mount, umount):
@@ -541,7 +522,7 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
                 "description": "Set/get compression for a file or directory",
                 "value": "N/A",
             },
-            "label": {"description": "Set/get label of device.", "value": "N/A"},
+            "label": {"description": "Set/get label of device.", "value": "N/A",},
             "ro": {
                 "description": "Set/get read-only flag or subvolume",
                 "value": "N/A",
@@ -560,7 +541,7 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
                 "description": "Set/get compression for a file or directory",
                 "value": "N/A",
             },
-            "label": {"description": "Set/get label of device.", "value": "N/A"},
+            "label": {"description": "Set/get label of device.", "value": "N/A",},
             "ro": {
                 "description": "Set/get read-only flag or subvolume",
                 "value": "N/A",
@@ -578,7 +559,7 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
                 "description": "Set/get compression for a file or directory",
                 "value": "N/A",
             },
-            "label": {"description": "Set/get label of device.", "value": "mylabel"},
+            "label": {"description": "Set/get label of device.", "value": "mylabel",},
             "ro": {
                 "description": "Set/get read-only flag or subvolume",
                 "value": "N/A",
@@ -596,7 +577,7 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
                 "description": "Set/get compression for a file or directory",
                 "value": "N/A",
             },
-            "label": {"description": "Set/get label of device.", "value": "N/A"},
+            "label": {"description": "Set/get label of device.", "value": "N/A",},
             "ro": {
                 "description": "Set/get read-only flag or subvolume",
                 "value": True,
@@ -614,7 +595,7 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
                 "description": "Set/get compression for a file or directory",
                 "value": "N/A",
             },
-            "label": {"description": "Set/get label of device.", "value": "N/A"},
+            "label": {"description": "Set/get label of device.", "value": "N/A",},
             "ro": {
                 "description": "Set/get read-only flag or subvolume",
                 "value": "N/A",
@@ -753,42 +734,5 @@ class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
             salt_mock["btrfs.properties"].assert_any_call(
                 "/tmp/xxx/@/var", set="ro=true"
             )
-            mount.assert_called_once()
-            umount.assert_called_once()
-
-    @patch("salt.states.btrfs._umount")
-    @patch("salt.states.btrfs._mount")
-    @patch("os.path.exists")
-    def test_properties_test(self, exists, mount, umount):
-        """
-        Test setting a property in test mode.
-        """
-        exists.return_value = True
-        mount.return_value = "/tmp/xxx"
-        salt_mock = {
-            "btrfs.properties": MagicMock(
-                side_effect=[
-                    {
-                        "ro": {
-                            "description": "Set/get read-only flag or subvolume",
-                            "value": "N/A",
-                        },
-                    },
-                ]
-            ),
-        }
-        opts_mock = {
-            "test": True,
-        }
-        with patch.dict(btrfs.__salt__, salt_mock), patch.dict(
-            btrfs.__opts__, opts_mock
-        ):
-            assert btrfs.properties(name="@/var", device="/dev/sda1", ro=True) == {
-                "name": "@/var",
-                "result": None,
-                "changes": {"ro": "true"},
-                "comment": [],
-            }
-            salt_mock["btrfs.properties"].assert_called_with("/tmp/xxx/@/var")
             mount.assert_called_once()
             umount.assert_called_once()

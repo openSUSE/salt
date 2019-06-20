@@ -1,15 +1,6 @@
-# -*- coding: utf-8 -*-
-
-# Import Python libs
-from __future__ import absolute_import
-
 import salt.states.pkg as pkg
-
-# Import Salt Libs
 from salt.ext import six
 from salt.ext.six.moves import zip
-
-# Import Salt Testing Libs
 from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.mock import MagicMock, patch
 from tests.support.unit import TestCase
@@ -35,7 +26,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
         """
         list_upgrades = MagicMock(
             return_value={
-                pkgname: pkgver["new"] for pkgname, pkgver in six.iteritems(self.pkgs)
+                pkgname: pkgver["new"] for pkgname, pkgver in self.pkgs.items()
             }
         )
         upgrade = MagicMock(return_value=self.pkgs)
@@ -75,7 +66,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
 
         list_upgrades = MagicMock(
             return_value={
-                pkgname: pkgver["new"] for pkgname, pkgver in six.iteritems(self.pkgs)
+                pkgname: pkgver["new"] for pkgname, pkgver in self.pkgs.items()
             }
         )
         upgrade = MagicMock(return_value=self.pkgs)
@@ -92,9 +83,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
             # Run state with test=false
             with patch.dict(pkg.__opts__, {"test": False}):
                 ret = pkg.uptodate(
-                    "dummy",
-                    test=True,
-                    pkgs=[pkgname for pkgname in six.iterkeys(self.pkgs)],
+                    "dummy", test=True, pkgs=[pkgname for pkgname in self.pkgs.keys()],
                 )
                 self.assertTrue(ret["result"])
                 self.assertDictEqual(ret["changes"], pkgs)
@@ -102,9 +91,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
             # Run state with test=true
             with patch.dict(pkg.__opts__, {"test": True}):
                 ret = pkg.uptodate(
-                    "dummy",
-                    test=True,
-                    pkgs=[pkgname for pkgname in six.iterkeys(self.pkgs)],
+                    "dummy", test=True, pkgs=[pkgname for pkgname in self.pkgs.keys()],
                 )
                 self.assertIsNone(ret["result"])
                 self.assertDictEqual(ret["changes"], pkgs)
@@ -146,9 +133,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
             # Run state with test=false
             with patch.dict(pkg.__opts__, {"test": False}):
                 ret = pkg.uptodate(
-                    "dummy",
-                    test=True,
-                    pkgs=[pkgname for pkgname in six.iterkeys(self.pkgs)],
+                    "dummy", test=True, pkgs=[pkgname for pkgname in self.pkgs.keys()],
                 )
                 self.assertTrue(ret["result"])
                 self.assertDictEqual(ret["changes"], {})
@@ -156,9 +141,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
             # Run state with test=true
             with patch.dict(pkg.__opts__, {"test": True}):
                 ret = pkg.uptodate(
-                    "dummy",
-                    test=True,
-                    pkgs=[pkgname for pkgname in six.iterkeys(self.pkgs)],
+                    "dummy", test=True, pkgs=[pkgname for pkgname in self.pkgs.keys()],
                 )
                 self.assertTrue(ret["result"])
                 self.assertDictEqual(ret["changes"], {})
@@ -176,7 +159,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
 
         list_upgrades = MagicMock(
             return_value={
-                pkgname: pkgver["new"] for pkgname, pkgver in six.iteritems(self.pkgs)
+                pkgname: pkgver["new"] for pkgname, pkgver in self.pkgs.items()
             }
         )
         upgrade = MagicMock(return_value={})
@@ -193,9 +176,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
             # Run state with test=false
             with patch.dict(pkg.__opts__, {"test": False}):
                 ret = pkg.uptodate(
-                    "dummy",
-                    test=True,
-                    pkgs=[pkgname for pkgname in six.iterkeys(self.pkgs)],
+                    "dummy", test=True, pkgs=[pkgname for pkgname in self.pkgs.keys()],
                 )
                 self.assertFalse(ret["result"])
                 self.assertDictEqual(ret["changes"], {})
@@ -203,9 +184,7 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
             # Run state with test=true
             with patch.dict(pkg.__opts__, {"test": True}):
                 ret = pkg.uptodate(
-                    "dummy",
-                    test=True,
-                    pkgs=[pkgname for pkgname in six.iterkeys(self.pkgs)],
+                    "dummy", test=True, pkgs=[pkgname for pkgname in self.pkgs.keys()],
                 )
                 self.assertIsNone(ret["result"])
                 self.assertDictEqual(ret["changes"], pkgs)

@@ -1,10 +1,31 @@
+#
+# Author: Alberto Planas <aplanas@suse.com>
+#
+# Copyright 2018 SUSE LINUX GmbH, Nuernberg, Germany.
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """
 :maintainer:    Alberto Planas <aplanas@suse.com>
 :maturity:      new
 :depends:       None
 :platform:      Linux
 """
-
 import functools
 import logging
 import os.path
@@ -22,7 +43,7 @@ def _mount(device, use_default):
     """
     Mount the device in a temporary place.
     """
-    opts = "defaults" if use_default else "subvol=/"
+    opts = "subvol=/" if not use_default else "defaults"
     dest = tempfile.mkdtemp()
     res = __states__["mount.mounted"](
         dest, device=device, fstype="btrfs", opts=opts, persist=False
@@ -82,8 +103,8 @@ def __mount_device(action):
 
     @functools.wraps(action)
     def wrapper(*args, **kwargs):
-        name = kwargs.get("name", args[0] if args else None)
-        device = kwargs.get("device", args[1] if len(args) > 1 else None)
+        name = kwargs["name"]
+        device = kwargs["device"]
         use_default = kwargs.get("use_default", False)
 
         ret = {
@@ -100,9 +121,10 @@ def __mount_device(action):
                     ret["comment"].append(msg)
                 kwargs["__dest"] = dest
             ret = action(*args, **kwargs)
-        except Exception as e:  # pylint: disable=broad-except
-            log.error("""Traceback: {}""".format(traceback.format_exc()))
-            ret["comment"].append(e)
+        except Exception:
+            tb = str(traceback.format_exc())
+            log.exception("Exception captured in wrapper %s", tb)
+            ret["comment"].append(tb)
         finally:
             if device:
                 _umount(dest)
@@ -165,7 +187,7 @@ def subvolume_created(
     if __opts__["test"]:
         ret["result"] = None
         if not exists:
-            ret["changes"][name] = "Subvolume {} will be created".format(name)
+            ret["comment"].append("Subvolume {} will be created".format(name))
         return ret
 
     if not exists:
@@ -231,7 +253,7 @@ def subvolume_deleted(name, device, commit=False, __dest=None):
     if __opts__["test"]:
         ret["result"] = None
         if exists:
-            ret["changes"][name] = "Subvolume {} will be removed".format(name)
+            ret["comment"].append("Subvolume {} will be removed".format(name))
         return ret
 
     # If commit is set, we wait until all is over
@@ -344,10 +366,10 @@ def properties(name, device, use_default=False, __dest=None, **properties):
     if __opts__["test"]:
         ret["result"] = None
         if properties_to_set:
-            ret["changes"] = properties_to_set
+            msg = "Properties {} will be changed in {}".format(properties_to_set, name)
         else:
             msg = "No properties will be changed in {}".format(name)
-            ret["comment"].append(msg)
+        ret["comment"].append(msg)
         return ret
 
     if properties_to_set:

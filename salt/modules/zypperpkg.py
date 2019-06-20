@@ -879,6 +879,7 @@ def list_pkgs(versions_as_list=False, root=None, includes=None, **kwargs):
     # inclusion types are passed
     contextkey = "pkg.list_pkgs_{}_{}".format(root, includes)
 
+    # TODO(aplanas): this cached value depends on the parameters
     if contextkey not in __context__:
         ret = {}
         cmd = ["rpm"]
@@ -953,6 +954,28 @@ def list_pkgs(versions_as_list=False, root=None, includes=None, **kwargs):
                             "version": info[element]["version"],
                             "release": None,
                             "arch": info[element]["arch"],
+                            "install_date": None,
+                            "install_date_time_t": None,
+                        }
+                    ]
+
+        for include in includes:
+            if include in ("pattern", "patch"):
+                if include == "pattern":
+                    pkgs = list_installed_patterns(root=root)
+                elif include == "patch":
+                    pkgs = list_installed_patches(root=root)
+                else:
+                    pkgs = []
+                for pkg in pkgs:
+                    pkg_extended_name = "{}:{}".format(include, pkg)
+                    info = info_available(pkg_extended_name, refresh=False, root=root)
+                    _ret[pkg_extended_name] = [
+                        {
+                            "epoch": None,
+                            "version": info[pkg]["version"],
+                            "release": None,
+                            "arch": info[pkg]["arch"],
                             "install_date": None,
                             "install_date_time_t": None,
                         }
@@ -1401,7 +1424,9 @@ def refresh_db(force=None, root=None):
 
 
 def _find_types(pkgs):
-    """Form a package names list, find prefixes of packages types."""
+    """
+    Form a package names list, find prefixes of packages types.
+    """
     return sorted({pkg.split(":", 1)[0] for pkg in pkgs if len(pkg.split(":", 1)) == 2})
 
 
@@ -1596,12 +1621,7 @@ def install(
                     'Advisory id "{}" not found'.format(advisory_id)
                 )
             else:
-                # If we add here the `patch:` prefix, the
-                # `_find_types` helper will take the patches into the
-                # list of packages. Usually this is the correct thing
-                # to do, but we can break software the depends on the
-                # old behaviour.
-                targets.append(advisory_id)
+                targets.append("patch:{}".format(advisory_id))
     else:
         targets = pkg_params
 
@@ -1638,16 +1658,6 @@ def install(
         cmd_install.append("--no-recommends")
 
     errors = []
-
-    # If the type is 'advisory', we manually add the 'patch:'
-    # prefix. This kind of package will not appear in pkg_list in this
-    # way.
-    #
-    # Note that this enable a different mechanism to install a patch;
-    # if the name of the package is already prefixed with 'patch:' we
-    # can avoid listing them in the `advisory_ids` field.
-    if pkg_type == "advisory":
-        targets = ["patch:{}".format(t) for t in targets]
 
     # Split the targets into batches of 500 packages each, so that
     # the maximal length of the command line is not broken
@@ -1800,6 +1810,10 @@ def upgrade(
                 log.warning(
                     "Disabling vendor changes is not supported on this Zypper version"
                 )
+
+        if no_recommends:
+            cmd_update.append("--no-recommends")
+            log.info("Disabling recommendations")
 
         if no_recommends:
             cmd_update.append("--no-recommends")
@@ -2035,13 +2049,13 @@ def list_locks(root=None):
                 for element in [el for el in meta if el]:
                     if ":" in element:
                         lock.update(
-                            dict([tuple([i.strip() for i in element.split(":", 1)])])
+                            dict([tuple([i.strip() for i in element.split(":", 1)]),])
                         )
                 if lock.get("solvable_name"):
                     locks[lock.pop("solvable_name")] = lock
     except OSError:
         pass
-    except Exception:  # pylint: disable=broad-except
+    except Exception:
         log.warning("Detected a problem when accessing {}".format(_locks))
 
     return locks
@@ -2092,12 +2106,13 @@ def unhold(name=None, pkgs=None, **kwargs):
         salt '*' pkg.remove_lock pkgs='["foo", "bar"]'
     """
     ret = {}
+    root = kwargs.get("root")
     if (not name and not pkgs) or (name and pkgs):
         raise CommandExecutionError("Name or packages must be specified.")
     elif name:
         pkgs = [name]
 
-    locks = list_locks()
+    locks = list_locks(root)
     try:
         pkgs = list(__salt__["pkg_resource.parse_targets"](pkgs)[0].keys())
     except MinionError as exc:
@@ -2114,14 +2129,17 @@ def unhold(name=None, pkgs=None, **kwargs):
             ret[pkg]["comment"] = "Package {} unable to be unheld.".format(pkg)
 
     if removed:
-        __zypper__.call("rl", *removed)
+        __zypper__(root=root).call("rl", *removed)
 
     return ret
 
 
-def remove_lock(packages, **kwargs):  # pylint: disable=unused-argument
+def remove_lock(packages, root=None, **kwargs):  # pylint: disable=unused-argument
     """
     Remove specified package lock.
+
+    root
+        operate on a different root directory.
 
     CLI Example:
 
@@ -2134,7 +2152,7 @@ def remove_lock(packages, **kwargs):  # pylint: disable=unused-argument
     salt.utils.versions.warn_until(
         "Sodium", "This function is deprecated. Please use unhold() instead."
     )
-    locks = list_locks()
+    locks = list_locks(root)
     try:
         packages = list(__salt__["pkg_resource.parse_targets"](packages)[0].keys())
     except MinionError as exc:
@@ -2158,6 +2176,9 @@ def hold(name=None, pkgs=None, **kwargs):
     """
     Add a package lock. Specify packages to lock by exact name.
 
+    root
+        operate on a different root directory.
+
     CLI Example:
 
     .. code-block:: bash
@@ -2172,12 +2193,13 @@ def hold(name=None, pkgs=None, **kwargs):
     :return:
     """
     ret = {}
+    root = kwargs.get("root")
     if (not name and not pkgs) or (name and pkgs):
         raise CommandExecutionError("Name or packages must be specified.")
     elif name:
         pkgs = [name]
 
-    locks = list_locks()
+    locks = list_locks(root=root)
     added = []
     try:
         pkgs = list(__salt__["pkg_resource.parse_targets"](pkgs)[0].keys())
@@ -2193,12 +2215,12 @@ def hold(name=None, pkgs=None, **kwargs):
             ret[pkg]["comment"] = "Package {} is already set to be held.".format(pkg)
 
     if added:
-        __zypper__.call("al", *added)
+        __zypper__(root=root).call("al", *added)
 
     return ret
 
 
-def add_lock(packages, **kwargs):  # pylint: disable=unused-argument
+def add_lock(packages, root=None, **kwargs):  # pylint: disable=unused-argument
     """
     Add a package lock. Specify packages to lock by exact name.
 
@@ -2216,7 +2238,7 @@ def add_lock(packages, **kwargs):  # pylint: disable=unused-argument
     salt.utils.versions.warn_until(
         "Sodium", "This function is deprecated. Please use hold() instead."
     )
-    locks = list_locks()
+    locks = list_locks(root)
     added = []
     try:
         packages = list(__salt__["pkg_resource.parse_targets"](packages)[0].keys())
@@ -2410,14 +2432,11 @@ def _get_installed_patterns(root=None):
     # a real error.
     output = __salt__["cmd.run"](cmd, ignore_retcode=True)
 
-    # On <= SLE12SP4 we have patterns that have multiple names (alias)
-    # and that are duplicated.  The alias start with ".", so we filter
-    # them.
-    installed_patterns = {
+    installed_patterns = [
         _pattern_name(line)
         for line in output.splitlines()
-        if line.startswith("pattern() = ") and not _pattern_name(line).startswith(".")
-    }
+        if line.startswith("pattern() = ")
+    ]
 
     patterns = {
         k: v for k, v in _get_visible_patterns(root=root).items() if v["installed"]
@@ -2735,7 +2754,7 @@ def download(*packages, **kwargs):
     )
 
 
-def list_downloaded(root=None, **kwargs):
+def list_downloaded(root=None):
     """
     .. versionadded:: 2017.7.0
 

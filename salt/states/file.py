@@ -290,7 +290,6 @@ import sys
 import time
 import traceback
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
 from datetime import date, datetime  # python3 problem in the making?
 
 import salt.loader
@@ -311,6 +310,12 @@ from salt.ext.six.moves import zip_longest
 from salt.ext.six.moves.urllib.parse import urlparse as _urlparse
 from salt.serializers import DeserializationError
 from salt.state import get_accumulator_dir as _get_accumulator_dir
+
+try:
+    from collections.abc import Iterable, Mapping
+except ImportError:
+    from collections import Iterable, Mapping
+
 
 if salt.utils.platform.is_windows():
     import salt.utils.win_dacl

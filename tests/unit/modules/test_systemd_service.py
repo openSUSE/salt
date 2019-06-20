@@ -1,23 +1,16 @@
-# -*- coding: utf-8 -*-
 """
     :codeauthor: Rahul Handay <rahulha@saltstack.com>
 """
 
-# Import Python libs
-from __future__ import absolute_import, print_function, unicode_literals
 
 import os
 
 import pytest
-
-# Import Salt Libs
 import salt.modules.systemd_service as systemd
 import salt.utils.systemd
 from salt.exceptions import CommandExecutionError
 from tests.support.mixins import LoaderModuleMockMixin
-from tests.support.mock import MagicMock, patch
-
-# Import Salt Testing Libs
+from tests.support.mock import MagicMock, Mock, patch
 from tests.support.unit import TestCase
 
 _SYSTEMCTL_STATUS = {
@@ -93,7 +86,7 @@ class SystemdTestCase(TestCase, LoaderModuleMockMixin):
         cmd_mock = MagicMock(return_value=_LIST_UNIT_FILES)
         listdir_mock = MagicMock(return_value=["foo", "bar", "baz", "README"])
         sd_mock = MagicMock(
-            return_value=set([x.replace(".service", "") for x in _SYSTEMCTL_STATUS])
+            return_value={x.replace(".service", "") for x in _SYSTEMCTL_STATUS}
         )
         access_mock = MagicMock(
             side_effect=lambda x, y: x
@@ -124,7 +117,7 @@ class SystemdTestCase(TestCase, LoaderModuleMockMixin):
         # only 'baz' will be considered an enabled sysv service).
         listdir_mock = MagicMock(return_value=["foo", "bar", "baz", "README"])
         sd_mock = MagicMock(
-            return_value=set([x.replace(".service", "") for x in _SYSTEMCTL_STATUS])
+            return_value={x.replace(".service", "") for x in _SYSTEMCTL_STATUS}
         )
         access_mock = MagicMock(
             side_effect=lambda x, y: x

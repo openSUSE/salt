@@ -1,3 +1,25 @@
+#
+# Author: Alberto Planas <aplanas@suse.com>
+#
+# Copyright 2019 SUSE LINUX GmbH, Nuernberg, Germany.
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """
 :maintainer:    Alberto Planas <aplanas@suse.com>
 :maturity:      new
@@ -11,6 +33,7 @@ import re
 
 import salt.utils.files
 from salt.exceptions import CommandExecutionError
+from salt.ext.six.moves import zip
 
 ADMIN_CFG = "/etc/kubernetes/admin.conf"
 
@@ -37,23 +60,22 @@ def _api_server_endpoint(config=None):
             endpoint = re.search(
                 r"^\s*server: https?://(.*)$", fp_.read(), re.MULTILINE
             ).group(1)
-    # pylint:disable=broad-except
     except Exception:
         # Any error or exception is mapped to None
         pass
     return endpoint
 
 
-def _token(create_if_needed=False):
+def _token(create_if_needed=True):
     """
     Return a valid bootstrap token
     """
     tokens = token_list()
-    if not tokens and create_if_needed:
+    if not tokens:
         token_create(description="Token created by kubeadm salt module")
         tokens = token_list()
-    # We expect that the token is valid for authentication and signing
-    return tokens[0]["token"] if tokens else None
+    # We expect that the token is valid for authestication and signing
+    return tokens[0]["token"]
 
 
 def _discovery_token_ca_cert_hash():
@@ -91,10 +113,6 @@ def join_params(create_if_needed=False):
     .. versionadded:: TBD
 
     Return the parameters required for joining into the cluster
-
-    create_if_needed
-       If the token bucket is empty and this parameter is True, a new
-       token will be created.
 
     CLI Example:
 
@@ -169,7 +187,7 @@ def token_create(
     Create bootstrap tokens on the server
 
     token
-       Token to write, if None one will be generated. The token must
+       Token to write, if None one will be gerenared. The token must
        match a regular expression, that by default is
        [a-z0-9]{6}.[a-z0-9]{16}
 
@@ -180,7 +198,7 @@ def token_create(
        A human friendly description of how this token is used
 
     groups
-       List of extra groups that this token will authenticate, default
+       List of extra groups that this token will authenticate, defaut
        to ['system:bootstrappers:kubeadm:default-node-token']
 
     ttl
@@ -189,7 +207,7 @@ def token_create(
        is 24h0m0s
 
     usages
-       Describes the ways in which this token can be used. The default
+       Describes the ways in wich this token can be used. The default
        value is ['signing', 'authentication']
 
     kubeconfig
@@ -239,7 +257,7 @@ def token_delete(token, kubeconfig=None, rootfs=None):
     Delete bootstrap tokens on the server
 
     token
-       Token to write, if None one will be generated. The token must
+       Token to write, if None one will be gerenared. The token must
        match a regular expression, that by default is
        [a-z0-9]{6}.[a-z0-9]{16}
 
@@ -328,21 +346,20 @@ def token_list(kubeconfig=None, rootfs=None):
 
     lines = _cmd(cmd).splitlines()
 
-    tokens = []
-    if lines:
-        # Find the header and parse it.  We do not need to validate
-        # the content, as the regex will take care of future changes.
-        header = lines.pop(0)
-        header = [i.lower() for i in re.findall(r"(\w+(?:\s\w+)*)", header)]
+    # Find the header and parse it.  We do not need to validate the
+    # content, as the regex will take care of future changes.
+    header = lines.pop(0)
+    header = [i.lower() for i in re.findall(r"(\w+(?:\s\w+)*)", header)]
 
-        for line in lines:
-            # TODO(aplanas): descriptions with multiple spaces can
-            # break the parser.
-            values = re.findall(r"(\S+(?:\s\S+)*)", line)
-            if len(header) != len(values):
-                log.error("Error parsing line: {}".format(line))
-                continue
-            tokens.append({key: value for key, value in zip(header, values)})
+    tokens = []
+    for line in lines:
+        # TODO(aplanas): descriptions with multiple spaces can break
+        # the parser.
+        values = re.findall(r"(\S+(?:\s\S+)*)", line)
+        if len(header) != len(values):
+            log.error("Error parsing line: {}".format(line))
+            continue
+        tokens.append({key: value for key, value in zip(header, values)})
     return tokens
 
 
@@ -869,7 +886,7 @@ def config_upload_from_flags(
     flags
 
     apiserver_advertise_address
-       The IP address the API server will advertise it's listening on
+       The IP address the API server will adversite it's listening on
 
     apiserver_bind_port
        The port the API server is accessible on (default 6443)
@@ -900,11 +917,11 @@ def config_upload_from_flags(
        Specify range of IP addresses for the pod network
 
     service_cidr
-       Use alternative range of IP address for service VIPs (default
+       Use alternative range of IP address dor service VIPs (default
        "10.96.0.0/12")
 
     service_dns_domain
-       Use alternative domain for services (default "cluster.local")
+       Use alternative domain for serivces (default "cluster.local")
 
     kubeconfig
        The kubeconfig file to use when talking to the cluster. The
@@ -1004,7 +1021,7 @@ def init(
     Command to set up the Kubernetes control plane
 
     apiserver_advertise_address
-       The IP address the API server will advertise it's listening on
+       The IP address the API server will adversite it's listening on
 
     apiserver_bind_port
        The port the API server is accessible on (default 6443)
@@ -1035,10 +1052,10 @@ def init(
        various features
 
     ignore_preflight_errors
-       A list of checks whose errors will be shown as warnings
+       A list of checkt whose errors will be shown as warnings
 
     image_repository
-       Choose a container registry to pull control plane images from
+       Choose a container registry to pull controll plane images from
 
     kubernetes_version
        Choose a specifig Kubernetes version for the control plane
@@ -1051,11 +1068,11 @@ def init(
        Specify range of IP addresses for the pod network
 
     service_cidr
-       Use alternative range of IP address for service VIPs (default
+       Use alternative range of IP address dor service VIPs (default
        "10.96.0.0/12")
 
     service_dns_domain
-       Use alternative domain for services (default "cluster.local")
+       Use alternative domain for serivces (default "cluster.local")
 
     skip_certificate_key_print
        Don't print the key used to encrypt the control-plane
@@ -1190,10 +1207,10 @@ def join(
 
     apiserver_advertise_address
        If the node should host a new control plane instance, the IP
-       address the API Server will advertise it's listening on
+       address the API Server will adversise it's listening on
 
     apiserver_bind_port
-       If the node should host a new control plane instance, the port
+       If the node shoult host a new control plane instance, the port
        the API Server to bind to (default 6443)
 
     certificate_key

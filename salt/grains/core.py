@@ -2759,7 +2759,7 @@ def _hw_data(osdata):
             contents_file = os.path.join("/sys/class/dmi/id", fw_file)
             if os.path.exists(contents_file):
                 try:
-                    with salt.utils.files.fopen(contents_file, "rb") as ifile:
+                    with salt.utils.files.fopen(contents_file, "r") as ifile:
                         grains[key] = salt.utils.stringutils.to_unicode(
                             ifile.read().strip(), errors="replace"
                         )
@@ -2768,9 +2768,7 @@ def _hw_data(osdata):
                 except UnicodeDecodeError:
                     # Some firmwares provide non-valid 'product_name'
                     # files, ignore them
-                    log.debug(
-                        "The content in /sys/devices/virtual/dmi/id/product_name is not valid"
-                    )
+                    pass
                 except OSError as err:
                     # PermissionError is new to Python 3, but corresponds to the EACESS and
                     # EPERM error numbers. Use those instead here for PY2 compatibility.

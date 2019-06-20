@@ -1,15 +1,9 @@
-# -*- coding: utf-8 -*-
 """
     :codeauthor: Jayesh Kariya <jayeshk@saltstack.com>
 """
 
-# Import Python Libs
-from __future__ import absolute_import
 
-# Import Salt Libs
 import salt.modules.rpm_lowpkg as rpm
-
-# Import Salt Testing Libs
 from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.mock import MagicMock, patch
 from tests.support.unit import TestCase
@@ -100,6 +94,15 @@ class RpmTestCase(TestCase, LoaderModuleMockMixin):
     # 'file_dict' function tests: 2
 
     def test_file_dict(self):
+        """
+        Test if it list the files that belong to a package
+        """
+        mock = MagicMock(return_value="")
+        with patch.dict(rpm.__salt__, {"cmd.run": mock}):
+            self.assertDictEqual(rpm.file_dict("httpd"), {"errors": [], "packages": {}})
+            self.assertFalse(_called_with_root(mock))
+
+    def test_file_dict_root(self):
         """
         Test if it list the files that belong to a package
         """
