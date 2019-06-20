@@ -254,6 +254,7 @@ def minion_mods(
         whitelist=whitelist,
         loaded_base_name=loaded_base_name,
         static_modules=static_modules,
+        extra_module_dirs=utils.module_dirs if utils else None,
     )
 
     ret.pack['__salt__'] = ret
@@ -347,6 +348,7 @@ def engines(opts, functions, runners, utils, proxy=None):
         opts,
         tag='engines',
         pack=pack,
+        extra_module_dirs=utils.module_dirs if utils else None,
     )
 
 
@@ -359,6 +361,7 @@ def proxy(opts, functions=None, returners=None, whitelist=None, utils=None):
         opts,
         tag='proxy',
         pack={'__salt__': functions, '__ret__': returners, '__utils__': utils},
+        extra_module_dirs=utils.module_dirs if utils else None,
     )
 
     ret.pack['__proxy__'] = ret
@@ -396,12 +399,14 @@ def pillars(opts, functions, context=None):
     '''
     Returns the pillars modules
     '''
+    _utils = utils(opts)
     ret = LazyLoader(_module_dirs(opts, 'pillar'),
                      opts,
                      tag='pillar',
                      pack={'__salt__': functions,
                            '__context__': context,
-                           '__utils__': utils(opts)})
+                           '__utils__': _utils},
+                     extra_module_dirs=_utils.module_dirs)
     ret.pack['__ext_pillar__'] = ret
     return FilterDictWrapper(ret, '.ext_pillar')
 
@@ -501,11 +506,13 @@ def fileserver(opts, backends):
     '''
     Returns the file server modules
     '''
+    _utils = utils(opts)
     return LazyLoader(_module_dirs(opts, 'fileserver'),
                       opts,
                       tag='fileserver',
                       whitelist=backends,
-                      pack={'__utils__': utils(opts)})
+                      pack={'__utils__': _utils},
+                      extra_module_dirs=_utils.module_dirs)
 
 
 def roster(opts, runner=None, utils=None, whitelist=None):
@@ -521,6 +528,7 @@ def roster(opts, runner=None, utils=None, whitelist=None):
             '__runner__': runner,
             '__utils__': utils,
         },
+        extra_module_dirs=utils.module_dirs if utils else None,
     )
 
 
@@ -562,6 +570,7 @@ def states(opts, functions, utils, serializers, whitelist=None, proxy=None, cont
         tag='states',
         pack={'__salt__': functions, '__proxy__': proxy or {}},
         whitelist=whitelist,
+        extra_module_dirs=utils.module_dirs if utils else None,
     )
     ret.pack['__states__'] = ret
     ret.pack['__utils__'] = utils
@@ -683,6 +692,7 @@ def grain_funcs(opts, proxy=None):
         ),
         opts,
         tag='grains',
+        extra_module_dirs=_utils.module_dirs,
     )
     ret.pack['__utils__'] = utils(opts, proxy=proxy)
     return ret
@@ -947,6 +957,7 @@ def runner(opts, utils=None, context=None, whitelist=None):
         tag='runners',
         pack={'__utils__': utils, '__context__': context},
         whitelist=whitelist,
+        extra_module_dirs=utils.module_dirs if utils else None,
     )
     # TODO: change from __salt__ to something else, we overload __salt__ too much
     ret.pack['__salt__'] = ret
@@ -982,6 +993,7 @@ def sdb(opts, functions=None, whitelist=None, utils=None):
             '__salt__': minion_mods(opts, utils=utils),
         },
         whitelist=whitelist,
+        extra_module_dirs=utils.module_dirs if utils else None,
     )
 
 
@@ -1023,6 +1035,7 @@ def clouds(opts):
     '''
     Return the cloud functions
     '''
+    _utils = salt.loader.utils(opts)
     # Let's bring __active_provider_name__, defaulting to None, to all cloud
     # drivers. This will get temporarily updated/overridden with a context
     # manager when needed.
@@ -1034,8 +1047,9 @@ def clouds(opts):
                      int_type='clouds'),
         opts,
         tag='clouds',
-        pack={'__utils__': salt.loader.utils(opts),
+        pack={'__utils__': _utils,
               '__active_provider_name__': None},
+        extra_module_dirs=_utils.module_dirs,
     )
     for funcname in LIBCLOUD_FUNCS_NOT_SUPPORTED:
         log.trace(
@@ -1149,6 +1163,7 @@ class LazyLoader(salt.utils.lazy.LazyDict):
     :param bool virtual_enable: Whether or not to respect the __virtual__ function when loading modules.
     :param str virtual_funcs: The name of additional functions in the module to call to verify its functionality.
                                 If not true, the module will not load.
+    :param list extra_module_dirs: A list of directories that will be able to import from
     :returns: A LazyLoader object which functions as a dictionary. Keys are 'module.function' and values
     are function references themselves which are loaded on-demand.
     # TODO:
@@ -1170,6 +1185,7 @@ class LazyLoader(salt.utils.lazy.LazyDict):
                  static_modules=None,
                  proxy=None,
                  virtual_funcs=None,
+                 extra_module_dirs=None,
                  ):  # pylint: disable=W0231
         '''
         In pack, if any of the values are None they will be replaced with an
@@ -1210,6 +1226,9 @@ class LazyLoader(salt.utils.lazy.LazyDict):
         if virtual_funcs is None:
             virtual_funcs = []
         self.virtual_funcs = virtual_funcs
+
+        self.extra_module_dirs = extra_module_dirs if extra_module_dirs else []
+        self._clean_module_dirs = []
 
         self.disabled = set(
             self.opts.get(
@@ -1517,12 +1536,30 @@ class LazyLoader(salt.utils.lazy.LazyDict):
                 reload_module(submodule)
                 self._reload_submodules(submodule)
 
+    def __populate_sys_path(self):
+        for directory in self.extra_module_dirs:
+            if directory not in sys.path:
+                sys.path.append(directory)
+                self._clean_module_dirs.append(directory)
+
+    def __clean_sys_path(self):
+        for directory in self._clean_module_dirs:
+            if directory in sys.path:
+                sys.path.remove(directory)
+        self._clean_module_dirs = []
+
+        # Be sure that sys.path_importer_cache do not contains any
+        # invalid FileFinder references
+        if USE_IMPORTLIB:
+            importlib.invalidate_caches()
+
     def _load_module(self, name):
         mod = None
         fpath, suffix = self.file_mapping[name][:2]
         self.loaded_files.add(name)
         fpath_dirname = os.path.dirname(fpath)
         try:
+            self.__populate_sys_path()
             sys.path.append(fpath_dirname)
             if suffix == '.pyx':
                 mod = pyximport.load_module(name, fpath, tempfile.gettempdir())
@@ -1645,6 +1682,7 @@ class LazyLoader(salt.utils.lazy.LazyDict):
             return False
         finally:
             sys.path.remove(fpath_dirname)
+            self.__clean_sys_path()
 
         if hasattr(mod, '__opts__'):
             mod.__opts__.update(self.opts)
