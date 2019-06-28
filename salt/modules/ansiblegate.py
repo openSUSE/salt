@@ -160,6 +160,7 @@ class AnsibleModuleCaller:
         :param kwargs: keywords to the module
         :return:
         """
+        python_exec = "python3"
 
         module = self._resolver.load_module(module)
         if not hasattr(module, "main"):
@@ -182,9 +183,9 @@ class AnsibleModuleCaller:
             timeout=self.timeout,
         )
         proc_out.run()
-        proc_out_stdout = salt.utils.stringutils.to_str(proc_out.stdout)
+        proc_out_stdout = proc_out.stdout.decode()
         proc_exc = salt.utils.timed_subprocess.TimedProc(
-            [sys.executable, module.__file__],
+            [python_exec, module.__file__],
             stdin=proc_out_stdout,
             stdout=subprocess.PIPE,
             timeout=self.timeout,
@@ -298,7 +299,7 @@ def help(module=None, *args):
             'Available sections on module "{}"'.format(
                 module.__name__.replace("ansible.modules.", "")
             )
-        ] = list(doc)
+        ] = [i for i in doc.keys()]
     else:
         for arg in args:
             info = doc.get(arg)
