@@ -185,17 +185,27 @@ description:
                     "one.two.three", "arg_1", kwarg1="foobar"
                 )
                 proc.assert_any_call(
-                    [
-                        "echo",
-                        '{"ANSIBLE_MODULE_ARGS": {"kwarg1": "foobar", "_raw_params": "arg_1"}}',
-                    ],
-                    stdout=-1,
-                    timeout=1200,
-                )
-                proc.assert_any_call(
                     ["python3", "foofile"],
                     stdin=ANSIBLE_MODULE_ARGS,
                     stdout=-1,
                     timeout=1200,
                 )
+                try:
+                    proc.assert_any_call(
+                        [
+                            "echo",
+                            '{"ANSIBLE_MODULE_ARGS": {"kwarg1": "foobar", "_raw_params": "arg_1"}}',
+                        ],
+                        stdout=-1,
+                        timeout=1200,
+                    )
+                except AssertionError:
+                    proc.assert_any_call(
+                        [
+                            "echo",
+                            '{"ANSIBLE_MODULE_ARGS": {"_raw_params": "arg_1", "kwarg1": "foobar"}}',
+                        ],
+                        stdout=-1,
+                        timeout=1200,
+                    )
                 assert ret == {"completed": True, "timeout": 1200}
