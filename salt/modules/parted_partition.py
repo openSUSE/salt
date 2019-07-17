@@ -552,10 +552,23 @@ def mkpartfs(device, part_type, fs_type=None, start=None, end=None):
 
     .. code-block:: bash
 
-        salt '*' partition.mkpartfs /dev/sda primary fs_type=fat32 start=0 end=639
-        salt '*' partition.mkpartfs /dev/sda primary start=0 end=639
+        salt '*' partition.mkpartfs /dev/sda logical ext2 440 670
     """
-    out = mkpart(device, part_type, fs_type, start, end)
+    _validate_device(device)
+
+    if part_type not in {"primary", "logical", "extended"}:
+        raise CommandExecutionError("Invalid part_type passed to partition.mkpartfs")
+
+    if fs_type and not _is_fstype(fs_type):
+        raise CommandExecutionError("Invalid fs_type passed to partition.mkpartfs")
+
+    _validate_partition_boundary(start)
+    _validate_partition_boundary(end)
+
+    cmd = "parted -m -s -- {} mkpart {} {} {} {}".format(
+        device, part_type, fs_type, start, end
+    )
+    out = __salt__["cmd.run"](cmd).splitlines()
     return out
 
 
