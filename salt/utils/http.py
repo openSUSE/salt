@@ -628,12 +628,17 @@ def query(
         except salt.ext.tornado.httpclient.HTTPError as exc:
             ret["status"] = exc.code
             ret["error"] = str(exc)
+            log.error(
+                "Cannot perform 'http.query': {} - {}".format(url_full, ret["error"])
+            )
             return ret
         except (socket.herror, OSError, socket.timeout, socket.gaierror) as exc:
             if status is True:
                 ret["status"] = 0
             ret["error"] = str(exc)
-            log.debug("Cannot perform 'http.query': %s - %s", url_full, ret["error"])
+            log.error(
+                "Cannot perform 'http.query': {} - {}".format(url_full, ret["error"])
+            )
             return ret
 
         if stream is True or handle is True:
