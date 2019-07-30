@@ -63,10 +63,10 @@ class ChrootTestCase(TestCase, LoaderModuleMockMixin):
         '''
         Test if the chroot environment exist.
         '''
-        isdir.side_effect = (True, True, True)
+        isdir.side_effect = (True, True, True, True)
         self.assertTrue(chroot.exist('/chroot'))
 
-        isdir.side_effect = (True, True, False)
+        isdir.side_effect = (True, True, True, False)
         self.assertFalse(chroot.exist('/chroot'))
 
     @patch('os.makedirs')
@@ -177,6 +177,38 @@ class ChrootTestCase(TestCase, LoaderModuleMockMixin):
         with patch.dict(chroot.__utils__, utils_mock), \
                 patch.dict(chroot.__salt__, salt_mock):
             self.assertEqual(chroot.call('/chroot', 'test.ping'), 'result')
+            utils_mock['thin.gen_thin'].assert_called_once()
+            salt_mock['config.option'].assert_called()
+            salt_mock['archive.tar'].assert_called_once()
+            salt_mock['cmd.run_chroot'].assert_called_once()
+            utils_mock['files.rm_rf'].assert_called_once()
+
+    @patch('salt.modules.chroot.exist')
+    @patch('tempfile.mkdtemp')
+    def test_call_success_parameters(self, mkdtemp, exist):
+        '''
+        Test execution of Salt functions in chroot with parameters.
+        '''
+        # Success test
+        exist.return_value = True
+        mkdtemp.return_value = '/chroot/tmp01'
+        utils_mock = {
+            'thin.gen_thin': MagicMock(return_value='/salt-thin.tgz'),
+            'files.rm_rf': MagicMock(),
+            'json.find_json': MagicMock(return_value={'return': 'result'})
+        }
+        salt_mock = {
+            'archive.tar': MagicMock(return_value=''),
+            'config.option': MagicMock(),
+            'cmd.run_chroot': MagicMock(return_value={
+                'retcode': 0,
+                'stdout': '',
+            }),
+        }
+        with patch.dict(chroot.__utils__, utils_mock), \
+                patch.dict(chroot.__salt__, salt_mock):
+            self.assertEqual(chroot.call('/chroot', 'ssh.set_auth_key',
+                                         user='user', key='key'), 'result')
             utils_mock['thin.gen_thin'].assert_called_once()
             salt_mock['config.option'].assert_called()
             salt_mock['archive.tar'].assert_called_once()
