@@ -879,7 +879,6 @@ def list_pkgs(versions_as_list=False, root=None, includes=None, **kwargs):
     # inclusion types are passed
     contextkey = "pkg.list_pkgs_{}_{}".format(root, includes)
 
-    # TODO(aplanas): this cached value depends on the parameters
     if contextkey not in __context__:
         ret = {}
         cmd = ["rpm"]

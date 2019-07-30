@@ -912,7 +912,8 @@ Repository 'DUMMY' not found by its alias, number, or URI.
         ), patch.dict(
             zypper.__salt__, {"pkg_resource.stringify": MagicMock()}
         ), patch.dict(
-            pkg_resource.__salt__, {"pkg.parse_arch": zypper.parse_arch}
+            pkg_resource.__salt__,
+            {"pkg.parse_arch_from_name": zypper.parse_arch_from_name},
         ):
             pkgs = zypper.list_pkgs(
                 attr=["epoch", "release", "arch", "install_date_time_t"]
@@ -1950,3 +1951,22 @@ pattern() = package-c"""
             "package-a": {"installed": True, "summary": "description a",},
             "package-b": {"installed": False, "summary": "description b",},
         }
+
+    def test__clean_cache_empty(self):
+        """Test that an empty cached can be cleaned"""
+        context = {}
+        with patch.dict(zypper.__context__, context):
+            zypper._clean_cache()
+            assert context == {}
+
+    def test__clean_cache_filled(self):
+        """Test that a filled cached can be cleaned"""
+        context = {
+            "pkg.list_pkgs_/mnt_[]": None,
+            "pkg.list_pkgs_/mnt_[patterns]": None,
+            "pkg.list_provides": None,
+            "pkg.other_data": None,
+        }
+        with patch.dict(zypper.__context__, context):
+            zypper._clean_cache()
+            self.assertEqual(zypper.__context__, {"pkg.other_data": None})
