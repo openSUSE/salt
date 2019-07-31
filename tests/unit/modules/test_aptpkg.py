@@ -896,8 +896,7 @@ class AptUtilsTestCase(TestCase, LoaderModuleMockMixin):
                 [
                     "systemd-run",
                     "--scope",
-                    "--description",
-                    '"salt.modules.aptpkg"',
+                    '--description "salt.modules.aptpkg"',
                     "apt-get",
                     "purge",
                     "vim",
