@@ -494,6 +494,10 @@ def query(url,
                 decompress_response=False,
                 **req_kwargs
             )
+        except ssl.SSLError as exc:
+            ret['status'] = 901
+            ret['error'] = ">>> No TLS 1.2 and above for RHEL6 and SLES11. Please check your Apache config. <<<"
+            return ret
         except tornado.httpclient.HTTPError as exc:
             ret['status'] = exc.code
             ret['error'] = str(exc)
