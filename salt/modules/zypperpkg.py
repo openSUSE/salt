@@ -1412,8 +1412,10 @@ def refresh_db(force=None, root=None):
     return ret
 
 
-def _find_types(pkgs):
+def _detect_includes(pkgs, inclusion_detection):
     """Form a package names list, find prefixes of packages types."""
+    if not inclusion_detection:
+        return None
     return sorted({pkg.split(":", 1)[0] for pkg in pkgs if len(pkg.split(":", 1)) == 2})
 
 
@@ -1429,6 +1431,7 @@ def install(
     ignore_repo_failure=False,
     no_recommends=False,
     root=None,
+    inclusion_detection=False,
     **kwargs
 ):
     """
@@ -1544,6 +1547,9 @@ def install(
 
         .. versionadded:: 2018.3.0
 
+    inclusion_detection:
+        Detect ``includes`` based on ``sources``
+        By default packages are always included
 
     Returns a dict containing the new package names and versions::
 
@@ -1619,7 +1625,8 @@ def install(
 
     diff_attr = kwargs.get("diff_attr")
 
-    includes = _find_types(targets)
+    includes = _detect_includes(targets, inclusion_detection)
+
     old = (
         list_pkgs(attr=diff_attr, root=root, includes=includes)
         if not downloadonly
@@ -1849,7 +1856,7 @@ def upgrade(
     return ret
 
 
-def _uninstall(name=None, pkgs=None, root=None):
+def _uninstall(inclusion_detection, name=None, pkgs=None, root=None):
     """
     Remove and purge do identical things but with different Zypper commands,
     this function performs the common logic.
@@ -1859,7 +1866,7 @@ def _uninstall(name=None, pkgs=None, root=None):
     except MinionError as exc:
         raise CommandExecutionError(exc)
 
-    includes = _find_types(pkg_params.keys())
+    includes = _detect_includes(pkg_params.keys(), inclusion_detection)
     old = list_pkgs(root=root, includes=includes)
     targets = []
     for target in pkg_params:
@@ -1922,7 +1929,7 @@ def normalize_name(name):
 
 
 def remove(
-    name=None, pkgs=None, root=None, **kwargs
+    name=None, pkgs=None, root=None, inclusion_detection=False, **kwargs
 ):  # pylint: disable=unused-argument
     """
     .. versionchanged:: 2015.8.12,2016.3.3,2016.11.0
@@ -1954,8 +1961,11 @@ def remove(
     root
         Operate on a different root directory.
 
-    .. versionadded:: 0.16.0
+    inclusion_detection:
+        Detect ``includes`` based on ``pkgs``
+        By default packages are always included
 
+    .. versionadded:: 0.16.0
 
     Returns a dict containing the changes.
 
@@ -1967,10 +1977,12 @@ def remove(
         salt '*' pkg.remove <package1>,<package2>,<package3>
         salt '*' pkg.remove pkgs='["foo", "bar"]'
     """
-    return _uninstall(name=name, pkgs=pkgs, root=root)
+    return _uninstall(inclusion_detection, name=name, pkgs=pkgs, root=root)
 
 
-def purge(name=None, pkgs=None, root=None, **kwargs):  # pylint: disable=unused-argument
+def purge(
+    name=None, pkgs=None, root=None, inclusion_detection=False, **kwargs
+):  # pylint: disable=unused-argument
     """
     .. versionchanged:: 2015.8.12,2016.3.3,2016.11.0
         On minions running systemd>=205, `systemd-run(1)`_ is now used to
@@ -2002,6 +2014,10 @@ def purge(name=None, pkgs=None, root=None, **kwargs):  # pylint: disable=unused-
     root
         Operate on a different root directory.
 
+    inclusion_detection:
+        Detect ``includes`` based on ``pkgs``
+        By default packages are always included
+
     .. versionadded:: 0.16.0
 
 
@@ -2015,7 +2031,7 @@ def purge(name=None, pkgs=None, root=None, **kwargs):  # pylint: disable=unused-
         salt '*' pkg.purge <package1>,<package2>,<package3>
         salt '*' pkg.purge pkgs='["foo", "bar"]'
     """
-    return _uninstall(name=name, pkgs=pkgs, root=root)
+    return _uninstall(inclusion_detection, name=name, pkgs=pkgs, root=root)
 
 
 def list_locks(root=None):
