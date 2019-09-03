@@ -2,7 +2,6 @@
 Module for gathering and managing network information
 """
 
-# Import python libs
 import datetime
 import hashlib
 import logging
@@ -12,7 +11,6 @@ import socket
 import time
 from multiprocessing.pool import ThreadPool
 
-# Import salt libs
 import salt.utils.decorators.path
 import salt.utils.functools
 import salt.utils.network
@@ -20,8 +18,6 @@ import salt.utils.platform
 import salt.utils.validate.net
 from salt._compat import ipaddress
 from salt.exceptions import CommandExecutionError
-
-# Import 3rd-party libs
 from salt.ext.six.moves import range
 
 log = logging.getLogger(__name__)
@@ -2076,7 +2072,10 @@ def fqdns():
 
     def _lookup_fqdn(ip):
         try:
-            return [socket.getfqdn(socket.gethostbyaddr(ip)[0])]
+            name, aliaslist, addresslist = socket.gethostbyaddr(ip)
+            return [socket.getfqdn(name)] + [
+                als for als in aliaslist if salt.utils.network.is_fqdn(als)
+            ]
         except socket.herror as err:
             if err.errno in (0, HOST_NOT_FOUND, NO_DATA):
                 # No FQDN for this IP address, so we don't need to know this all the time.
@@ -2102,13 +2101,12 @@ def fqdns():
     # This avoid blocking the execution when the "fqdn" is not defined for certains IP addresses, which was causing
     # that "socket.timeout" was reached multiple times secuencially, blocking execution for several seconds.
 
-    results = []
     try:
         pool = ThreadPool(8)
         results = pool.map(_lookup_fqdn, addresses)
         pool.close()
         pool.join()
-    except Exception as exc:  # pylint: disable=broad-except
+    except Exception as exc:
         log.error("Exception while creating a ThreadPool for resolving FQDNs: %s", exc)
 
     for item in results:
