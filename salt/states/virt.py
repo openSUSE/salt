@@ -389,8 +389,8 @@ def running(name,
 
     try:
         try:
-            __salt__['virt.vm_state'](name)
-            if __salt__['virt.vm_state'](name) != 'running':
+            domain_state = __salt__['virt.vm_state'](name)
+            if domain_state.get(name, None) != 'running':
                 action_msg = 'started'
                 if update:
                     status = __salt__['virt.update'](name,
@@ -670,7 +670,7 @@ def network_running(name,
     try:
         info = __salt__['virt.network_info'](name, connection=connection, username=username, password=password)
         if info:
-            if info['active']:
+            if info[name]['active']:
                 ret['comment'] = 'Network {0} exists and is running'.format(name)
             else:
                 __salt__['virt.network_start'](name, connection=connection, username=username, password=password)
@@ -680,7 +680,7 @@ def network_running(name,
             __salt__['virt.network_define'](name,
                                             bridge,
                                             forward,
-                                            vport,
+                                            vport=vport,
                                             tag=tag,
                                             autostart=autostart,
                                             start=True,
@@ -744,11 +744,11 @@ def pool_running(name,
                 - owner: 1000
                 - group: 100
             - source:
-                - dir: samba_share
-                - hosts:
-                   one.example.com
-                   two.example.com
-                - format: cifs
+                dir: samba_share
+                hosts:
+                  - one.example.com
+                  - two.example.com
+                format: cifs
             - autostart: True
 
     '''
@@ -761,7 +761,7 @@ def pool_running(name,
     try:
         info = __salt__['virt.pool_info'](name, connection=connection, username=username, password=password)
         if info:
-            if info['state'] == 'running':
+            if info[name]['state'] == 'running':
                 ret['comment'] = 'Pool {0} exists and is running'.format(name)
             else:
                 __salt__['virt.pool_start'](name, connection=connection, username=username, password=password)
@@ -795,6 +795,12 @@ def pool_running(name,
                                         connection=connection,
                                         username=username,
                                         password=password)
+
+            __salt__['virt.pool_start'](name,
+                                        connection=connection,
+                                        username=username,
+                                        password=password)
+
             ret['changes'][name] = 'Pool defined and started'
             ret['comment'] = 'Pool {0} defined and started'.format(name)
     except libvirt.libvirtError as err:
