@@ -26,8 +26,9 @@ from errno import EACCES, EPERM
 import datetime
 import warnings
 import time
+import salt.modules.network
 
-from multiprocessing.pool import ThreadPool
+from salt.utils.network import _get_interfaces
 
 # pylint: disable=import-error
 try:
@@ -84,6 +85,7 @@ __salt__ = {
     'cmd.run_all': salt.modules.cmdmod._run_all_quiet,
     'smbios.records': salt.modules.smbios.records,
     'smbios.get': salt.modules.smbios.get,
+    'network.fqdns': salt.modules.network.fqdns,
 }
 log = logging.getLogger(__name__)
 
@@ -107,7 +109,6 @@ HAS_UNAME = True
 if not hasattr(os, 'uname'):
     HAS_UNAME = False
 
-_INTERFACES = {}
 
 # Possible value for h_errno defined in netdb.h
 HOST_NOT_FOUND = 1
@@ -1538,17 +1539,6 @@ def _linux_bin_exists(binary):
         return False
 
 
-def _get_interfaces():
-    '''
-    Provide a dict of the connected interfaces and their ip addresses
-    '''
-
-    global _INTERFACES
-    if not _INTERFACES:
-        _INTERFACES = salt.utils.network.interfaces()
-    return _INTERFACES
-
-
 def _parse_lsb_release():
     ret = {}
     try:
@@ -2255,52 +2245,12 @@ def fqdns():
     '''
     Return all known FQDNs for the system by enumerating all interfaces and
     then trying to reverse resolve them (excluding 'lo' interface).
+    To disable the fqdns grain, set enable_fqdns_grains: False in the minion configuration file.
     '''
-    # Provides:
-    # fqdns
-
-    grains = {}
-    fqdns = set()
-
-    def _lookup_fqdn(ip):
-        try:
-            name, aliaslist, addresslist = socket.gethostbyaddr(ip)
-            return [socket.getfqdn(name)] + [als for als in aliaslist if salt.utils.network.is_fqdn(als)]
-        except socket.herror as err:
-            if err.errno in (0, HOST_NOT_FOUND, NO_DATA):
-                # No FQDN for this IP address, so we don't need to know this all the time.
-                log.debug("Unable to resolve address %s: %s", ip, err)
-            else:
-                log.error(err_message, ip, err)
-        except (socket.error, socket.gaierror, socket.timeout) as err:
-            log.error(err_message, ip, err)
-
-    start = time.time()
-
-    addresses = salt.utils.network.ip_addrs(include_loopback=False, interface_data=_get_interfaces())
-    addresses.extend(salt.utils.network.ip_addrs6(include_loopback=False, interface_data=_get_interfaces()))
-    err_message = 'Exception during resolving address: %s'
-
-    # Create a ThreadPool to process the underlying calls to 'socket.gethostbyaddr' in parallel.
-    # This avoid blocking the execution when the "fqdn" is not defined for certains IP addresses, which was causing
-    # that "socket.timeout" was reached multiple times secuencially, blocking execution for several seconds.
-
-    try:
-       pool = ThreadPool(8)
-       results = pool.map(_lookup_fqdn, addresses)
-       pool.close()
-       pool.join()
-    except Exception as exc:
-       log.error("Exception while creating a ThreadPool for resolving FQDNs: %s", exc)
-
-    for item in results:
-        if item:
-            fqdns.update(item)
-
-    elapsed = time.time() - start
-    log.debug('Elapsed time getting FQDNs: {} seconds'.format(elapsed))
-
-    return {"fqdns": sorted(list(fqdns))}
+    opt = {"fqdns": []}
+    if __opts__.get('enable_fqdns_grains', True) == True:
+        opt = __salt__['network.fqdns']()
+    return opt
 
 
 def ip_fqdn():
