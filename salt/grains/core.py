@@ -27,7 +27,6 @@ import datetime
 import warnings
 import salt.modules.network
 
-from multiprocessing.pool import ThreadPool
 from salt.utils.network import _get_interfaces
 
 # pylint: disable=import-error
@@ -109,7 +108,6 @@ HAS_UNAME = True
 if not hasattr(os, 'uname'):
     HAS_UNAME = False
 
-_INTERFACES = {}
 
 # Possible value for h_errno defined in netdb.h
 HOST_NOT_FOUND = 1
@@ -2192,8 +2190,12 @@ def fqdns():
     '''
     Return all known FQDNs for the system by enumerating all interfaces and
     then trying to reverse resolve them (excluding 'lo' interface).
+    To disable the fqdns grain, set enable_fqdns_grains: False in the minion configuration file.
     '''
-    return __salt__['network.fqdns']()
+    opt = {"fqdns": []}
+    if __opts__.get('enable_fqdns_grains', True) == True:
+        opt = __salt__['network.fqdns']()
+    return opt
 
 
 def ip_fqdn():
