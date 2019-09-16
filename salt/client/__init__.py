@@ -1776,6 +1776,7 @@ class LocalClient:
             "key": self.key,
             "tgt_type": tgt_type,
             "ret": ret,
+            "timeout": timeout,
             "jid": jid,
         }
 
