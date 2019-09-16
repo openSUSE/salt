@@ -1622,6 +1622,7 @@ class LocalClient(object):
                           'key': self.key,
                           'tgt_type': tgt_type,
                           'ret': ret,
+                          'timeout': timeout,
                           'jid': jid}
 
         # if kwargs are passed, pack them.

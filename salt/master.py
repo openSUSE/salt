@@ -2084,7 +2084,6 @@ class ClearFuncs(TransportMethods):
     def publish_batch(self, clear_load, minions, missing):
         batch_load = {}
         batch_load.update(clear_load)
-        import salt.cli.batch_async
         batch = salt.cli.batch_async.BatchAsync(
             self.local.opts,
             functools.partial(self._prep_jid, clear_load, {}),
