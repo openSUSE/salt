@@ -68,8 +68,8 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         ret = self.batch.start()
         # assert start_batch is called later with batch_presence_ping_timeout as param
         self.assertEqual(
-            self.batch.event.io_loop.call_later.call_args[0],
-            (self.batch.batch_presence_ping_timeout, self.batch.start_batch))
+            self.batch.event.io_loop.spawn_callback.call_args[0],
+            (self.batch.start_batch,))
         # assert test.ping called
         self.assertEqual(
             self.batch.local.run_job_async.call_args[0],
@@ -88,8 +88,8 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         ret = self.batch.start()
         # assert start_batch is called later with gather_job_timeout as param
         self.assertEqual(
-            self.batch.event.io_loop.call_later.call_args[0],
-            (self.batch.opts['gather_job_timeout'], self.batch.start_batch))
+            self.batch.event.io_loop.spawn_callback.call_args[0],
+            (self.batch.start_batch,))
 
     def test_batch_fire_start_event(self):
         self.batch.minions = set(['foo', 'bar'])
@@ -113,12 +113,11 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
     def test_start_batch_calls_next(self):
         self.batch.run_next = MagicMock(return_value=MagicMock())
         self.batch.event = MagicMock()
-        future = tornado.gen.Future()
-        future.set_result(None)
-        self.batch.run_next = MagicMock(return_value=future)
         self.batch.start_batch()
         self.assertEqual(self.batch.initialized, True)
-        self.assertEqual(len(self.batch.run_next.mock_calls), 1)
+        self.assertEqual(
+            self.batch.event.io_loop.spawn_callback.call_args[0],
+            (self.batch.run_next,))
 
     def test_batch_fire_done_event(self):
         self.batch.targeted_minions = {'foo', 'baz', 'bar'}
@@ -154,14 +153,14 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         future = tornado.gen.Future()
         future.set_result({'minions': ['foo', 'bar']})
         self.batch.local.run_job_async.return_value = future
-        ret = self.batch.run_next().result()
+        self.batch.run_next()
         self.assertEqual(
             self.batch.local.run_job_async.call_args[0],
             ({'foo', 'bar'}, 'my.fun', [], 'list')
         )
         self.assertEqual(
-            self.batch.event.io_loop.call_later.call_args[0],
-            (self.batch.opts['timeout'], self.batch.find_job, {'foo', 'bar'})
+            self.batch.event.io_loop.spawn_callback.call_args[0],
+            (self.batch.find_job, {'foo', 'bar'})
         )
         self.assertEqual(self.batch.active, {'bar', 'foo'})
 
@@ -252,13 +251,14 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.assertEqual(self.batch.active, set())
         self.assertEqual(self.batch.done_minions, {'foo'})
         self.assertEqual(
-            self.batch.event.io_loop.call_later.call_args[0],
-            (self.batch.batch_delay, self.batch.run_next))
+            self.batch.event.io_loop.spawn_callback.call_args[0],
+            (self.batch.schedule_next,))
 
     def test_batch__event_handler_find_job_return(self):
         self.batch.event = MagicMock(
-            unpack=MagicMock(return_value=('salt/job/1236/ret/foo', {'id': 'foo'})))
+            unpack=MagicMock(return_value=('salt/job/1236/ret/foo', {'id': 'foo', 'return': 'deadbeaf'})))
         self.batch.start()
+        self.batch.patterns.add(('salt/job/1236/ret/*', 'find_job_return'))
         self.batch._BatchAsync__event_handler(MagicMock())
         self.assertEqual(self.batch.find_job_returned, {'foo'})
 
@@ -275,10 +275,13 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         future = tornado.gen.Future()
         future.set_result({})
         self.batch.local.run_job_async.return_value = future
+        self.batch.minions = set(['foo', 'bar'])
+        self.batch.jid_gen = MagicMock(return_value="1234")
+        tornado.gen.sleep = MagicMock(return_value=future)
         self.batch.find_job({'foo', 'bar'})
         self.assertEqual(
-            self.batch.event.io_loop.call_later.call_args[0],
-            (self.batch.opts['gather_job_timeout'], self.batch.check_find_job, {'foo', 'bar'})
+            self.batch.event.io_loop.spawn_callback.call_args[0],
+            (self.batch.check_find_job, {'foo', 'bar'}, "1234")
         )
 
     @tornado.testing.gen_test
@@ -288,17 +291,21 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         future = tornado.gen.Future()
         future.set_result({})
         self.batch.local.run_job_async.return_value = future
+        self.batch.minions = set(['foo', 'bar'])
+        self.batch.jid_gen = MagicMock(return_value="1234")
+        tornado.gen.sleep = MagicMock(return_value=future)
         self.batch.find_job({'foo', 'bar'})
         self.assertEqual(
-            self.batch.event.io_loop.call_later.call_args[0],
-            (self.batch.opts['gather_job_timeout'], self.batch.check_find_job, {'foo'})
+            self.batch.event.io_loop.spawn_callback.call_args[0],
+            (self.batch.check_find_job, {'foo'}, "1234")
         )
 
     def test_batch_check_find_job_did_not_return(self):
         self.batch.event = MagicMock()
         self.batch.active = {'foo'}
         self.batch.find_job_returned = set()
-        self.batch.check_find_job({'foo'})
+        self.batch.patterns = { ('salt/job/1234/ret/*', 'find_job_return') }
+        self.batch.check_find_job({'foo'}, jid="1234")
         self.assertEqual(self.batch.find_job_returned, set())
         self.assertEqual(self.batch.active, set())
         self.assertEqual(len(self.batch.event.io_loop.add_callback.mock_calls), 0)
@@ -306,9 +313,10 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
     def test_batch_check_find_job_did_return(self):
         self.batch.event = MagicMock()
         self.batch.find_job_returned = {'foo'}
-        self.batch.check_find_job({'foo'})
+        self.batch.patterns = { ('salt/job/1234/ret/*', 'find_job_return') }
+        self.batch.check_find_job({'foo'}, jid="1234")
         self.assertEqual(
-            self.batch.event.io_loop.add_callback.call_args[0],
+            self.batch.event.io_loop.spawn_callback.call_args[0],
             (self.batch.find_job, {'foo'})
         )
 
@@ -329,7 +337,8 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         # both not yet done but only 'foo' responded to find_job
         not_done = {'foo', 'bar'}
 
-        self.batch.check_find_job(not_done)
+        self.batch.patterns = { ('salt/job/1234/ret/*', 'find_job_return') }
+        self.batch.check_find_job(not_done, jid="1234")
 
         # assert 'bar' removed from active
         self.assertEqual(self.batch.active, {'foo'})
@@ -339,7 +348,7 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
 
         # assert 'find_job' schedueled again only for 'foo'
         self.assertEqual(
-            self.batch.event.io_loop.add_callback.call_args[0],
+            self.batch.event.io_loop.spawn_callback.call_args[0],
             (self.batch.find_job, {'foo'})
         )
 
@@ -347,4 +356,4 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.batch.event = MagicMock()
         self.batch.scheduled = True
         self.batch.schedule_next()
-        self.assertEqual(len(self.batch.event.io_loop.call_later.mock_calls), 0)
+        self.assertEqual(len(self.batch.event.io_loop.spawn_callback.mock_calls), 0)
