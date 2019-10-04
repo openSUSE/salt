@@ -91,7 +91,7 @@ class BatchAsync:
             keep_loop=True,
         )
         self.scheduled = False
-        self.patterns = {}
+        self.patterns = set()
 
     def __set_event_handler(self):
         ping_return_pattern = "salt/job/{}/ret/*".format(self.ping_jid)
