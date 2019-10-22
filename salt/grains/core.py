@@ -987,6 +987,10 @@ def _virtual(osdata):
                         grains['virtual'] = 'gce'
                     elif 'BHYVE' in output:
                         grains['virtual'] = 'bhyve'
+            except UnicodeDecodeError:
+                # Some firmwares provide non-valid 'product_name'
+                # files, ignore them
+                pass
             except IOError:
                 pass
     elif osdata['kernel'] == 'FreeBSD':
