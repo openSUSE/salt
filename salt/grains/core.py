@@ -1046,7 +1046,7 @@ def _virtual(osdata):
         if os.path.isfile("/sys/devices/virtual/dmi/id/product_name"):
             try:
                 with salt.utils.files.fopen(
-                    "/sys/devices/virtual/dmi/id/product_name", "rb"
+                    "/sys/devices/virtual/dmi/id/product_name", "r"
                 ) as fhr:
                     output = salt.utils.stringutils.to_unicode(
                         fhr.read(), errors="replace"
@@ -1066,9 +1066,7 @@ def _virtual(osdata):
             except UnicodeDecodeError:
                 # Some firmwares provide non-valid 'product_name'
                 # files, ignore them
-                log.debug(
-                    "The content in /sys/devices/virtual/dmi/id/product_name is not valid"
-                )
+                pass
             except OSError:
                 pass
     elif osdata["kernel"] == "FreeBSD":

@@ -958,28 +958,6 @@ def list_pkgs(versions_as_list=False, root=None, includes=None, **kwargs):
                         }
                     ]
 
-        for include in includes:
-            if include in ("pattern", "patch"):
-                if include == "pattern":
-                    pkgs = list_installed_patterns(root=root)
-                elif include == "patch":
-                    pkgs = list_installed_patches(root=root)
-                else:
-                    pkgs = []
-                for pkg in pkgs:
-                    pkg_extended_name = "{}:{}".format(include, pkg)
-                    info = info_available(pkg_extended_name, refresh=False, root=root)
-                    _ret[pkg_extended_name] = [
-                        {
-                            "epoch": None,
-                            "version": info[pkg]["version"],
-                            "release": None,
-                            "arch": info[pkg]["arch"],
-                            "install_date": None,
-                            "install_date_time_t": None,
-                        }
-                    ]
-
         __context__[contextkey] = _ret
 
     return __salt__["pkg_resource.format_pkg_list"](
