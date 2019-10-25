@@ -412,15 +412,15 @@ class AptPkgTestCase(TestCase, LoaderModuleMockMixin):
                 }
                 with patch.multiple(aptpkg, **patch_kwargs):
                     aptpkg.upgrade()
-                    args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args.args if "--download-only" in args]
+                    args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args[0] if "--download-only" in args]
                     self.assertFalse(any(args_matching))
 
                     aptpkg.upgrade(downloadonly=True)
-                    args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args.args if "--download-only" in args]
+                    args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args[0] if "--download-only" in args]
                     self.assertTrue(any(args_matching))
 
                     aptpkg.upgrade(download_only=True)
-                    args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args.args if "--download-only" in args]
+                    args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args[0] if "--download-only" in args]
                     self.assertTrue(any(args_matching))
 
     def test_show(self):
