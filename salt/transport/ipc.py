@@ -770,6 +770,7 @@ class IPCMessageSubscriber(IPCClient):
                 break
             except Exception as exc:
                 log.error('Exception occurred while Subscriber handling stream: %s', exc)
+                yield tornado.gen.sleep(1)
 
     def __run_callbacks(self, raw):
         for callback in self.callbacks:
