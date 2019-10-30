@@ -238,7 +238,6 @@ class BatchAsync:
                     self.event.unsubscribe(pattern, match_type="glob")
             del self
             gc.collect()
-        yield
 
     @tornado.gen.coroutine
     def schedule_next(self):
@@ -275,7 +274,6 @@ class BatchAsync:
         else:
             yield self.end_batch()
         gc.collect()
-        yield
 
     def __del__(self):
         self.local = None
