@@ -232,7 +232,6 @@ class BatchAsync:
                 "metadata": self.metadata,
             }
             self.event.fire_event(data, "salt/batch/{}/done".format(self.batch_jid))
-            self.event.remove_event_handler(self.__event_handler)
             for (pattern, label) in self.patterns:
                 if label in ["ping_return", "batch_run"]:
                     self.event.unsubscribe(pattern, match_type="glob")
@@ -277,6 +276,7 @@ class BatchAsync:
 
     def __del__(self):
         self.local = None
+        self.event.remove_event_handler(self.__event_handler)
         self.event = None
         self.ioloop = None
         gc.collect()
