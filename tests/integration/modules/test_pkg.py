@@ -145,6 +145,7 @@ class PkgModuleTest(ModuleCase, SaltReturnAssertsMixin):
         try:
             if os_grain in ['CentOS', 'RedHat', 'SUSE']:
                 my_baseurl = 'http://my.fake.repo/foo/bar/\n http://my.fake.repo.alt/foo/bar/'
+                expected_get_repo_baseurl_zypp = 'http://my.fake.repo/foo/bar/%0A%20http://my.fake.repo.alt/foo/bar/'
                 expected_get_repo_baseurl = 'http://my.fake.repo/foo/bar/\nhttp://my.fake.repo.alt/foo/bar/'
                 major_release = int(
                     self.run_function(
@@ -169,17 +170,24 @@ class PkgModuleTest(ModuleCase, SaltReturnAssertsMixin):
                     enabled=enabled,
                     failovermethod=failovermethod,
                 )
-                # return data from pkg.mod_repo contains the file modified at
-                # the top level, so use next(iter(ret)) to get that key
                 self.assertNotEqual(ret, {})
-                repo_info = ret[next(iter(ret))]
+                repo_info = {repo: ret}
                 self.assertIn(repo, repo_info)
-                self.assertEqual(repo_info[repo]['baseurl'], my_baseurl)
+                if os_grain == 'SUSE':
+                    self.assertEqual(repo_info[repo]['baseurl'], expected_get_repo_baseurl_zypp)
+                else:
+                    self.assertEqual(repo_info[repo]['baseurl'], my_baseurl)
                 ret = self.run_function('pkg.get_repo', [repo])
-                self.assertEqual(ret['baseurl'], expected_get_repo_baseurl)
+                if os_grain == 'SUSE':
+                    self.assertEqual(repo_info[repo]['baseurl'], expected_get_repo_baseurl_zypp)
+                else:
+                    self.assertEqual(ret['baseurl'], expected_get_repo_baseurl)
                 self.run_function('pkg.mod_repo', [repo])
                 ret = self.run_function('pkg.get_repo', [repo])
-                self.assertEqual(ret['baseurl'], expected_get_repo_baseurl)
+                if os_grain == 'SUSE':
+                    self.assertEqual(repo_info[repo]['baseurl'], expected_get_repo_baseurl_zypp)
+                else:
+                    self.assertEqual(ret['baseurl'], expected_get_repo_baseurl)
         finally:
             if repo is not None:
                 self.run_function('pkg.del_repo', [repo])
