@@ -140,8 +140,14 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
                 "salt/batch/1235/done"
             )
         )
+
+    def test_batch__del__(self):
+        batch = BatchAsync(MagicMock(), MagicMock(), MagicMock())
+        event = MagicMock()
+        batch.event = event
+        batch.__del__()
         self.assertEqual(
-            len(self.batch.event.remove_event_handler.mock_calls), 1)
+            len(event.remove_event_handler.mock_calls), 1)
 
     @tornado.testing.gen_test
     def test_batch_next(self):
