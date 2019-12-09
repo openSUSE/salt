@@ -331,7 +331,7 @@ def _get_uuid(dom):
 
         salt '*' virt.get_uuid <domain>
     '''
-    return ElementTree.fromstring(dom.XMLDesc(0)).find('uuid').text
+    return ElementTree.fromstring(get_xml(dom)).find('uuid').text
 
 
 def _get_on_poweroff(dom):
@@ -344,7 +344,7 @@ def _get_on_poweroff(dom):
 
         salt '*' virt.get_on_restart <domain>
     '''
-    node = ElementTree.fromstring(dom.XMLDesc(0)).find('on_poweroff')
+    node = ElementTree.fromstring(get_xml(dom)).find('on_poweroff')
     return node.text if node is not None else ''
 
 
@@ -358,7 +358,7 @@ def _get_on_reboot(dom):
 
         salt '*' virt.get_on_reboot <domain>
     '''
-    node = ElementTree.fromstring(dom.XMLDesc(0)).find('on_reboot')
+    node = ElementTree.fromstring(get_xml(dom)).find('on_reboot')
     return node.text if node is not None else ''
 
 
@@ -372,7 +372,7 @@ def _get_on_crash(dom):
 
         salt '*' virt.get_on_crash <domain>
     '''
-    node = ElementTree.fromstring(dom.XMLDesc(0)).find('on_crash')
+    node = ElementTree.fromstring(get_xml(dom)).find('on_crash')
     return node.text if node is not None else ''
 
 
