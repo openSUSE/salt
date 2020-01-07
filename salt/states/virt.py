@@ -617,13 +617,22 @@ def running(
 
         .. versionadded:: 3000
 
-    :param boot_dev:
-        Space separated list of devices to boot from sorted by decreasing priority.
-        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+    :param boot:
+        Specifies kernel for the virtual machine, as well as boot parameters
+        for the virtual machine. This is an optionl parameter, and all of the
+        keys are optional within the dictionary. If a remote path is provided
+        to kernel or initrd, salt will handle the downloading of the specified
+        remote fild, and will modify the XML accordingly.
 
-        By default, the value will ``"hd"``.
+        .. code-block:: python
 
-        .. versionadded:: 3002
+            {
+                'kernel': '/root/f8-i386-vmlinuz',
+                'initrd': '/root/f8-i386-initrd',
+                'cmdline': 'console=ttyS0 ks=http://example.com/f8-i386/os/'
+            }
+
+        .. versionadded:: 3000
 
     .. rubric:: Example States
 
