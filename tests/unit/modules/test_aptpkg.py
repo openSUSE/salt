@@ -413,14 +413,17 @@ class AptPkgTestCase(TestCase, LoaderModuleMockMixin):
                 with patch.multiple(aptpkg, **patch_kwargs):
                     aptpkg.upgrade()
                     args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args[0] if "--download-only" in args]
+                    # Here we shouldn't see the parameter and args_matching should be empty.
                     self.assertFalse(any(args_matching))
 
                     aptpkg.upgrade(downloadonly=True)
                     args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args[0] if "--download-only" in args]
+                    # --download-only should be in the args list and we should have at least on True in the list.
                     self.assertTrue(any(args_matching))
 
                     aptpkg.upgrade(download_only=True)
                     args_matching = [True for args in patch_kwargs['__salt__']['cmd.run_all'].call_args[0] if "--download-only" in args]
+                    # --download-only should be in the args list and we should have at least on True in the list.
                     self.assertTrue(any(args_matching))
 
     def test_show(self):
@@ -544,6 +547,32 @@ class AptPkgTestCase(TestCase, LoaderModuleMockMixin):
             self.assertEqual(aptpkg.show('foo*', refresh=True), {})
             self.assert_called_once(refresh_mock)
             refresh_mock.reset_mock()
+
+    @patch('salt.utils.path.os_walk', MagicMock(return_value=[('test', 'test', 'test')]))
+    @patch('os.path.getsize', MagicMock(return_value=123456))
+    @patch('os.path.getctime', MagicMock(return_value=1234567890.123456))
+    @patch('fnmatch.filter', MagicMock(return_value=['/var/cache/apt/archive/test_package.rpm']))
+    def test_list_downloaded(self):
+        '''
+        Test downloaded packages listing.
+        :return:
+        '''
+        DOWNLOADED_RET = {
+            'test-package': {
+                '1.0': {
+                    'path': '/var/cache/apt/archive/test_package.rpm',
+                    'size': 123456,
+                    'creation_date_time_t': 1234567890,
+                    'creation_date_time': '2009-02-13T23:31:30',
+                }
+            }
+        }
+
+        with patch.dict(aptpkg.__salt__, {'lowpkg.bin_pkg_info': MagicMock(return_value={'name': 'test-package',
+                                                                                         'version': '1.0'})}):
+            list_downloaded = aptpkg.list_downloaded()
+            self.assertEqual(len(list_downloaded), 1)
+            self.assertDictEqual(list_downloaded, DOWNLOADED_RET)
 
 
 @skipIf(pytest is None, 'PyTest is missing')
