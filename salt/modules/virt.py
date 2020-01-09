@@ -1885,8 +1885,8 @@ def update(name,
         boot = _handle_remote_boot_params(boot)
 
     new_desc = ElementTree.fromstring(_gen_xml(name,
-                                               cpu,
-                                               mem,
+                                               cpu or 0,
+                                               mem or 0,
                                                all_disks,
                                                _get_merged_nics(hypervisor, nic_profile, interfaces),
                                                hypervisor,
