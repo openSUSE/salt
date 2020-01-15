@@ -1582,8 +1582,26 @@ class Webserver(object):
         self.server_thread.join()
 
 
-def win32_kill_process_tree(pid, sig=signal.SIGTERM, include_parent=True,
-        timeout=None, on_terminate=None):
+class SaveRequestsPostHandler(tornado.web.RequestHandler):
+    '''
+    Save all requests sent to the server.
+    '''
+    received_requests = []
+
+    def post(self, *args):  # pylint: disable=arguments-differ
+        '''
+        Handle the post
+        '''
+        self.received_requests.append(self.request)
+
+    def data_received(self):  # pylint: disable=arguments-differ
+        '''
+        Streaming not used for testing
+        '''
+        raise NotImplementedError()
+
+
+class MirrorPostHandler(tornado.web.RequestHandler):
     '''
     Kill a process tree (including grandchildren) with signal "sig" and return
     a (gone, still_alive) tuple.  "on_terminate", if specified, is a callabck
@@ -1605,6 +1623,9 @@ def win32_kill_process_tree(pid, sig=signal.SIGTERM, include_parent=True,
                                     callback=on_terminate)
     return (gone, alive)
 
+
+def win32_kill_process_tree(pid, sig=signal.SIGTERM, include_parent=True,
+        timeout=None, on_terminate=None):
 
 def this_user():
     '''
