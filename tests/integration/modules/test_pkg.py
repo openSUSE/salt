@@ -163,7 +163,9 @@ class PkgModuleTest(ModuleCase, SaltReturnAssertsMixin):
                 if os_grain == 'SUSE':
                     self.assertEqual(repo_info[repo]['baseurl'], expected_get_repo_baseurl_zypp)
                 else:
-                    self.assertEqual(repo_info[repo]['baseurl'], my_baseurl)
+                    repo_baseurls = find_value_by_key('baseurl', repo_info[repo])
+                    for repo_baseurl in repo_baseurls:
+                        self.assertEqual(repo_baseurl, my_baseurl)
                 ret = self.run_function('pkg.get_repo', [repo])
                 if os_grain == 'SUSE':
                     self.assertEqual(repo_info[repo]['baseurl'], expected_get_repo_baseurl_zypp)
@@ -421,3 +423,15 @@ class PkgModuleTest(ModuleCase, SaltReturnAssertsMixin):
             cmd_pkg = self.run_function('cmd.run', ['zypper info {0}'.format(self.pkg)])
         pkg_latest = self.run_function('pkg.latest_version', [self.pkg])
         self.assertIn(pkg_latest, cmd_pkg)
+
+
+def find_value_by_key(target, data):
+    '''
+    Gets all values from a nested dict by key.
+    '''
+    if isinstance(data, str):
+        for key, value in data.items():
+            if isinstance(value, dict):
+                yield from find_value_by_key(value, target)
+            elif key == target:
+                yield value
