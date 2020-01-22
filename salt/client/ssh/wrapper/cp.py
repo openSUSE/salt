@@ -4,7 +4,7 @@ Wrap the cp module allowing for managed ssh file transfers
 '''
 # Import Python libs
 from __future__ import absolute_import, print_function
-import logging
+import salt.log.setup as logging
 import os
 
 # Import salt libs
