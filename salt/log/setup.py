@@ -36,6 +36,7 @@ PROFILE = logging.PROFILE = 15
 TRACE = logging.TRACE = 5
 GARBAGE = logging.GARBAGE = 1
 QUIET = logging.QUIET = 1000
+DEBUG = logging.DEBUG = 10
 
 # Import salt libs
 from salt.textformat import TextFormat
@@ -253,11 +254,11 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
         '''
         instance = super(SaltLoggingClass, cls).__new__(cls)
 
-        try:
-            max_logger_length = len(max(
-                list(logging.Logger.manager.loggerDict), key=len
-            ))
-            for handler in logging.root.handlers:
+        max_logger_length = len(max(
+            list(logging.Logger.manager.loggerDict), key=len
+        ))
+        for handler in logging.root.handlers:
+            try:
                 if handler in (LOGGING_NULL_HANDLER,
                                LOGGING_STORE_HANDLER,
                                LOGGING_TEMP_HANDLER):
@@ -276,18 +277,15 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
                 match = MODNAME_PATTERN.search(fmt)
                 if not match:
                     # Not matched. Release handler and return.
-                    handler.release()
                     return instance
 
                 if 'digits' not in match.groupdict():
                     # No digits group. Release handler and return.
-                    handler.release()
                     return instance
 
                 digits = match.group('digits')
                 if not digits or not (digits and digits.isdigit()):
                     # No valid digits. Release handler and return.
-                    handler.release()
                     return instance
 
                 if int(digits) < max_logger_length:
@@ -299,9 +297,14 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
                     )
                     handler.setFormatter(formatter)
                 handler.release()
-        except ValueError:
-            # There are no registered loggers yet
-            pass
+            except ValueError:
+                # There are no registered loggers yet
+                pass
+            finally:
+                try:
+                    handler.release()
+                except:
+                    pass
         return instance
 
     def _log(self, level, msg, args, exc_info=None, extra=None,  # pylint: disable=arguments-differ
@@ -339,9 +342,15 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
         else:
             extra['exc_info_on_loglevel'] = exc_info_on_loglevel
 
-        LOGGING_LOGGER_CLASS._log(
-            self, level, msg, args, exc_info=exc_info, extra=extra
-        )
+        try:
+            logging._acquireLock()
+            LOGGING_LOGGER_CLASS._log(
+                self, level, msg, args, exc_info=exc_info, extra=extra, stack_info=False
+            )
+        except:
+            pass
+        finally:
+            logging._releaseLock()
 
     # pylint: disable=C0103
     # pylint: disable=W0221
@@ -419,6 +428,7 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
     # pylint: enable=C0103
 
 
+
 # Override the python's logging logger class as soon as this module is imported
 if logging.getLoggerClass() is not SaltLoggingClass:
 
@@ -427,6 +437,7 @@ if logging.getLoggerClass() is not SaltLoggingClass:
     logging.addLevelName(PROFILE, 'PROFILE')
     logging.addLevelName(TRACE, 'TRACE')
     logging.addLevelName(GARBAGE, 'GARBAGE')
+    logging.addLevelName(DEBUG, 'DEBUG')
 
     if len(logging.root.handlers) == 0:
         # No configuration to the logging system has been done so far.
