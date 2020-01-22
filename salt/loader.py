@@ -11,7 +11,7 @@ import os
 import re
 import sys
 import time
-import logging
+import salt.log.setup as logging
 import inspect
 import tempfile
 import functools
