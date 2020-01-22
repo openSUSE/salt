@@ -1,15 +1,13 @@
-# -*- coding: utf-8 -*-
 """
 Lazily-evaluated data structures, primarily used by Salt's loader
 """
 
-# Import Python Libs
-from __future__ import absolute_import, unicode_literals
 
-import logging
+import time
 from collections.abc import MutableMapping
 
 import salt.exceptions
+import salt.log.setup as logging
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +79,7 @@ class LazyDict(MutableMapping):
 
         Override this to return a more meaningfull error message if possible
         """
-        return "'{0}' is not available.".format(function_name)
+        return "'{}' is not available.".format(function_name)
 
     def __setitem__(self, key, val):
         self._dict[key] = val
@@ -100,11 +98,13 @@ class LazyDict(MutableMapping):
             # load the item
             if self._load(key):
                 log.debug("LazyLoaded %s", key)
+                time.sleep(0.0001)
                 return self._dict[key]
             else:
                 log.debug(
                     "Could not LazyLoad %s: %s", key, self.missing_fun_string(key)
                 )
+                time.sleep(0.0001)
                 raise KeyError(key)
         else:
             return self._dict[key]

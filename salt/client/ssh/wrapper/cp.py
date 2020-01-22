@@ -1,15 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Wrap the cp module allowing for managed ssh file transfers
 """
-# Import Python libs
-from __future__ import absolute_import, print_function
 
-import logging
 import os
 
-# Import salt libs
 import salt.client.ssh
+import salt.log.setup as logging
 import salt.utils.files
 import salt.utils.stringutils
 import salt.utils.templates
@@ -107,7 +103,7 @@ def _render_filenames(path, dest, saltenv, template):
     if template not in salt.utils.templates.TEMPLATE_REGISTRY:
         raise CommandExecutionError(
             "Attempted to render file paths with unavailable engine "
-            "{0}".format(template)
+            "{}".format(template)
         )
 
     kwargs = {}
@@ -133,7 +129,7 @@ def _render_filenames(path, dest, saltenv, template):
         if not data["result"]:
             # Failed to render the template
             raise CommandExecutionError(
-                "Failed to render file path with error: {0}".format(data["data"])
+                "Failed to render file path with error: {}".format(data["data"])
             )
         else:
             return data["data"]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
     salt._logging.impl
     ~~~~~~~~~~~~~~~~~~
@@ -6,15 +5,12 @@
     Salt's logging implementation classes/functionality
 """
 
-# Import python libs
-from __future__ import absolute_import, print_function, unicode_literals
 
 import logging
 import re
 import sys
 import types
 
-# Import 3rd-party libs
 import salt.ext.six as six
 
 # Let's define these custom logging levels before importing the salt._logging.mixins
@@ -23,8 +19,8 @@ PROFILE = logging.PROFILE = 15
 TRACE = logging.TRACE = 5
 GARBAGE = logging.GARBAGE = 1
 QUIET = logging.QUIET = 1000
+DEBUG = logging.DEBUG = 10
 
-# Import Salt libs
 from salt._logging.handlers import StreamHandler  # isort:skip
 
 # from salt._logging.handlers import SysLogHandler  # isort:skip
@@ -52,7 +48,7 @@ LOG_LEVELS = {
     "warning": logging.WARNING,
 }
 
-LOG_VALUES_TO_LEVELS = dict((v, k) for (k, v) in LOG_LEVELS.items())
+LOG_VALUES_TO_LEVELS = {v: k for (k, v) in LOG_LEVELS.items()}
 
 LOG_COLORS = {
     "levels": {
@@ -96,9 +92,7 @@ LOG_COLORS = {
 }
 
 # Make a list of log level names sorted by log level
-SORTED_LEVEL_NAMES = [
-    l[0] for l in sorted(six.iteritems(LOG_LEVELS), key=lambda x: x[1])
-]
+SORTED_LEVEL_NAMES = [l[0] for l in sorted(LOG_LEVELS.items(), key=lambda x: x[1])]
 
 MODNAME_PATTERN = re.compile(r"(?P<name>%%\(name\)(?:\-(?P<digits>[\d]+))?s)")
 
@@ -168,8 +162,7 @@ def set_log_record_factory(factory):
     Set the logging  log record factory
     """
     get_log_record_factory.__factory__ = factory
-    if not six.PY2:
-        logging.setLogRecordFactory(factory)
+    logging.setLogRecordFactory(factory)
 
 
 set_log_record_factory(SaltLogRecord)
@@ -180,7 +173,7 @@ LOGGING_LOGGER_CLASS = logging.getLoggerClass()
 
 
 class SaltLoggingClass(
-    six.with_metaclass(LoggingMixinMeta, LOGGING_LOGGER_CLASS, NewStyleClassMixin)
+    LOGGING_LOGGER_CLASS, NewStyleClassMixin, metaclass=LoggingMixinMeta
 ):
     def __new__(cls, *args):
         """
@@ -194,13 +187,11 @@ class SaltLoggingClass(
             logging.getLogger(__name__)
 
         """
-        instance = super(SaltLoggingClass, cls).__new__(cls)
+        instance = super().__new__(cls)
 
-        try:
-            max_logger_length = len(
-                max(list(logging.Logger.manager.loggerDict), key=len)
-            )
-            for handler in logging.root.handlers:
+        max_logger_length = len(max(list(logging.Logger.manager.loggerDict), key=len))
+        for handler in logging.root.handlers:
+            try:
                 if handler in (
                     LOGGING_NULL_HANDLER,
                     LOGGING_STORE_HANDLER,
@@ -221,18 +212,15 @@ class SaltLoggingClass(
                 match = MODNAME_PATTERN.search(fmt)
                 if not match:
                     # Not matched. Release handler and return.
-                    handler.release()
                     return instance
 
                 if "digits" not in match.groupdict():
                     # No digits group. Release handler and return.
-                    handler.release()
                     return instance
 
                 digits = match.group("digits")
                 if not digits or not (digits and digits.isdigit()):
                     # No valid digits. Release handler and return.
-                    handler.release()
                     return instance
 
                 if int(digits) < max_logger_length:
@@ -243,9 +231,14 @@ class SaltLoggingClass(
                     )
                     handler.setFormatter(formatter)
                 handler.release()
-        except ValueError:
-            # There are no registered loggers yet
-            pass
+            except ValueError:
+                # There are no registered loggers yet
+                pass
+            finally:
+                try:
+                    handler.release()
+                except:
+                    pass
         return instance
 
     def _log(
@@ -279,7 +272,7 @@ class SaltLoggingClass(
                 "Only one of 'exc_info' and 'exc_info_on_loglevel' is " "permitted"
             )
         if exc_info_on_loglevel is not None:
-            if isinstance(exc_info_on_loglevel, six.string_types):
+            if isinstance(exc_info_on_loglevel, str):
                 exc_info_on_loglevel = LOG_LEVELS.get(
                     exc_info_on_loglevel, logging.ERROR
                 )
@@ -295,31 +288,37 @@ class SaltLoggingClass(
         else:
             extra["exc_info_on_loglevel"] = exc_info_on_loglevel
 
-        if sys.version_info < (3,):
-            LOGGING_LOGGER_CLASS._log(
-                self, level, msg, args, exc_info=exc_info, extra=extra
-            )
-        elif sys.version_info < (3, 8):
-            LOGGING_LOGGER_CLASS._log(
-                self,
-                level,
-                msg,
-                args,
-                exc_info=exc_info,
-                extra=extra,
-                stack_info=stack_info,
-            )
-        else:
-            LOGGING_LOGGER_CLASS._log(
-                self,
-                level,
-                msg,
-                args,
-                exc_info=exc_info,
-                extra=extra,
-                stack_info=stack_info,
-                stacklevel=stacklevel,
-            )
+        try:
+            logging._acquireLock()
+            if sys.version_info < (3,):
+                LOGGING_LOGGER_CLASS._log(
+                    self, level, msg, args, exc_info=exc_info, extra=extra
+                )
+            elif sys.version_info < (3, 8):
+                LOGGING_LOGGER_CLASS._log(
+                    self,
+                    level,
+                    msg,
+                    args,
+                    exc_info=exc_info,
+                    extra=extra,
+                    stack_info=stack_info,
+                )
+            else:
+                LOGGING_LOGGER_CLASS._log(
+                    self,
+                    level,
+                    msg,
+                    args,
+                    exc_info=exc_info,
+                    extra=extra,
+                    stack_info=stack_info,
+                    stacklevel=stacklevel,
+                )
+        except:
+            pass
+        finally:
+            logging._releaseLock()
 
     def makeRecord(
         self,
@@ -357,7 +356,7 @@ class SaltLoggingClass(
         except NameError:
             salt_system_encoding = "utf-8"
 
-        if isinstance(msg, six.string_types) and not isinstance(msg, six.text_type):
+        if isinstance(msg, str) and not isinstance(msg, str):
             try:
                 _msg = msg.decode(salt_system_encoding, "replace")
             except UnicodeDecodeError:
@@ -367,9 +366,7 @@ class SaltLoggingClass(
 
         _args = []
         for item in args:
-            if isinstance(item, six.string_types) and not isinstance(
-                item, six.text_type
-            ):
+            if isinstance(item, str) and not isinstance(item, str):
                 try:
                     _args.append(item.decode(salt_system_encoding, "replace"))
                 except UnicodeDecodeError:
@@ -378,24 +375,9 @@ class SaltLoggingClass(
                 _args.append(item)
         _args = tuple(_args)
 
-        if six.PY2:
-            # Recreate what's done for Py >= 3.5
-            _log_record_factory = get_log_record_factory()
-            logrecord = _log_record_factory(
-                name, level, fn, lno, _msg, _args, exc_info, func
-            )
-
-            if extra is not None:
-                for key in extra:
-                    if (key in ["message", "asctime"]) or (key in logrecord.__dict__):
-                        raise KeyError(
-                            "Attempt to overwrite '{}' in LogRecord".format(key)
-                        )
-                    logrecord.__dict__[key] = extra[key]
-        else:
-            logrecord = LOGGING_LOGGER_CLASS.makeRecord(
-                self, name, level, fn, lno, _msg, _args, exc_info, func, sinfo
-            )
+        logrecord = LOGGING_LOGGER_CLASS.makeRecord(
+            self, name, level, fn, lno, _msg, _args, exc_info, func, sinfo
+        )
 
         if exc_info_on_loglevel is not None:
             # Let's add some custom attributes to the LogRecord class in order
@@ -419,6 +401,7 @@ if logging.getLoggerClass() is not SaltLoggingClass:
     logging.addLevelName(PROFILE, "PROFILE")
     logging.addLevelName(TRACE, "TRACE")
     logging.addLevelName(GARBAGE, "GARBAGE")
+    logging.addLevelName(DEBUG, "DEBUG")
 
     # ----- REMOVE ON REFACTORING COMPLETE -------------------------------------------------------------------------->
     if not logging.root.handlers:

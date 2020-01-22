@@ -1,14 +1,10 @@
-# -*- coding: utf-8 -*-
-
-# Import Python libs
-from __future__ import absolute_import, print_function, unicode_literals
-
 import copy
 import logging
+import multiprocessing
 import os
 import random
+import time
 
-# Import Salt libs
 import salt.config
 import salt.syspaths as syspaths
 import salt.utils.args
@@ -16,8 +12,10 @@ from salt.exceptions import SaltClientError  # Temporary
 
 log = logging.getLogger(__name__)
 
+_LOCK = multiprocessing.Lock()
 
-class SSHClient(object):
+
+class SSHClient:
     """
     Create a client object for executing routines via the salt-ssh backend
 
@@ -60,7 +58,11 @@ class SSHClient(object):
         opts["selected_target_option"] = tgt_type
         opts["tgt"] = tgt
         opts["arg"] = arg
-        return salt.client.ssh.SSH(opts)
+        _LOCK.acquire()
+        ret = salt.client.ssh.SSH(opts)
+        time.sleep(0.01)
+        _LOCK.release()
+        return ret
 
     def cmd_iter(
         self,
@@ -80,8 +82,7 @@ class SSHClient(object):
         .. versionadded:: 2015.5.0
         """
         ssh = self._prep_ssh(tgt, fun, arg, timeout, tgt_type, kwarg, **kwargs)
-        for ret in ssh.run_iter(jid=kwargs.get("jid", None)):
-            yield ret
+        yield from ssh.run_iter(jid=kwargs.get("jid", None))
 
     def cmd(
         self, tgt, fun, arg=(), timeout=None, tgt_type="glob", kwarg=None, **kwargs
