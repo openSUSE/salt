@@ -10,7 +10,6 @@ import importlib
 import importlib.machinery  # pylint: disable=no-name-in-module,import-error
 import importlib.util  # pylint: disable=no-name-in-module,import-error
 import inspect
-import logging
 import os
 import re
 import sys
@@ -27,6 +26,7 @@ import salt.config
 import salt.defaults.events
 import salt.defaults.exitcodes
 import salt.loader_context
+import salt.log.setup as logging
 import salt.syspaths
 import salt.utils.args
 import salt.utils.context
@@ -2195,7 +2195,7 @@ class LazyLoader(salt.utils.lazy.LazyDict):
                             mod.__name__, exc
                         )
                     )
-                    log.error(error_reason, exc_info_on_loglevel=logging.DEBUG)
+                    log.error(error_reason, exc_info_on_loglevel=logging.logging.DEBUG)
                     virtual = None
                 # Get the module's virtual name
                 virtualname = getattr(mod, "__virtualname__", virtual)
@@ -2341,5 +2341,5 @@ def catch_entry_points_exception(entry_point):
             entry_point_details.name,
             entry_point_details.version,
             exc,
-            exc_info_on_loglevel=logging.DEBUG,
+            exc_info_on_loglevel=logging.logging.DEBUG,
         )
