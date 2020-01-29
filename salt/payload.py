@@ -18,7 +18,7 @@ import salt.crypt
 import salt.transport.frame
 import salt.utils.immutabletypes as immutabletypes
 import salt.utils.stringutils
-from salt.exceptions import SaltReqTimeoutError
+from salt.exceptions import SaltReqTimeoutError, SaltDeserializationError
 from salt.utils.data import CaseInsensitiveDict
 
 # Import third party libs
@@ -164,7 +164,13 @@ class Serial(object):
             )
             log.debug('Msgpack deserialization failure on message: %s', msg)
             gc.collect()
-            raise
+            raise six.raise_from(
+                SaltDeserializationError(
+                    'Could not deserialize msgpack message.'
+                    ' See log for more info.'
+                ),
+                exc,
+            )
         finally:
             gc.enable()
         return ret
