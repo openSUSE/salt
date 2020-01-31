@@ -223,9 +223,9 @@ def render(input, saltenv='base', sls='', argline='', **kws):
         if STATE_CONF:
             tmplctx = STATE_CONF.copy()
             if tmplctx:
-                prefix = sls + '::'
+                prefix = sls + "::"
                 tmplctx = {
-                    k[len(prefix):] if k.startswith(prefix) else k: v
+                    k[len(prefix) :] if k.startswith(prefix) else k: v
                     for k, v in six.iteritems(tmplctx)
                 }
         else:
