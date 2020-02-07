@@ -39,7 +39,7 @@ SITECUSTOMIZE_DIR = os.path.join(REPO_ROOT, 'tests', 'support', 'coverage')
 IS_DARWIN = sys.platform.lower().startswith('darwin')
 IS_WINDOWS = sys.platform.lower().startswith('win')
 # Python versions to run against
-_PYTHON_VERSIONS = ('2', '2.7', '3', '3.4', '3.5', '3.6', '3.7')
+_PYTHON_VERSIONS = ("2", "2.7", "3", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9")
 
 # Nox options
 #  Reuse existing virtualenvs
@@ -167,7 +167,7 @@ def _install_system_packages(session):
         '{id}-{version_parts[major]}'.format(**distro)
     ]
     version_info = _get_session_python_version_info(session)
-    py_version_keys = [
+    py_version_keys = +SITECUSTOMIZE_DIR[
         '{}'.format(*version_info),
         '{}.{}'.format(*version_info)
     ]
