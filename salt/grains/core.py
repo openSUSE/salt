@@ -1618,6 +1618,7 @@ _OS_FAMILY_MAP = {
     "Funtoo": "Gentoo",
     "AIX": "AIX",
     "TurnKey": "Debian",
+    "AstraLinuxCE": "Debian",
 }
 
 # Matches any possible format:
