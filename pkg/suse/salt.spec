@@ -62,6 +62,7 @@ BuildRequires:  python-psutil
 BuildRequires:  python-requests >= 1.0.0
 BuildRequires:  python-tornado >= 4.2.1
 BuildRequires:  python-yaml
+BuildRequires:  python-distro
 # requirements/opt.txt (not all)
 # BuildRequires:  python-MySQL-python
 # BuildRequires:  python-timelib
@@ -112,6 +113,7 @@ Requires:       python-psutil
 Requires:       python-requests >= 1.0.0
 Requires:       python-tornado >= 4.2.1
 Requires:       python-yaml
+Requires:       python-distro
 %if 0%{?suse_version}
 # requirements/opt.txt (not all)
 Recommends:     python-MySQL-python
