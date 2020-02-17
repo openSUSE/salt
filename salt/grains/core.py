@@ -40,20 +40,20 @@ except ImportError:
 __proxyenabled__ = ['*']
 __FQDN__ = None
 
-# Extend the default list of supported distros. This will be used for the
-# /etc/DISTRO-release checking that is part of linux_distribution()
-from platform import _supported_dists
-_supported_dists += ('arch', 'mageia', 'meego', 'vmware', 'bluewhite64',
-                     'slamd64', 'ovs', 'system', 'mint', 'oracle', 'void')
-
 # linux_distribution deprecated in py3.7
 try:
     from platform import linux_distribution as _deprecated_linux_distribution
 
+    # Extend the default list of supported distros. This will be used for the
+    # /etc/DISTRO-release checking that is part of linux_distribution()
+    from platform import _supported_dists
+    _supported_dists += ('arch', 'mageia', 'meego', 'vmware', 'bluewhite64',
+                         'slamd64', 'ovs', 'system', 'mint', 'oracle', 'void')
+
     def linux_distribution(**kwargs):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return _deprecated_linux_distribution(**kwargs)
+            return _deprecated_linux_distribution(supported_dists=_supported_dists, **kwargs)
 except ImportError:
     from distro import linux_distribution
 
@@ -1961,7 +1961,7 @@ def os_data():
         )
         (osname, osrelease, oscodename) = \
             [x.strip('"').strip("'") for x in
-             linux_distribution(supported_dists=_supported_dists)]
+             linux_distribution()]
         # Try to assign these three names based on the lsb info, they tend to
         # be more accurate than what python gets from /etc/DISTRO-release.
         # It's worth noting that Ubuntu has patched their Python distribution
