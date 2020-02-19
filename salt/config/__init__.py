@@ -1216,6 +1216,10 @@ VALID_OPTS = {
     # Use Adler32 hashing algorithm for server_id (default False until Sodium, "adler32" after)
     # Possible values are: False, adler32, crc32
     'server_id_use_crc': (bool, six.string_types),
+
+    # Allow raw_shell option when using the ssh
+    # client via the Salt API
+    'netapi_allow_raw_shell': bool,
 }
 
 # default configurations
@@ -1869,8 +1873,8 @@ DEFAULT_MASTER_OPTS = {
     'auth_events': True,
     'minion_data_cache_events': True,
     'enable_ssh_minions': False,
+    'netapi_allow_raw_shell': False,
 }
-
 
 # ----- Salt Proxy Minion Configuration Defaults ----------------------------------->
 # These are merged with DEFAULT_MINION_OPTS since many of them also apply here.

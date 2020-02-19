@@ -1582,6 +1582,25 @@ class Webserver(object):
         self.server_thread.join()
 
 
+class SaveRequestsPostHandler(tornado.web.RequestHandler):
+    '''
+    Save all requests sent to the server.
+    '''
+    received_requests = []
+
+    def post(self, *args):  # pylint: disable=arguments-differ
+        '''
+        Handle the post
+        '''
+        self.received_requests.append(self.request)
+
+    def data_received(self):  # pylint: disable=arguments-differ
+        '''
+        Streaming not used for testing
+        '''
+        raise NotImplementedError()
+
+
 def win32_kill_process_tree(pid, sig=signal.SIGTERM, include_parent=True,
         timeout=None, on_terminate=None):
     '''
