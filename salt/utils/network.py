@@ -15,6 +15,7 @@ import logging
 import platform
 import random
 import subprocess
+import collections
 from string import ascii_letters, digits
 
 # Import 3rd-party libs
@@ -1958,3 +1959,57 @@ def parse_host_port(host_port):
             raise ValueError('bad hostname: "{}"'.format(host))
 
     return host, port
+
+
+def is_fqdn(hostname):
+    """
+    Verify if hostname conforms to be a FQDN.
+
+    :param hostname: text string with the name of the host
+    :return: bool, True if hostname is correct FQDN, False otherwise
+    """
+
+    compliant = re.compile(r"(?!-)[A-Z\d\-\_]{1,63}(?<!-)$", re.IGNORECASE)
+    return "." in hostname and len(hostname) < 0xff and all(compliant.match(x) for x in hostname.rstrip(".").split("."))
+
+
+def _filter_by_networks(values, networks):
+    '''
+    Filter address list against a list of networks.
+    '''
+    filtered_addresses = []
+
+    for value in values:
+        address = ipaddress.ip_address(value)
+        for network in networks:
+            if address in network:
+                filtered_addresses.append(value)
+
+    return filtered_addresses
+
+
+@jinja_filter('filter_by_networks')
+def filter_by_networks(values, filters=None):
+    '''
+    Returns a the list of IPs filtered by the optional network list.
+    If no filter is specified all all items are returned.
+
+    {% set networks = ['192.168.0.0/24', 'fe80::/64'] %}
+    {{ grains['ip_interfaces'] | filter_by_networks(networks) }}
+    {{ grains['ipv6'] | filter_by_networks(networks) }}
+    {{ grains['ipv4'] | filter_by_networks(networks) }}
+    '''
+    if filters:
+        networks = [ipaddress.ip_network(network) for network in filters]
+        new_values = None
+        if isinstance(values, collections.Mapping):
+            new_values = {}
+            for interface in values:
+                new_values[interface] = _filter_by_networks(values[interface], networks)
+        elif isinstance(values, collections.Sequence):
+            new_values = _filter_by_networks(values, networks)
+        else:
+            raise ValueError('Do not know how to filter a {}'.format(type(values)))
+        return new_values
+    else:
+        return values
