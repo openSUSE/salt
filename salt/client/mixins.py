@@ -34,6 +34,12 @@ from salt.ext import six
 
 # Import 3rd-party libs
 import salt.ext.tornado.stack_context
+try:
+    from collections.abc import Mapping, MutableMapping
+except ImportError:
+    # pylint: disable=no-name-in-module
+    from collections import Mapping, MutableMapping
+
 
 log = logging.getLogger(__name__)
 
@@ -55,8 +61,8 @@ CLIENT_INTERNAL_KEYWORDS = frozenset([
 ])
 
 
-class ClientFuncsDict(collections.MutableMapping):
-    '''
+class ClientFuncsDict(MutableMapping):
+    """
     Class to make a read-only dict for accessing runner funcs "directly"
     '''
     def __init__(self, client):
@@ -141,9 +147,9 @@ class SyncClientMixin(object):
                                                       crypt='clear',
                                                       usage='master_call') as channel:
             ret = channel.send(load)
-            if isinstance(ret, collections.Mapping):
-                if 'error' in ret:
-                    salt.utils.error.raise_error(**ret['error'])
+            if isinstance(ret, Mapping):
+                if "error" in ret:
+                    salt.utils.error.raise_error(**ret["error"])
             return ret
 
     def cmd_sync(self, low, timeout=None, full_return=False):
