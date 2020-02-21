@@ -4,7 +4,9 @@ A collection of mixins useful for the various *Client interfaces
 '''
 
 # Import Python libs
-from __future__ import absolute_import, print_function, with_statement, unicode_literals
+from __future__ import absolute_import, print_function, unicode_literals, with_statement
+
+import copy as pycopy
 import fnmatch
 import signal
 import logging
@@ -43,28 +45,31 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-CLIENT_INTERNAL_KEYWORDS = frozenset([
-    'client',
-    'cmd',
-    'eauth',
-    'fun',
-    'kwarg',
-    'match',
-    'token',
-    '__jid__',
-    '__tag__',
-    '__user__',
-    'username',
-    'password',
-    'full_return',
-    'print_event'
-])
+CLIENT_INTERNAL_KEYWORDS = frozenset(
+    [
+        "client",
+        "cmd",
+        "eauth",
+        "fun",
+        "kwarg",
+        "match",
+        "token",
+        "__jid__",
+        "__tag__",
+        "__user__",
+        "username",
+        "password",
+        "full_return",
+        "print_event",
+    ]
+)
 
 
 class ClientFuncsDict(MutableMapping):
     """
     Class to make a read-only dict for accessing runner funcs "directly"
-    '''
+    """
+
     def __init__(self, client):
         self.client = client
 
