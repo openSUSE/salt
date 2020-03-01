@@ -2498,7 +2498,7 @@ def list_products(all=False, refresh=False, root=None):
         OEM_PATH = os.path.join(root, os.path.relpath(OEM_PATH, os.path.sep))
     cmd = list()
     if not all:
-        cmd.append('--disable-repos')
+        cmd.append('--disable-repositories')
     cmd.append('products')
     if not all:
         cmd.append('-i')
