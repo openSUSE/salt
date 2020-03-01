@@ -238,7 +238,18 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     'stdout': get_test_data(filename)
             }
 
-            with patch.dict(zypper.__salt__, {'cmd.run_all': MagicMock(return_value=ref_out)}):
+            cmd_run_all = MagicMock(return_value=ref_out)
+            mock_call = call(['zypper',
+                              '--non-interactive',
+                              '--xmlout',
+                              '--no-refresh',
+                              '--disable-repositories',
+                              'products', u'-i'],
+                              env={'ZYPP_READONLY_HACK': '1'},
+                              output_loglevel='trace',
+                              python_shell=False)
+
+            with patch.dict(zypper.__salt__, {'cmd.run_all': cmd_run_all}):
                 products = zypper.list_products()
                 self.assertEqual(len(products), 7)
                 self.assertIn(test_data['vendor'], [product['vendor'] for product in products])
@@ -247,6 +258,7 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         self.assertCountEqual(test_data[kwd], [prod.get(kwd) for prod in products])
                     else:
                         self.assertEqual(test_data[kwd], sorted([prod.get(kwd) for prod in products]))
+                cmd_run_all.assert_has_calls([mock_call])
 
     def test_refresh_db(self):
         '''
