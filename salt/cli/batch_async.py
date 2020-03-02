@@ -109,7 +109,7 @@ class BatchAsync:
             return
         mtag, data = self.event.unpack(raw, self.event.serial)
         for (pattern, op) in self.patterns:
-            if fnmatch.fnmatch(mtag, pattern):
+            if mtag.startswith(pattern[:-1]):
                 minion = data["id"]
                 if op == "ping_return":
                     self.minions.add(minion)
