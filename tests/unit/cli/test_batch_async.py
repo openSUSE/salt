@@ -126,9 +126,10 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.batch.timedout_minions = {'bar'}
         self.batch.event = MagicMock()
         self.batch.metadata = {'mykey': 'myvalue'}
+        old_event = self.batch.event
         self.batch.end_batch()
         self.assertEqual(
-            self.batch.event.fire_event.call_args[0],
+            old_event.fire_event.call_args[0],
             (
                 {
                     'available_minions': set(['foo', 'bar']),
@@ -146,6 +147,21 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         event = MagicMock()
         batch.event = event
         batch.__del__()
+        self.assertEqual(batch.local, None)
+        self.assertEqual(batch.event, None)
+        self.assertEqual(batch.ioloop, None)
+
+    def test_batch_close_safe(self):
+        batch = BatchAsync(MagicMock(), MagicMock(), MagicMock())
+        event = MagicMock()
+        batch.event = event
+        batch.patterns = { ('salt/job/1234/ret/*', 'find_job_return'), ('salt/job/4321/ret/*', 'find_job_return') }
+        batch.close_safe()
+        self.assertEqual(batch.local, None)
+        self.assertEqual(batch.event, None)
+        self.assertEqual(batch.ioloop, None)
+        self.assertEqual(
+            len(event.unsubscribe.mock_calls), 2)
         self.assertEqual(
             len(event.remove_event_handler.mock_calls), 1)
 
