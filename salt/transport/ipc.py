@@ -697,7 +697,7 @@ class IPCMessageSubscriber(IPCClient):
         for callback in self.callbacks:
             self.io_loop.spawn_callback(callback, raw)
 
-    @tornado.gen.coroutine
+    @salt.ext.tornado.gen.coroutine
     def read_async(self):
         '''
         Asynchronously read messages and invoke a callback when they are ready.
@@ -712,7 +712,7 @@ class IPCMessageSubscriber(IPCClient):
                 yield salt.ext.tornado.gen.sleep(1)
             except Exception as exc:  # pylint: disable=broad-except
                 log.error('Exception occurred while Subscriber connecting: %s', exc)
-                yield tornado.gen.sleep(1)
+                yield salt.ext.tornado.gen.sleep(1)
         yield self._read(None, self.__run_callbacks)
 
     def close(self):
