@@ -1,8 +1,8 @@
-import tornado
+import salt.ext.tornado
 from salt.cli.batch_async import BatchAsync
+from salt.ext.tornado.testing import AsyncTestCase
 from tests.support.mock import NO_MOCK, NO_MOCK_REASON, MagicMock, patch
 from tests.support.unit import TestCase, skipIf
-from tornado.testing import AsyncTestCase
 
 
 @skipIf(NO_MOCK, NO_MOCK_REASON)
@@ -52,10 +52,10 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.batch.start_batch()
         self.assertEqual(self.batch.batch_size, 2)
 
-    @tornado.testing.gen_test
+    @salt.ext.tornado.testing.gen_test
     def test_batch_start_on_batch_presence_ping_timeout(self):
         self.batch.event = MagicMock()
-        future = tornado.gen.Future()
+        future = salt.ext.tornado.gen.Future()
         future.set_result({"minions": ["foo", "bar"]})
         self.batch.local.run_job_async.return_value = future
         ret = self.batch.start()
@@ -71,10 +71,10 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         # assert targeted_minions == all minions matched by tgt
         self.assertEqual(self.batch.targeted_minions, {"foo", "bar"})
 
-    @tornado.testing.gen_test
+    @salt.ext.tornado.testing.gen_test
     def test_batch_start_on_gather_job_timeout(self):
         self.batch.event = MagicMock()
-        future = tornado.gen.Future()
+        future = salt.ext.tornado.gen.Future()
         future.set_result({"minions": ["foo", "bar"]})
         self.batch.local.run_job_async.return_value = future
         self.batch.batch_presence_ping_timeout = None
@@ -103,7 +103,7 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
             ),
         )
 
-    @tornado.testing.gen_test
+    @salt.ext.tornado.testing.gen_test
     def test_start_batch_calls_next(self):
         self.batch.run_next = MagicMock(return_value=MagicMock())
         self.batch.event = MagicMock()
@@ -160,14 +160,14 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.assertEqual(len(event.unsubscribe.mock_calls), 2)
         self.assertEqual(len(event.remove_event_handler.mock_calls), 1)
 
-    @tornado.testing.gen_test
+    @salt.ext.tornado.testing.gen_test
     def test_batch_next(self):
         self.batch.event = MagicMock()
         self.batch.opts["fun"] = "my.fun"
         self.batch.opts["arg"] = []
         self.batch._get_next = MagicMock(return_value={"foo", "bar"})
         self.batch.batch_size = 2
-        future = tornado.gen.Future()
+        future = salt.ext.tornado.gen.Future()
         future.set_result({"minions": ["foo", "bar"]})
         self.batch.local.run_job_async.return_value = future
         self.batch.run_next()
@@ -290,38 +290,38 @@ class AsyncBatchTestCase(AsyncTestCase, TestCase):
         self.batch._BatchAsync__event_handler(MagicMock())
         self.assertEqual(self.batch.find_job_returned, {"foo"})
 
-    @tornado.testing.gen_test
+    @salt.ext.tornado.testing.gen_test
     def test_batch_run_next_end_batch_when_no_next(self):
         self.batch.end_batch = MagicMock()
         self.batch._get_next = MagicMock(return_value={})
         self.batch.run_next()
         self.assertEqual(len(self.batch.end_batch.mock_calls), 1)
 
-    @tornado.testing.gen_test
+    @salt.ext.tornado.testing.gen_test
     def test_batch_find_job(self):
         self.batch.event = MagicMock()
-        future = tornado.gen.Future()
+        future = salt.ext.tornado.gen.Future()
         future.set_result({})
         self.batch.local.run_job_async.return_value = future
         self.batch.minions = {"foo", "bar"}
         self.batch.jid_gen = MagicMock(return_value="1234")
-        tornado.gen.sleep = MagicMock(return_value=future)
+        salt.ext.tornado.gen.sleep = MagicMock(return_value=future)
         self.batch.find_job({"foo", "bar"})
         self.assertEqual(
             self.batch.event.io_loop.spawn_callback.call_args[0],
             (self.batch.check_find_job, {"foo", "bar"}, "1234"),
         )
 
-    @tornado.testing.gen_test
+    @salt.ext.tornado.testing.gen_test
     def test_batch_find_job_with_done_minions(self):
         self.batch.done_minions = {"bar"}
         self.batch.event = MagicMock()
-        future = tornado.gen.Future()
+        future = salt.ext.tornado.gen.Future()
         future.set_result({})
         self.batch.local.run_job_async.return_value = future
         self.batch.minions = {"foo", "bar"}
         self.batch.jid_gen = MagicMock(return_value="1234")
-        tornado.gen.sleep = MagicMock(return_value=future)
+        salt.ext.tornado.gen.sleep = MagicMock(return_value=future)
         self.batch.find_job({"foo", "bar"})
         self.assertEqual(
             self.batch.event.io_loop.spawn_callback.call_args[0],
