@@ -2089,7 +2089,7 @@ class ClearFuncs(TransportMethods):
             functools.partial(self._prep_jid, clear_load, {}),
             batch_load
         )
-        ioloop = tornado.ioloop.IOLoop.current()
+        ioloop = salt.ext.tornado.ioloop.IOLoop.current()
         ioloop.add_callback(batch.start)
 
         return {
