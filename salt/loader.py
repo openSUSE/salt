@@ -683,6 +683,7 @@ def grain_funcs(opts, proxy=None):
           __opts__ = salt.config.minion_config('/etc/salt/minion')
           grainfuncs = salt.loader.grain_funcs(__opts__)
     '''
+    _utils = utils(opts)
     ret = LazyLoader(
         _module_dirs(
             opts,
