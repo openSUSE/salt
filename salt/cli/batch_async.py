@@ -6,7 +6,7 @@ Execute a job on the targeted minions by using a moving window of fixed size `ba
 # Import python libs
 from __future__ import absolute_import, print_function, unicode_literals
 import gc
-import tornado
+import salt.ext.tornado
 
 # Import salt libs
 import salt.client
@@ -50,7 +50,7 @@ class BatchAsync(object):
          }
     '''
     def __init__(self, parent_opts, jid_gen, clear_load):
-        ioloop = tornado.ioloop.IOLoop.current()
+        ioloop = salt.ext.tornado.ioloop.IOLoop.current()
         self.local = salt.client.get_local_client(parent_opts['conf_file'], io_loop=ioloop)
         if 'gather_job_timeout' in clear_load['kwargs']:
             clear_load['gather_job_timeout'] = clear_load['kwargs'].pop('gather_job_timeout')
@@ -152,7 +152,7 @@ class BatchAsync(object):
                 self.find_job_returned = self.find_job_returned.difference(running)
                 self.event.io_loop.spawn_callback(self.find_job, running)
 
-    @tornado.gen.coroutine
+    @salt.ext.tornado.gen.coroutine
     def find_job(self, minions):
         if self.event:
             not_done = minions.difference(self.done_minions).difference(self.timedout_minions)
@@ -170,7 +170,7 @@ class BatchAsync(object):
                         gather_job_timeout=self.opts['gather_job_timeout'],
                         jid=jid,
                         **self.eauth)
-                    yield tornado.gen.sleep(self.opts['gather_job_timeout'])
+                    yield salt.ext.tornado.gen.sleep(self.opts['gather_job_timeout'])
                     if self.event:
                         self.event.io_loop.spawn_callback(
                             self.check_find_job,
@@ -180,7 +180,7 @@ class BatchAsync(object):
                 log.error("Exception occured handling batch async: {}. Aborting execution.".format(ex))
                 self.close_safe()
 
-    @tornado.gen.coroutine
+    @salt.ext.tornado.gen.coroutine
     def start(self):
         if self.event:
             self.__set_event_handler()
@@ -198,11 +198,11 @@ class BatchAsync(object):
                 **self.eauth)
             self.targeted_minions = set(ping_return['minions'])
             #start batching even if not all minions respond to ping
-            yield tornado.gen.sleep(self.batch_presence_ping_timeout or self.opts['gather_job_timeout'])
+            yield salt.ext.tornado.gen.sleep(self.batch_presence_ping_timeout or self.opts['gather_job_timeout'])
             if self.event:
                 self.event.io_loop.spawn_callback(self.start_batch)
 
-    @tornado.gen.coroutine
+    @salt.ext.tornado.gen.coroutine
     def start_batch(self):
         if not self.initialized:
             self.batch_size = get_bnum(self.opts, self.minions, True)
@@ -216,7 +216,7 @@ class BatchAsync(object):
             if self.event:
                 self.event.io_loop.spawn_callback(self.run_next)
 
-    @tornado.gen.coroutine
+    @salt.ext.tornado.gen.coroutine
     def end_batch(self):
         left = self.minions.symmetric_difference(self.done_minions.union(self.timedout_minions))
         if not left and not self.ended:
@@ -232,7 +232,7 @@ class BatchAsync(object):
 
             # release to the IOLoop to allow the event to be published
             # before closing batch async execution
-            yield tornado.gen.sleep(1)
+            yield salt.ext.tornado.gen.sleep(1)
             self.close_safe()
 
     def close_safe(self):
@@ -245,16 +245,16 @@ class BatchAsync(object):
        del self
        gc.collect()
 
-    @tornado.gen.coroutine
+    @salt.ext.tornado.gen.coroutine
     def schedule_next(self):
         if not self.scheduled:
             self.scheduled = True
             # call later so that we maybe gather more returns
-            yield tornado.gen.sleep(self.batch_delay)
+            yield salt.ext.tornado.gen.sleep(self.batch_delay)
             if self.event:
                 self.event.io_loop.spawn_callback(self.run_next)
 
-    @tornado.gen.coroutine
+    @salt.ext.tornado.gen.coroutine
     def run_next(self):
         self.scheduled = False
         next_batch = self._get_next()
@@ -272,7 +272,7 @@ class BatchAsync(object):
                     jid=self.batch_jid,
                     metadata=self.metadata)
 
-                yield tornado.gen.sleep(self.opts['timeout'])
+                yield salt.ext.tornado.gen.sleep(self.opts['timeout'])
 
                 # The batch can be done already at this point, which means no self.event
                 if self.event:
