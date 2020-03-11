@@ -9,7 +9,6 @@ except ImportError:
     pytest = None
 
 
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 @skipIf(pytest is None, "PyTest is missing")
 class PkgRPMTestCase(TestCase):
     """

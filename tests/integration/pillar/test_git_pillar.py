@@ -1601,7 +1601,6 @@ class TestPygit2SSH(GitPillarSSHTestBase):
         )
 
 
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 @skipIf(_windows_or_mac(), "minion is windows or mac")
 @skip_if_not_root
 @skipIf(

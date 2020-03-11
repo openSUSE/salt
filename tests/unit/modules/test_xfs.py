@@ -3,7 +3,7 @@ import textwrap
 import salt.modules.xfs as xfs
 from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.mock import MagicMock, patch
-from tests.support.unit import TestCase
+from tests.support.unit import TestCase, skipIf
 
 
 @patch("salt.modules.xfs._get_mounts", MagicMock(return_value={}))
