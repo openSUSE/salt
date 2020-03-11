@@ -6,7 +6,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 from tests.support.unit import skipIf, TestCase
-from tests.support.mock import MagicMock, patch, NO_MOCK, NO_MOCK_REASON
+from tests.support.mock import MagicMock, patch
 
 from salt.cli.support.console import IndentOutput
 from salt.cli.support.collector import SupportDataCollector, SaltSupport
@@ -26,7 +26,6 @@ except ImportError:
 
 
 @skipIf(not bool(pytest), 'Pytest needs to be installed')
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class SaltSupportIndentOutputTestCase(TestCase):
     '''
     Unit Tests for the salt-support indent output.
@@ -90,7 +89,6 @@ class SaltSupportIndentOutputTestCase(TestCase):
 
 
 @skipIf(not bool(pytest), 'Pytest needs to be installed')
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class SaltSupportCollectorTestCase(TestCase):
     '''
     Collector tests.
@@ -211,7 +209,6 @@ class SaltSupportCollectorTestCase(TestCase):
 
 
 @skipIf(not bool(pytest), 'Pytest needs to be installed')
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class SaltSupportRunnerTestCase(TestCase):
     '''
     Test runner class.
@@ -404,7 +401,6 @@ class SaltSupportRunnerTestCase(TestCase):
 
 
 @skipIf(not bool(pytest), 'Pytest needs to be installed')
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class ProfileIntegrityTestCase(TestCase):
     '''
     Default profile integrity

@@ -8,10 +8,9 @@ from salt.cli.batch_async import BatchAsync
 import salt.ext.tornado
 from salt.ext.tornado.testing import AsyncTestCase
 from tests.support.unit import skipIf, TestCase
-from tests.support.mock import MagicMock, patch, NO_MOCK, NO_MOCK_REASON
+from tests.support.mock import MagicMock, patch
 
 
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class AsyncBatchTestCase(AsyncTestCase, TestCase):
 
     def setUp(self):
