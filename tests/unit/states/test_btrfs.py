@@ -32,8 +32,6 @@ from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.unit import skipIf, TestCase
 from tests.support.mock import (
     MagicMock,
-    NO_MOCK,
-    NO_MOCK_REASON,
     patch,
 )
 
@@ -43,7 +41,6 @@ import salt.states.btrfs as btrfs
 import pytest
 
 
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class BtrfsTestCase(TestCase, LoaderModuleMockMixin):
     '''
     Test cases for salt.states.btrfs
