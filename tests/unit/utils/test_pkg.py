@@ -3,7 +3,7 @@
 from __future__ import absolute_import, unicode_literals, print_function
 
 from tests.support.unit import TestCase, skipIf
-from tests.support.mock import Mock, MagicMock, patch, NO_MOCK, NO_MOCK_REASON
+from tests.support.mock import Mock, MagicMock, patch
 import salt.utils.pkg
 from salt.utils.pkg import rpm
 
@@ -13,7 +13,6 @@ except ImportError:
     pytest = None
 
 
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 @skipIf(pytest is None, 'PyTest is missing')
 class PkgRPMTestCase(TestCase):
     '''

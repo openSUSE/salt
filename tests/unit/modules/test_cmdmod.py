@@ -37,7 +37,6 @@ MOCK_SHELL_FILE = '# List of acceptable shells\n' \
                   '/bin/bash\n'
 
 
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class CMDMODTestCase(TestCase, LoaderModuleMockMixin):
     '''
     Unit tests for the salt.modules.cmdmod module
