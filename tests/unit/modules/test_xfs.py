@@ -8,8 +8,6 @@ import textwrap
 from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.unit import skipIf, TestCase
 from tests.support.mock import (
-    NO_MOCK,
-    NO_MOCK_REASON,
     MagicMock,
     patch)
 
@@ -17,7 +15,6 @@ from tests.support.mock import (
 import salt.modules.xfs as xfs
 
 
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 @patch('salt.modules.xfs._get_mounts', MagicMock(return_value={}))
 class XFSTestCase(TestCase, LoaderModuleMockMixin):
     '''
