@@ -1,21 +1,15 @@
 """
     :codeauthor: Jayesh Kariya <jayeshk@saltstack.com>
 """
-# Import Python libs
 
 import shutil
 import tempfile
 
-# Import Salt Libs
 import salt.states.virt as virt
 import salt.utils.files
 from salt.exceptions import CommandExecutionError, SaltInvocationError
-
-# Import 3rd-party libs
 from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.mock import MagicMock, mock_open, patch
-
-# Import Salt Testing Libs
 from tests.support.runtests import RUNTIME_VARS
 from tests.support.unit import TestCase
 
@@ -638,6 +632,368 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     boot_dev=None,
                 )
 
+    def test_defined(self):
+        """
+        defined state test cases.
+        """
+        ret = {
+            "name": "myvm",
+            "changes": {},
+            "result": True,
+            "comment": "myvm is running",
+        }
+        with patch.dict(virt.__opts__, {"test": False}):
+            # no change test
+            init_mock = MagicMock(return_value=True)
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=["myvm"]),
+                    "virt.update": MagicMock(return_value={"definition": False}),
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": False}},
+                        "comment": "Domain myvm unchanged",
+                    }
+                )
+                self.assertDictEqual(virt.defined("myvm"), ret)
+
+            # Test defining a guest with connection details
+            init_mock.reset_mock()
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=[]),
+                    "virt.init": init_mock,
+                    "virt.update": MagicMock(
+                        side_effect=CommandExecutionError("not found")
+                    ),
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": True}},
+                        "comment": "Domain myvm defined",
+                    }
+                )
+                disks = [
+                    {
+                        "name": "system",
+                        "size": 8192,
+                        "overlay_image": True,
+                        "pool": "default",
+                        "image": "/path/to/image.qcow2",
+                    },
+                    {"name": "data", "size": 16834},
+                ]
+                ifaces = [
+                    {"name": "eth0", "mac": "01:23:45:67:89:AB"},
+                    {"name": "eth1", "type": "network", "source": "admin"},
+                ]
+                graphics = {
+                    "type": "spice",
+                    "listen": {"type": "address", "address": "192.168.0.1"},
+                }
+                self.assertDictEqual(
+                    virt.defined(
+                        "myvm",
+                        cpu=2,
+                        mem=2048,
+                        os_type="linux",
+                        arch="i686",
+                        vm_type="qemu",
+                        disk_profile="prod",
+                        disks=disks,
+                        nic_profile="prod",
+                        interfaces=ifaces,
+                        graphics=graphics,
+                        seed=False,
+                        install=False,
+                        pub_key="/path/to/key.pub",
+                        priv_key="/path/to/key",
+                        connection="someconnection",
+                        username="libvirtuser",
+                        password="supersecret",
+                    ),
+                    ret,
+                )
+                init_mock.assert_called_with(
+                    "myvm",
+                    cpu=2,
+                    mem=2048,
+                    os_type="linux",
+                    arch="i686",
+                    disk="prod",
+                    disks=disks,
+                    nic="prod",
+                    interfaces=ifaces,
+                    graphics=graphics,
+                    hypervisor="qemu",
+                    seed=False,
+                    boot=None,
+                    install=False,
+                    start=False,
+                    pub_key="/path/to/key.pub",
+                    priv_key="/path/to/key",
+                    connection="someconnection",
+                    username="libvirtuser",
+                    password="supersecret",
+                )
+
+            # Working update case when running
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=["myvm"]),
+                    "virt.update": MagicMock(
+                        return_value={"definition": True, "cpu": True}
+                    ),
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": True, "cpu": True}},
+                        "result": True,
+                        "comment": "Domain myvm updated",
+                    }
+                )
+                self.assertDictEqual(virt.defined("myvm", cpu=2), ret)
+
+            # Working update case when running with boot params
+            boot = {
+                "kernel": "/root/f8-i386-vmlinuz",
+                "initrd": "/root/f8-i386-initrd",
+                "cmdline": "console=ttyS0 ks=http://example.com/f8-i386/os/",
+            }
+
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=["myvm"]),
+                    "virt.update": MagicMock(
+                        return_value={"definition": True, "cpu": True}
+                    ),
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": True, "cpu": True}},
+                        "result": True,
+                        "comment": "Domain myvm updated",
+                    }
+                )
+                self.assertDictEqual(virt.defined("myvm", boot=boot), ret)
+
+            # Working update case when stopped
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=["myvm"]),
+                    "virt.update": MagicMock(return_value={"definition": True}),
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": True}},
+                        "result": True,
+                        "comment": "Domain myvm updated",
+                    }
+                )
+                self.assertDictEqual(virt.defined("myvm", cpu=2), ret)
+
+            # Failed live update case
+            update_mock = MagicMock(
+                return_value={
+                    "definition": True,
+                    "cpu": False,
+                    "errors": ["some error"],
+                }
+            )
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=["myvm"]),
+                    "virt.update": update_mock,
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {
+                            "myvm": {
+                                "definition": True,
+                                "cpu": False,
+                                "errors": ["some error"],
+                            }
+                        },
+                        "result": True,
+                        "comment": "Domain myvm updated with live update(s) failures",
+                    }
+                )
+                self.assertDictEqual(virt.defined("myvm", cpu=2), ret)
+                update_mock.assert_called_with(
+                    "myvm",
+                    cpu=2,
+                    mem=None,
+                    disk_profile=None,
+                    disks=None,
+                    nic_profile=None,
+                    interfaces=None,
+                    graphics=None,
+                    live=True,
+                    connection=None,
+                    username=None,
+                    password=None,
+                    boot=None,
+                    test=False,
+                )
+
+            # Failed definition update case
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=["myvm"]),
+                    "virt.update": MagicMock(
+                        side_effect=[self.mock_libvirt.libvirtError("error message")]
+                    ),
+                },
+            ):
+                ret.update({"changes": {}, "result": False, "comment": "error message"})
+                self.assertDictEqual(virt.defined("myvm", cpu=2), ret)
+
+        # Test dry-run mode
+        with patch.dict(virt.__opts__, {"test": True}):
+            # Guest defined case
+            init_mock = MagicMock(return_value=True)
+            update_mock = MagicMock(side_effect=CommandExecutionError("not found"))
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=[]),
+                    "virt.init": init_mock,
+                    "virt.update": update_mock,
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": True}},
+                        "result": None,
+                        "comment": "Domain myvm defined",
+                    }
+                )
+                disks = [
+                    {
+                        "name": "system",
+                        "size": 8192,
+                        "overlay_image": True,
+                        "pool": "default",
+                        "image": "/path/to/image.qcow2",
+                    },
+                    {"name": "data", "size": 16834},
+                ]
+                ifaces = [
+                    {"name": "eth0", "mac": "01:23:45:67:89:AB"},
+                    {"name": "eth1", "type": "network", "source": "admin"},
+                ]
+                graphics = {
+                    "type": "spice",
+                    "listen": {"type": "address", "address": "192.168.0.1"},
+                }
+                self.assertDictEqual(
+                    virt.defined(
+                        "myvm",
+                        cpu=2,
+                        mem=2048,
+                        os_type="linux",
+                        arch="i686",
+                        vm_type="qemu",
+                        disk_profile="prod",
+                        disks=disks,
+                        nic_profile="prod",
+                        interfaces=ifaces,
+                        graphics=graphics,
+                        seed=False,
+                        install=False,
+                        pub_key="/path/to/key.pub",
+                        priv_key="/path/to/key",
+                        connection="someconnection",
+                        username="libvirtuser",
+                        password="supersecret",
+                    ),
+                    ret,
+                )
+                init_mock.assert_not_called()
+                update_mock.assert_not_called()
+
+            # Guest update case
+            update_mock = MagicMock(return_value={"definition": True})
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=["myvm"]),
+                    "virt.update": update_mock,
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": True}},
+                        "result": None,
+                        "comment": "Domain myvm updated",
+                    }
+                )
+                self.assertDictEqual(virt.defined("myvm", cpu=2), ret)
+                update_mock.assert_called_with(
+                    "myvm",
+                    cpu=2,
+                    mem=None,
+                    disk_profile=None,
+                    disks=None,
+                    nic_profile=None,
+                    interfaces=None,
+                    graphics=None,
+                    live=True,
+                    connection=None,
+                    username=None,
+                    password=None,
+                    boot=None,
+                    test=True,
+                )
+
+            # No changes case
+            update_mock = MagicMock(return_value={"definition": False})
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.list_domains": MagicMock(return_value=["myvm"]),
+                    "virt.update": update_mock,
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": False}},
+                        "result": True,
+                        "comment": "Domain myvm unchanged",
+                    }
+                )
+                self.assertDictEqual(virt.defined("myvm"), ret)
+                update_mock.assert_called_with(
+                    "myvm",
+                    cpu=None,
+                    mem=None,
+                    disk_profile=None,
+                    disks=None,
+                    nic_profile=None,
+                    interfaces=None,
+                    graphics=None,
+                    live=True,
+                    connection=None,
+                    username=None,
+                    password=None,
+                    boot=None,
+                    test=True,
+                )
+
     def test_running(self):
         """
         running state test cases.
@@ -686,12 +1042,7 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     }
                 )
                 self.assertDictEqual(
-                    virt.running(
-                        "myvm",
-                        cpu=2,
-                        mem=2048,
-                        disks=[{"name": "system", "image": "/path/to/img.qcow2"}],
-                    ),
+                    virt.running("myvm", cpu=2, mem=2048, image="/path/to/img.qcow2"),
                     ret,
                 )
                 init_mock.assert_called_with(
@@ -712,7 +1063,134 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     install=True,
                     pub_key=None,
                     priv_key=None,
-                    boot_dev=None,
+                    connection=None,
+                    username=None,
+                    password=None,
+                )
+                start_mock.assert_called_with(
+                    "myvm", connection=None, username=None, password=None
+                )
+
+            # Test image parameter with disks with defined image
+            init_mock = MagicMock(return_value=True)
+            start_mock = MagicMock(return_value=0)
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.vm_state": MagicMock(return_value={"myvm": "stopped"}),
+                    "virt.init": init_mock,
+                    "virt.start": start_mock,
+                    "virt.list_domains": MagicMock(return_value=[]),
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": True, "started": True}},
+                        "comment": "Domain myvm defined and started",
+                    }
+                )
+                disks = [
+                    {
+                        "name": "system",
+                        "size": 8192,
+                        "overlay_image": True,
+                        "pool": "default",
+                        "image": "/path/to/image.qcow2",
+                    },
+                    {"name": "data", "size": 16834},
+                ]
+                self.assertDictEqual(
+                    virt.running(
+                        "myvm", cpu=2, mem=2048, disks=disks, image="/path/to/img.qcow2"
+                    ),
+                    ret,
+                )
+                init_mock.assert_called_with(
+                    "myvm",
+                    cpu=2,
+                    mem=2048,
+                    os_type=None,
+                    arch=None,
+                    boot=None,
+                    disk=None,
+                    disks=disks,
+                    nic=None,
+                    interfaces=None,
+                    graphics=None,
+                    hypervisor=None,
+                    start=False,
+                    seed=True,
+                    install=True,
+                    pub_key=None,
+                    priv_key=None,
+                    connection=None,
+                    username=None,
+                    password=None,
+                )
+                start_mock.assert_called_with(
+                    "myvm", connection=None, username=None, password=None
+                )
+
+            # Test image parameter with disks without defined image
+            init_mock = MagicMock(return_value=True)
+            start_mock = MagicMock(return_value=0)
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.vm_state": MagicMock(return_value={"myvm": "stopped"}),
+                    "virt.init": init_mock,
+                    "virt.start": start_mock,
+                    "virt.list_domains": MagicMock(return_value=[]),
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"myvm": {"definition": True, "started": True}},
+                        "comment": "Domain myvm defined and started",
+                    }
+                )
+                disks = [
+                    {
+                        "name": "system",
+                        "size": 8192,
+                        "overlay_image": True,
+                        "pool": "default",
+                    },
+                    {"name": "data", "size": 16834},
+                ]
+                self.assertDictEqual(
+                    virt.running(
+                        "myvm", cpu=2, mem=2048, disks=disks, image="/path/to/img.qcow2"
+                    ),
+                    ret,
+                )
+                init_mock.assert_called_with(
+                    "myvm",
+                    cpu=2,
+                    mem=2048,
+                    os_type=None,
+                    arch=None,
+                    boot=None,
+                    disk=None,
+                    disks=[
+                        {
+                            "name": "system",
+                            "size": 8192,
+                            "overlay_image": True,
+                            "pool": "default",
+                            "image": "/path/to/img.qcow2",
+                        },
+                        {"name": "data", "size": 16834},
+                    ],
+                    nic=None,
+                    interfaces=None,
+                    graphics=None,
+                    hypervisor=None,
+                    start=False,
+                    seed=True,
+                    install=True,
+                    pub_key=None,
+                    priv_key=None,
                     connection=None,
                     username=None,
                     password=None,
@@ -774,7 +1252,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                         install=False,
                         pub_key="/path/to/key.pub",
                         priv_key="/path/to/key",
-                        boot_dev="network hd",
                         connection="someconnection",
                         username="libvirtuser",
                         password="supersecret",
@@ -799,7 +1276,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     start=False,
                     pub_key="/path/to/key.pub",
                     priv_key="/path/to/key",
-                    boot_dev="network hd",
                     connection="someconnection",
                     username="libvirtuser",
                     password="supersecret",
@@ -944,7 +1420,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     password=None,
                     boot=None,
                     test=False,
-                    boot_dev=None,
                 )
 
             # Failed definition update case
@@ -1063,7 +1538,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     password=None,
                     boot=None,
                     test=True,
-                    boot_dev=None,
                 )
                 start_mock.assert_not_called()
 
@@ -1100,7 +1574,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     password=None,
                     boot=None,
                     test=True,
-                    boot_dev=None,
                 )
 
     def test_stopped(self):
@@ -1433,6 +1906,199 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                 {"changes": {}, "result": False, "comment": "No changes had happened"}
             )
             self.assertDictEqual(virt.rebooted("myvm"), ret)
+
+    def test_network_defined(self):
+        """
+        network_defined state test cases.
+        """
+        ret = {"name": "mynet", "changes": {}, "result": True, "comment": ""}
+        with patch.dict(virt.__opts__, {"test": False}):
+            define_mock = MagicMock(return_value=True)
+            # Non-existing network case
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.network_info": MagicMock(
+                        side_effect=[{}, {"mynet": {"active": False}}]
+                    ),
+                    "virt.network_define": define_mock,
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"mynet": "Network defined"},
+                        "comment": "Network mynet defined",
+                    }
+                )
+                self.assertDictEqual(
+                    virt.network_defined(
+                        "mynet",
+                        "br2",
+                        "bridge",
+                        vport="openvswitch",
+                        tag=180,
+                        ipv4_config={
+                            "cidr": "192.168.2.0/24",
+                            "dhcp_ranges": [
+                                {"start": "192.168.2.10", "end": "192.168.2.25"},
+                                {"start": "192.168.2.110", "end": "192.168.2.125"},
+                            ],
+                        },
+                        ipv6_config={
+                            "cidr": "2001:db8:ca2:2::1/64",
+                            "dhcp_ranges": [
+                                {
+                                    "start": "2001:db8:ca2:1::10",
+                                    "end": "2001:db8:ca2::1f",
+                                },
+                            ],
+                        },
+                        autostart=False,
+                        connection="myconnection",
+                        username="user",
+                        password="secret",
+                    ),
+                    ret,
+                )
+                define_mock.assert_called_with(
+                    "mynet",
+                    "br2",
+                    "bridge",
+                    vport="openvswitch",
+                    tag=180,
+                    autostart=False,
+                    start=False,
+                    ipv4_config={
+                        "cidr": "192.168.2.0/24",
+                        "dhcp_ranges": [
+                            {"start": "192.168.2.10", "end": "192.168.2.25"},
+                            {"start": "192.168.2.110", "end": "192.168.2.125"},
+                        ],
+                    },
+                    ipv6_config={
+                        "cidr": "2001:db8:ca2:2::1/64",
+                        "dhcp_ranges": [
+                            {"start": "2001:db8:ca2:1::10", "end": "2001:db8:ca2::1f"},
+                        ],
+                    },
+                    connection="myconnection",
+                    username="user",
+                    password="secret",
+                )
+
+            # Case where there is nothing to be done
+            define_mock.reset_mock()
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.network_info": MagicMock(
+                        return_value={"mynet": {"active": True}}
+                    ),
+                    "virt.network_define": define_mock,
+                },
+            ):
+                ret.update({"changes": {}, "comment": "Network mynet exists"})
+                self.assertDictEqual(
+                    virt.network_defined("mynet", "br2", "bridge"), ret
+                )
+
+            # Error case
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.network_info": MagicMock(return_value={}),
+                    "virt.network_define": MagicMock(
+                        side_effect=self.mock_libvirt.libvirtError("Some error")
+                    ),
+                },
+            ):
+                ret.update({"changes": {}, "comment": "Some error", "result": False})
+                self.assertDictEqual(
+                    virt.network_defined("mynet", "br2", "bridge"), ret
+                )
+
+        # Test cases with __opt__['test'] set to True
+        with patch.dict(virt.__opts__, {"test": True}):
+            ret.update({"result": None})
+
+            # Non-existing network case
+            define_mock.reset_mock()
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.network_info": MagicMock(return_value={}),
+                    "virt.network_define": define_mock,
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {"mynet": "Network defined"},
+                        "comment": "Network mynet defined",
+                    }
+                )
+                self.assertDictEqual(
+                    virt.network_defined(
+                        "mynet",
+                        "br2",
+                        "bridge",
+                        vport="openvswitch",
+                        tag=180,
+                        ipv4_config={
+                            "cidr": "192.168.2.0/24",
+                            "dhcp_ranges": [
+                                {"start": "192.168.2.10", "end": "192.168.2.25"},
+                                {"start": "192.168.2.110", "end": "192.168.2.125"},
+                            ],
+                        },
+                        ipv6_config={
+                            "cidr": "2001:db8:ca2:2::1/64",
+                            "dhcp_ranges": [
+                                {
+                                    "start": "2001:db8:ca2:1::10",
+                                    "end": "2001:db8:ca2::1f",
+                                },
+                            ],
+                        },
+                        autostart=False,
+                        connection="myconnection",
+                        username="user",
+                        password="secret",
+                    ),
+                    ret,
+                )
+                define_mock.assert_not_called()
+
+            # Case where there is nothing to be done
+            define_mock.reset_mock()
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.network_info": MagicMock(
+                        return_value={"mynet": {"active": True}}
+                    ),
+                    "virt.network_define": define_mock,
+                },
+            ):
+                ret.update(
+                    {"changes": {}, "comment": "Network mynet exists", "result": True}
+                )
+                self.assertDictEqual(
+                    virt.network_defined("mynet", "br2", "bridge"), ret
+                )
+
+            # Error case
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.network_info": MagicMock(
+                        side_effect=self.mock_libvirt.libvirtError("Some error")
+                    )
+                },
+            ):
+                ret.update({"changes": {}, "comment": "Some error", "result": False})
+                self.assertDictEqual(
+                    virt.network_defined("mynet", "br2", "bridge"), ret
+                )
 
     def test_network_defined(self):
         """
@@ -1988,72 +2654,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     password="secret",
                 )
 
-            # Define a pool that doesn't handle build
-            for mock in mocks:
-                mocks[mock].reset_mock()
-            with patch.dict(
-                virt.__salt__,
-                {  # pylint: disable=no-member
-                    "virt.pool_info": MagicMock(
-                        side_effect=[
-                            {},
-                            {"mypool": {"state": "stopped", "autostart": True}},
-                        ]
-                    ),
-                    "virt.pool_define": mocks["define"],
-                    "virt.pool_build": mocks["build"],
-                    "virt.pool_set_autostart": mocks["autostart"],
-                },
-            ):
-                ret.update(
-                    {
-                        "changes": {"mypool": "Pool defined, marked for autostart"},
-                        "comment": "Pool mypool defined, marked for autostart",
-                    }
-                )
-                self.assertDictEqual(
-                    virt.pool_defined(
-                        "mypool",
-                        ptype="rbd",
-                        source={
-                            "name": "libvirt-pool",
-                            "hosts": ["ses2.tf.local", "ses3.tf.local"],
-                            "auth": {
-                                "username": "libvirt",
-                                "password": "AQAz+PRdtquBBRAASMv7nlMZYfxIyLw3St65Xw==",
-                            },
-                        },
-                        autostart=True,
-                    ),
-                    ret,
-                )
-                mocks["define"].assert_called_with(
-                    "mypool",
-                    ptype="rbd",
-                    target=None,
-                    permissions=None,
-                    source_devices=None,
-                    source_dir=None,
-                    source_adapter=None,
-                    source_hosts=["ses2.tf.local", "ses3.tf.local"],
-                    source_auth={
-                        "username": "libvirt",
-                        "password": "AQAz+PRdtquBBRAASMv7nlMZYfxIyLw3St65Xw==",
-                    },
-                    source_name="libvirt-pool",
-                    source_format=None,
-                    source_initiator=None,
-                    start=False,
-                    transient=False,
-                    connection=None,
-                    username=None,
-                    password=None,
-                )
-                mocks["autostart"].assert_called_with(
-                    "mypool", state="on", connection=None, username=None, password=None,
-                )
-                mocks["build"].assert_not_called()
-
             mocks["update"] = MagicMock(return_value=False)
             for mock in mocks:
                 mocks[mock].reset_mock()
@@ -2103,9 +2703,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
             for mock in mocks:
                 mocks[mock].reset_mock()
             mocks["update"] = MagicMock(return_value=True)
-            mocks["build"] = MagicMock(
-                side_effect=self.mock_libvirt.libvirtError("Existing VG")
-            )
             with patch.dict(
                 virt.__salt__,
                 {  # pylint: disable=no-member
@@ -2209,7 +2806,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     ),
                     ret,
                 )
-                mocks["build"].assert_not_called()
                 mocks["update"].assert_called_with(
                     "mypool",
                     ptype="logical",
@@ -2557,8 +3153,8 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
             ):
                 ret.update(
                     {
-                        "changes": {"mypool": "Pool updated, restarted"},
-                        "comment": "Pool mypool updated, restarted",
+                        "changes": {"mypool": "Pool updated, built, restarted"},
+                        "comment": "Pool mypool updated, built, restarted",
                         "result": True,
                     }
                 )
@@ -2584,7 +3180,9 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                 mocks["start"].assert_called_with(
                     "mypool", connection=None, username=None, password=None
                 )
-                mocks["build"].assert_not_called()
+                mocks["build"].assert_called_with(
+                    "mypool", connection=None, username=None, password=None
+                )
                 mocks["update"].assert_called_with(
                     "mypool",
                     ptype="logical",
@@ -2662,6 +3260,45 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                         ptype="logical",
                         target="/dev/base",
                         source={"devices": [{"path": "/dev/sda"}]},
+                    ),
+                    ret,
+                )
+
+            # test case with test=True and pool to be defined
+            for mock in mocks:
+                mocks[mock].reset_mock()
+            with patch.dict(
+                virt.__salt__,
+                {  # pylint: disable=no-member
+                    "virt.pool_info": MagicMock(return_value={}),
+                },
+            ):
+                ret.update(
+                    {
+                        "changes": {
+                            "mypool": "Pool defined, marked for autostart, started"
+                        },
+                        "comment": "Pool mypool defined, marked for autostart, started",
+                        "result": None,
+                    }
+                )
+                self.assertDictEqual(
+                    virt.pool_running(
+                        "mypool",
+                        ptype="logical",
+                        target="/dev/base",
+                        permissions={
+                            "mode": "0770",
+                            "owner": 1000,
+                            "group": 100,
+                            "label": "seclabel",
+                        },
+                        source={"devices": [{"path": "/dev/sda"}]},
+                        transient=True,
+                        autostart=True,
+                        connection="myconnection",
+                        username="user",
+                        password="secret",
                     ),
                     ret,
                 )

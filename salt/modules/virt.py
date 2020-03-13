@@ -2579,7 +2579,6 @@ def update(
     live=True,
     boot=None,
     test=False,
-    boot_dev=None,
     **kwargs
 ):
     """
@@ -2653,17 +2652,9 @@ def update(
 
         .. versionadded:: 3000
 
-    :param boot_dev:
-        Space separated list of devices to boot from sorted by decreasing priority.
-        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
-
-        By default, the value will ``"hd"``.
-
-        .. versionadded:: 3002
-
     :param test: run in dry-run mode if set to True
 
-        .. versionadded:: 3001
+        .. versionadded:: sodium
 
     :return:
 
@@ -2713,7 +2704,6 @@ def update(
 
     new_desc = ElementTree.fromstring(
         _gen_xml(
-            conn,
             name,
             cpu or 0,
             mem or 0,
@@ -2879,26 +2869,22 @@ def update(
     # Set the new definition
     if need_update:
         # Create missing disks if needed
-        try:
-            if changes["disk"]:
-                for idx, item in enumerate(changes["disk"]["sorted"]):
-                    source_file = all_disks[idx].get("source_file")
-                    # We don't want to create image disks for cdrom devices
-                    if all_disks[idx].get("device", "disk") == "cdrom":
-                        continue
-                    if (
-                        item in changes["disk"]["new"]
-                        and source_file
-                        and not os.path.isfile(source_file)
-                    ):
-                        _qemu_image_create(all_disks[idx])
-                    elif item in changes["disk"]["new"] and not source_file:
-                        _disk_volume_create(conn, all_disks[idx])
+        if changes["disk"]:
+            for idx, item in enumerate(changes["disk"]["sorted"]):
+                source_file = all_disks[idx]["source_file"]
+                if (
+                    item in changes["disk"]["new"]
+                    and source_file
+                    and not os.path.isfile(source_file)
+                    and not test
+                ):
+                    _qemu_image_create(all_disks[idx])
 
+        try:
             if not test:
-                xml_desc = ElementTree.tostring(desc)
-                log.debug("Update virtual machine definition: %s", xml_desc)
-                conn.defineXML(salt.utils.stringutils.to_str(xml_desc))
+                conn.defineXML(
+                    salt.utils.stringutils.to_str(ElementTree.tostring(desc))
+                )
             status["definition"] = True
         except libvirt.libvirtError as err:
             conn.close()
