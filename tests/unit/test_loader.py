@@ -152,12 +152,12 @@ class LazyLoaderUtilsTest(TestCase):
     def setUpClass(cls):
         cls.opts = salt.config.minion_config(None)
         cls.opts['grains'] = salt.loader.grains(cls.opts)
-        if not os.path.isdir(TMP):
-            os.makedirs(TMP)
+        if not os.path.isdir(RUNTIME_VARS.TMP):
+            os.makedirs(RUNTIME_VARS.TMP)
 
     def setUp(self):
         # Setup the module
-        self.module_dir = tempfile.mkdtemp(dir=TMP)
+        self.module_dir = tempfile.mkdtemp(dir=RUNTIME_VARS.TMP)
         self.module_file = os.path.join(self.module_dir,
                                         '{}.py'.format(self.module_name))
         with salt.utils.files.fopen(self.module_file, 'w') as fh:
@@ -165,7 +165,7 @@ class LazyLoaderUtilsTest(TestCase):
             fh.flush()
             os.fsync(fh.fileno())
 
-        self.utils_dir = tempfile.mkdtemp(dir=TMP)
+        self.utils_dir = tempfile.mkdtemp(dir=RUNTIME_VARS.TMP)
         self.utils_file = os.path.join(self.utils_dir,
                                        '{}.py'.format(self.utils_name))
         with salt.utils.files.fopen(self.utils_file, 'w') as fh:
