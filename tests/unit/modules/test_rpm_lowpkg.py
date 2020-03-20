@@ -18,6 +18,11 @@ from tests.support.mock import (
 import salt.modules.rpm_lowpkg as rpm
 
 
+def _called_with_root(mock):
+    cmd = ' '.join(mock.call_args[0][0])
+    return cmd.startswith('rpm --root /')
+
+
 class RpmTestCase(TestCase, LoaderModuleMockMixin):
     '''
     Test cases for salt.modules.rpm
