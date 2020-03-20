@@ -14,6 +14,11 @@ def _called_with_root(mock):
     return cmd.startswith("rpm --root /")
 
 
+def _called_with_root(mock):
+    cmd = ' '.join(mock.call_args[0][0])
+    return cmd.startswith('rpm --root /')
+
+
 class RpmTestCase(TestCase, LoaderModuleMockMixin):
     """
     Test cases for salt.modules.rpm
