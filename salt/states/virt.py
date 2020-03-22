@@ -292,6 +292,8 @@ def defined(
     boot_dev=None,
     hypervisor_features=None,
     clock=None,
+    serials=None,
+    consoles=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -566,6 +568,17 @@ def defined(
             clock:
               timezone: CEST
 
+    :param serials:
+        Dictionary providing details on the serials connection to create. (Default: ``None``)
+        See :ref:`init-serials-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
+    :param consoles:
+        Dictionary providing details on the consoles device to create. (Default: ``None``)
+        See :ref:`init-consoles-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
+
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -629,6 +642,8 @@ def defined(
                     password=password,
                     boot=boot,
                     numatune=numatune,
+                    serials=serials,
+                    consoles=consoles,
                     test=__opts__["test"],
                     boot_dev=boot_dev,
                     hypervisor_features=hypervisor_features,
@@ -667,6 +682,8 @@ def defined(
                     password=password,
                     boot=boot,
                     numatune=numatune,
+                    serials=serials,
+                    consoles=consoles,
                     start=False,
                     boot_dev=boot_dev,
                     hypervisor_features=hypervisor_features,
@@ -707,6 +724,8 @@ def running(
     numatune=None,
     hypervisor_features=None,
     clock=None,
+    serials=None,
+    consoles=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -823,6 +842,16 @@ def running(
         pass a None object, for instance: 'kernel': ``None``.
 
         .. versionadded:: 3000
+    :param serials:
+        Dictionary providing details on the serials connection to create. (Default: ``None``)
+        See :ref:`init-serials-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
+    :param consoles:
+        Dictionary providing details on the consoles device to create. (Default: ``None``)
+        See :ref:`init-consoles-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
 
     :param boot:
         Specifies kernel for the virtual machine, as well as boot parameters
@@ -992,6 +1021,8 @@ def running(
         connection=connection,
         username=username,
         password=password,
+        serials=serials,
+        consoles=consoles,
     )
 
     result = True if not __opts__["test"] else None
