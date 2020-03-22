@@ -186,6 +186,10 @@ VIRT_STATE_NAME_MAP = {
     6: "crashed",
 }
 
+default_port = 23023
+default_serial_type = "tcp"
+default_console_type = "tcp"
+
 
 def __virtual__():
     if not HAS_LIBVIRT:
@@ -813,10 +817,12 @@ def _gen_xml(
     graphics=None,
     boot=None,
     boot_dev=None,
-    stop_on_reboot=False,
     numatune=None,
     hypervisor_features=None,
     clock=None,
+    serials=None,
+    consoles=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -893,18 +899,70 @@ def _gen_xml(
                 context["boot"]["kernel"] = "/usr/lib/grub2/x86_64-xen/grub.xen"
                 context["boot_dev"] = []
 
-    if "serial_type" in kwargs:
-        context["serial_type"] = kwargs["serial_type"]
-    if "serial_type" in context and context["serial_type"] == "tcp":
-        if "telnet_port" in kwargs:
-            context["telnet_port"] = kwargs["telnet_port"]
-        else:
-            context["telnet_port"] = 23023  # FIXME: use random unused port
-    if "serial_type" in context:
-        if "console" in kwargs:
-            context["console"] = kwargs["console"]
-        else:
-            context["console"] = True
+    context["serials"] = []
+    if serials is not None:
+        for serial in serials:
+            serial_type = serial.get("type") or default_serial_type
+            if not serial_type:
+                raise SaltInvocationError("Missing type in serial")
+
+            serial_context = {"type": serial_type}
+            if serial_context["type"] == "tcp":
+                serial_context["port"] = serial.get("port", default_port)
+                serial_context["protocol"] = serial.get("protocol", "telnet")
+            context["serials"].append(serial_context)
+
+    context["consoles"] = []
+    if consoles is not None:
+        for console in consoles:
+            console_type = console.get("type") or default_console_type
+            if not console_type:
+                raise SaltInvocationError("Missing type in console")
+
+            console_context = {"type": console_type}
+            if console_context["type"] == "tcp":
+                console_context["port"] = console.get("port", default_port)
+                console_context["protocol"] = console.get("protocol", "telnet")
+            context["consoles"].append(console_context)
+
+    # processing of deprecated parameters
+    old_port = kwargs.get("telnet_port")
+    if old_port:
+        salt.utils.versions.warn_until(
+            "Aluminium",
+            "'telnet_port' parameter has been deprecated, use the 'serials' and 'consoles' parameters instead. "
+            "It will be removed in {version}.",
+        )
+
+    old_serial_type = kwargs.get("serial_type")
+    if old_serial_type:
+        salt.utils.versions.warn_until(
+            "Aluminium",
+            "'serial_type' parameter has been deprecated, use the 'serials' and 'consoles' parameters instead. "
+            "It will be removed in {version}.",
+        )
+        serial_context = {"type": serial_type}
+        if serial_context["type"] == "tcp":
+            serial_context["port"] = old_port if old_port is not None else default_port
+            serial_context["protocol"] = serial.get("protocol", "telnet")
+        context["serials"].append(serial_context)
+
+    old_console = kwargs.get("console")
+    if old_console:
+        salt.utils.versions.warn_until(
+            "Aluminium",
+            "'console' parameter has been deprecated, use the 'serials' and 'consoles' parameters instead. "
+            "It will be removed in {version}.",
+        )
+        if old_console is True:
+            console_context = {
+                "type": old_serial_type if old_serial_type else default_console_type
+            }
+            if console_context["type"] == "tcp":
+                console_context["port"] = old_port if old_port else default_port
+                console_context["protocol"] = console.get("protocol", "telnet")
+            context["consoles"].append(console_context)
+    # end processing of deprecated parameters
 
     context["disks"] = []
     disk_bus_map = {"virtio": "vd", "xen": "xvd", "fdc": "fd", "ide": "hd"}
@@ -1771,10 +1829,12 @@ def init(
     arch=None,
     boot=None,
     boot_dev=None,
-    stop_on_reboot=False,
     numatune=None,
     hypervisor_features=None,
     clock=None,
+    serials=None,
+    consoles=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -2092,6 +2152,18 @@ def init(
                   limit: 2342
                 hpet:
                   present: False
+
+    :param serials:
+        Dictionary providing details on the serials connection to create. (Default: ``None``)
+        See :ref:`init-serials-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
+
+    :param consoles:
+        Dictionary providing details on the consoles device to create. (Default: ``None``)
+        See :ref:`init-consoles-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
 
     .. _init-cpu-def:
 
@@ -2465,6 +2537,40 @@ def init(
         By default, not setting the ``listen`` part of the dictionary will default to
         listen on all addresses.
 
+    .. _init-serials-def:
+
+    .. rubric:: Serials Definitions
+
+    Serial dictionaries can contain the following properties:
+
+    type
+        Type of the serial connection, like ``'tcp'``, ``'pty'``.
+
+    port
+        The serial port number.
+        (Default: 23023)
+
+    Protocol
+        Name of connection protocol.
+        (Default: telnet)
+
+    .. _init-consoles-def:
+
+    .. rubric:: Consoles Definitions
+
+    Consol dictionaries can contain the following properties:
+
+    type
+        Type of the serial connection, like ``'tcp'``, ``'pty'``.
+
+    port
+        The serial port number.
+        (Default: 23023)
+
+    Protocol
+        Name of connection protocol.
+        (Default: telnet)
+
     .. rubric:: CLI Example
 
     .. code-block:: bash
@@ -2614,10 +2720,12 @@ def init(
             graphics,
             boot,
             boot_dev,
-            stop_on_reboot,
             numatune,
             hypervisor_features,
             clock,
+            serials,
+            consoles,
+            stop_on_reboot,
             **kwargs
         )
         log.debug("New virtual machine definition: %s", vm_xml)
@@ -2888,6 +2996,44 @@ def _normalize_cpusets(desc, data):
             tuning[child] = new_item
 
 
+def _serial_or_concole_equal(old, new):
+    def _filter_serial_or_concole(item):
+        """
+        Filter out elements to ignore when comparing items
+        """
+        return {
+            "type": item.attrib["type"],
+            "port": item.find("source").attrib["service"]
+            if item.find("source") is not None
+            else None,
+            "protocol": item.find("protocol").attrib["type"]
+            if item.find("protocol") is not None
+            else None,
+        }
+
+    return _filter_serial_or_concole(old) == _filter_serial_or_concole(new)
+
+
+def _diff_serial_list(old, new):
+    """
+        Compare serial definitions to extract the changes
+
+        :param old: list of ElementTree nodes representing the old serials
+        :param new: list of ElementTree nodes representing the new serials
+        """
+    return _diff_lists(old, new, _serial_or_concole_equal)
+
+
+def _diff_console_list(old, new):
+    """
+        Compare console definitions to extract the changes
+
+        :param old: list of ElementTree nodes representing the old consoles
+        :param new: list of ElementTree nodes representing the new consoles
+        """
+    return _diff_lists(old, new, _serial_or_concole_equal)
+
+
 def update(
     name,
     cpu=0,
@@ -2902,9 +3048,11 @@ def update(
     numatune=None,
     test=False,
     boot_dev=None,
-    stop_on_reboot=False,
     hypervisor_features=None,
     clock=None,
+    serials=None,
+    consoles=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -2993,14 +3141,6 @@ def update(
 
         .. versionadded:: Magnesium
 
-    :param stop_on_reboot:
-        If set to ``True`` the guest will stop instead of rebooting.
-        This is specially useful when creating a virtual machine with an installation cdrom or
-        an autoinstallation needing a special first boot configuration.
-        Defaults to ``False``
-
-        .. versionadded:: Aluminium
-
     :param numatune:
         The optional numatune element provides details of how to tune the performance of a NUMA host via controlling NUMA
         policy for domain process. The optional ``memory`` element specifies how to allocate memory for the domain process
@@ -3010,6 +3150,26 @@ def update(
         To update any numatune parameters, specify the new value. To remove any ``numatune`` parameters, pass a None object,
         for instance: 'numatune': ``None``. Please note that ``None`` is mapped to ``null`` in sls file, pass ``null`` in
         sls file instead.
+
+        .. versionadded:: Aluminium
+
+    :param serials:
+        Dictionary providing details on the serials connection to create. (Default: ``None``)
+        See :ref:`init-serials-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
+
+    :param consoles:
+        Dictionary providing details on the consoles device to create. (Default: ``None``)
+        See :ref:`init-consoles-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
+
+    :param stop_on_reboot:
+        If set to ``True`` the guest will stop instead of rebooting.
+        This is specially useful when creating a virtual machine with an installation cdrom or
+        an autoinstallation needing a special first boot configuration.
+        Defaults to ``False``
 
         .. versionadded:: Aluminium
 
@@ -3139,7 +3299,10 @@ def update(
             graphics,
             boot,
             boot_dev,
-            stop_on_reboot,
+            numatune,
+            serial=serials,
+            consoles=consoles,
+            stop_on_reboot=stop_on_reboot,
             **kwargs
         )
     )
@@ -3530,6 +3693,8 @@ def update(
         "disk": ["disks", "disk_profile"],
         "interface": ["interfaces", "nic_profile"],
         "graphics": ["graphics"],
+        "serial": ["serial"],
+        "console": ["console"],
     }
     changes = {}
     for dev_type in parameters:
