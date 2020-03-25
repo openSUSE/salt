@@ -253,7 +253,9 @@ class AptPkgTestCase(TestCase, LoaderModuleMockMixin):
             if installed['wget'].get(names[name], False):
                 installed['wget'][name] = installed['wget'].pop(names[name])
 
-        assert aptpkg.info_installed('wget') == installed
+        del installed['wget']['status']
+        self.assertEqual(aptpkg.info_installed('wget'), installed)
+        self.assertEqual(len(aptpkg.info_installed()), 1)
 
     @patch('salt.modules.aptpkg.__salt__', {'lowpkg.info': MagicMock(return_value=LOWPKG_INFO)})
     def test_info_installed_attr(self):
