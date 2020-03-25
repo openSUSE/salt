@@ -636,14 +636,6 @@ class Install(install):
         install.finalize_options(self)
 
     def run(self):
-        if LooseVersion(setuptools.__version__) < LooseVersion("9.1"):
-            sys.stderr.write(
-                "\n\nInstalling Salt requires setuptools >= 9.1\n"
-                "Available setuptools version is {}\n\n".format(setuptools.__version__)
-            )
-            sys.stderr.flush()
-            sys.exit(1)
-
         # Let's set the running_salt_install attribute so we can add
         # _version.txt in the build command
         self.distribution.running_salt_install = True
