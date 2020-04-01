@@ -1,8 +1,6 @@
-# -*- coding: utf-8 -*-
 """
     :codeauthor: Rahul Handay <rahulha@saltstack.com>
 """
-from __future__ import absolute_import, print_function, unicode_literals
 
 import copy
 import os
@@ -32,7 +30,7 @@ from tests.support.runtests import RUNTIME_VARS
 from tests.support.unit import TestCase
 
 
-class MockState(object):
+class MockState:
     """
         Mock class
     """
@@ -40,7 +38,7 @@ class MockState(object):
     def __init__(self):
         pass
 
-    class State(object):
+    class State:
         """
             Mock state class
         """
@@ -129,7 +127,7 @@ class MockState(object):
         def requisite_in(self, data):  # pylint: disable=unused-argument
             return data, []
 
-    class HighState(object):
+    class HighState:
         """
             Mock HighState class
         """
@@ -232,7 +230,7 @@ class MockState(object):
             return True
 
 
-class MockSerial(object):
+class MockSerial:
     """
         Mock Class
     """
@@ -240,7 +238,7 @@ class MockSerial(object):
     def __init__(self):
         pass
 
-    class Serial(object):
+    class Serial:
         """
             Mock Serial class
         """
@@ -263,7 +261,7 @@ class MockSerial(object):
             return True
 
 
-class MockTarFile(object):
+class MockTarFile:
     """
         Mock tarfile class
     """
@@ -950,57 +948,57 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
         with patch.dict(state.__opts__, {test_arg: True}):
             self.assertTrue(
                 state._get_test_value(test=None),
-                msg="Failure when {0} is True in __opts__".format(test_arg),
+                msg="Failure when {} is True in __opts__".format(test_arg),
             )
 
         with patch.dict(config.__pillar__, {test_arg: "blah"}):
             self.assertFalse(
                 state._get_test_value(test=None),
-                msg="Failure when {0} is blah in __opts__".format(test_arg),
+                msg="Failure when {} is blah in __opts__".format(test_arg),
             )
 
         with patch.dict(config.__pillar__, {test_arg: "true"}):
             self.assertFalse(
                 state._get_test_value(test=None),
-                msg="Failure when {0} is true in __opts__".format(test_arg),
+                msg="Failure when {} is true in __opts__".format(test_arg),
             )
 
         with patch.dict(config.__opts__, {test_arg: False}):
             self.assertFalse(
                 state._get_test_value(test=None),
-                msg="Failure when {0} is False in __opts__".format(test_arg),
+                msg="Failure when {} is False in __opts__".format(test_arg),
             )
 
         with patch.dict(config.__opts__, {}):
             self.assertFalse(
                 state._get_test_value(test=None),
-                msg="Failure when {0} does not exist in __opts__".format(test_arg),
+                msg="Failure when {} does not exist in __opts__".format(test_arg),
             )
 
         with patch.dict(config.__pillar__, {test_arg: None}):
             self.assertEqual(
                 state._get_test_value(test=None),
                 None,
-                msg="Failure when {0} is None in __opts__".format(test_arg),
+                msg="Failure when {} is None in __opts__".format(test_arg),
             )
 
         with patch.dict(config.__pillar__, {test_arg: True}):
             self.assertTrue(
                 state._get_test_value(test=None),
-                msg="Failure when {0} is True in __pillar__".format(test_arg),
+                msg="Failure when {} is True in __pillar__".format(test_arg),
             )
 
         with patch.dict(config.__pillar__, {"master": {test_arg: True}}):
             self.assertTrue(
                 state._get_test_value(test=None),
-                msg="Failure when {0} is True in master __pillar__".format(test_arg),
+                msg="Failure when {} is True in master __pillar__".format(test_arg),
             )
 
         with patch.dict(config.__pillar__, {"master": {test_arg: False}}):
             with patch.dict(config.__pillar__, {test_arg: True}):
                 self.assertTrue(
                     state._get_test_value(test=None),
-                    msg="Failure when {0} is False in master __pillar__ and True in pillar".format(
+                    msg="Failure when {} is False in master __pillar__ and True in pillar".format(
                         test_arg
                     ),
                 )
@@ -1009,7 +1007,7 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
             with patch.dict(config.__pillar__, {test_arg: False}):
                 self.assertFalse(
                     state._get_test_value(test=None),
-                    msg="Failure when {0} is True in master __pillar__ and False in pillar".format(
+                    msg="Failure when {} is True in master __pillar__ and False in pillar".format(
                         test_arg
                     ),
                 )
@@ -1017,14 +1015,14 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
         with patch.dict(state.__opts__, {"test": False}):
             self.assertFalse(
                 state._get_test_value(test=None),
-                msg="Failure when {0} is False in __opts__".format(test_arg),
+                msg="Failure when {} is False in __opts__".format(test_arg),
             )
 
         with patch.dict(state.__opts__, {"test": False}):
             with patch.dict(config.__pillar__, {"master": {test_arg: True}}):
                 self.assertTrue(
                     state._get_test_value(test=None),
-                    msg="Failure when {0} is False in __opts__".format(test_arg),
+                    msg="Failure when {} is False in __opts__".format(test_arg),
                 )
 
         with patch.dict(state.__opts__, {}):
@@ -1077,7 +1075,7 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
                 expected = 1
                 assert (
                     call_count == expected
-                ), "{0} called {1} time(s) (expected: {2})".format(
+                ), "{} called {} time(s) (expected: {})".format(
                     key, call_count, expected
                 )
 
@@ -1091,7 +1089,7 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
                 expected = 1
                 assert (
                     call_count == expected
-                ), "{0} called {1} time(s) (expected: {2})".format(
+                ), "{} called {} time(s) (expected: {})".format(
                     key, call_count, expected
                 )
 
@@ -1105,7 +1103,7 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
                 expected = 1
                 assert (
                     call_count == expected
-                ), "{0} called {1} time(s) (expected: {2})".format(
+                ), "{} called {} time(s) (expected: {})".format(
                     key, call_count, expected
                 )
 
@@ -1121,7 +1119,7 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
                 expected = 1
                 assert (
                     call_count == expected
-                ), "{0} called {1} time(s) (expected: {2})".format(
+                ), "{} called {} time(s) (expected: {})".format(
                     key, call_count, expected
                 )
 
@@ -1168,15 +1166,8 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
                     state._format_cached_grains.assert_called_once()
 
                 MockTarFile.path = ""
-                if six.PY2:
-                    with patch("salt.utils.files.fopen", mock_open()), patch.dict(
-                        state.__utils__,
-                        {"state.check_result": MagicMock(return_value=True)},
-                    ):
-                        self.assertTrue(state.pkg(tar_file, 0, "md5"))
-                else:
-                    with patch("salt.utils.files.fopen", mock_open()):
-                        self.assertTrue(state.pkg(tar_file, 0, "md5"))
+                with patch("salt.utils.files.fopen", mock_open()):
+                    self.assertTrue(state.pkg(tar_file, 0, "md5"))
 
     def test_lock_saltenv(self):
         """
