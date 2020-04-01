@@ -1721,6 +1721,10 @@ def _netlink_tool_remote_on(port, which_end):
         chunks = line.split()
         remote_host, remote_port = chunks[4].rsplit(":", 1)
 
+        if which_end == "remote_port" and int(remote_port) != int(port):
+            continue
+        if which_end == "local_port" and int(local_port) != int(port):
+            continue
         remotes.add(remote_host.strip("[]"))
 
     if valid is False:
