@@ -3608,7 +3608,7 @@ class BaseHighState(object):
             self.state.opts['pillar'] = self.state._gather_pillar()
         self.state.module_refresh()
 
-    def render_state(self, sls, saltenv, mods, matches, local=False):
+    def render_state(self, sls, saltenv, mods, matches, local=False, context=None):
         '''
         Render a state file and retrieve all of the include states
         '''
@@ -3932,7 +3932,7 @@ class BaseHighState(object):
                 errors.append(err)
             state.setdefault('__exclude__', []).extend(exc)
 
-    def render_highstate(self, matches):
+    def render_highstate(self, matches, context=None):
         '''
         Gather the state files and render them into a single unified salt
         high data structure.
@@ -3964,7 +3964,8 @@ class BaseHighState(object):
                     if r_env in mods:
                         continue
                     state, errors = self.render_state(
-                        sls, saltenv, mods, matches)
+                        sls, saltenv, mods, matches, context=context
+                    )
                     if state:
                         self.merge_included_states(highstate, state, errors)
                     for i, error in enumerate(errors[:]):

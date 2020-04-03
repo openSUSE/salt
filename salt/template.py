@@ -32,15 +32,18 @@ SLS_ENCODING = 'utf-8'  # this one has no BOM.
 SLS_ENCODER = codecs.getencoder(SLS_ENCODING)
 
 
-def compile_template(template,
-                     renderers,
-                     default,
-                     blacklist,
-                     whitelist,
-                     saltenv='base',
-                     sls='',
-                     input_data='',
-                     **kwargs):
+def compile_template(
+    template,
+    renderers,
+    default,
+    blacklist,
+    whitelist,
+    saltenv='base',
+    sls='',
+    input_data='',
+    context=None,
+    **kwargs
+):
     '''
     Take the path to a template and return the high data structure
     derived from the template.
@@ -94,6 +97,8 @@ def compile_template(template,
         if salt.utils.stringio.is_readable(input_data):
             input_data.seek(0)      # pylint: disable=no-member
         render_kwargs = dict(renderers=renderers, tmplpath=template)
+        if context:
+            render_kwargs["context"] = context
         render_kwargs.update(kwargs)
         if argline:
             render_kwargs['argline'] = argline
