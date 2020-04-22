@@ -402,7 +402,11 @@ class IPCClient(object):
 
         self._closing = True
 
-        log.debug('Closing %s instance', self.__class__.__name__)
+        try:
+            log.debug('Closing %s instance', self.__class__.__name__)
+        except NameError:
+            # Possible race condition: name '__salt_system_encoding__' is not defined
+            pass
 
         if self.stream is not None and not self.stream.closed():
             self.stream.close()
