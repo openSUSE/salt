@@ -20,9 +20,11 @@ Rob Speer's changes are as follows:
     - added a __getstate__ and __setstate__ so it can be pickled
     - added __getitem__
 """
+
 try:
     from collections.abc import MutableSet
 except ImportError:
+    # pylint: disable=no-name-in-module
     from collections import MutableSet
 
 SLICE_ALL = slice(None)
