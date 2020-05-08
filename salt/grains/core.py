@@ -47,13 +47,29 @@ try:
     # Extend the default list of supported distros. This will be used for the
     # /etc/DISTRO-release checking that is part of linux_distribution()
     from platform import _supported_dists
-    _supported_dists += ('arch', 'mageia', 'meego', 'vmware', 'bluewhite64',
-                         'slamd64', 'ovs', 'system', 'mint', 'oracle', 'void')
+
+    _supported_dists += (
+        "arch",
+        "mageia",
+        "meego",
+        "vmware",
+        "bluewhite64",
+        "slamd64",
+        "ovs",
+        "system",
+        "mint",
+        "oracle",
+        "void",
+    )
 
     def linux_distribution(**kwargs):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return _deprecated_linux_distribution(supported_dists=_supported_dists, **kwargs)
+            return _deprecated_linux_distribution(
+                supported_dists=_supported_dists, **kwargs
+            )
+
+
 except ImportError:
     from distro import linux_distribution
 
@@ -1974,9 +1990,9 @@ def os_data():
             'Getting OS name, release, and codename from '
             'platform.linux_distribution()'
         )
-        (osname, osrelease, oscodename) = \
-            [x.strip('"').strip("'") for x in
-             linux_distribution()]
+        (osname, osrelease, oscodename) = [
+            x.strip('"').strip("'") for x in linux_distribution()
+        ]
         # Try to assign these three names based on the lsb info, they tend to
         # be more accurate than what python gets from /etc/DISTRO-release.
         # It's worth noting that Ubuntu has patched their Python distribution
