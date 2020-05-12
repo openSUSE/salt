@@ -1348,7 +1348,7 @@ def mod_repo(repo, **kwargs):
     return repo
 
 
-def refresh_db(force=None, root=None):
+def refresh_db(root=None, force=None):
     """
     Trigger a repository refresh by calling ``zypper refresh``. Refresh will run
     with ``--force`` if the "force=True" flag is passed on the CLI or
@@ -1358,9 +1358,6 @@ def refresh_db(force=None, root=None):
     It will return a dict::
 
         {'<database name>': Bool}
-
-    root
-        operate on a different root directory.
 
     CLI Example:
 
