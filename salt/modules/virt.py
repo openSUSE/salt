@@ -1700,6 +1700,7 @@ def update(
     graphics=None,
     live=True,
     boot=None,
+    test=False,
     **kwargs
 ):
     """
@@ -1757,6 +1758,10 @@ def update(
 
         .. versionadded:: 3000
 
+    :param test: run in dry-run mode if set to True
+
+        .. versionadded:: sodium
+
     :return:
 
         Returns a dictionary indicating the status of what has been done. It is structured in
@@ -1804,8 +1809,8 @@ def update(
     new_desc = ElementTree.fromstring(
         _gen_xml(
             name,
-            cpu,
-            mem,
+            cpu or 0,
+            mem or 0,
             all_disks,
             _get_merged_nics(hypervisor, nic_profile, interfaces),
             hypervisor,
@@ -1926,11 +1931,15 @@ def update(
                     item in changes["disk"]["new"]
                     and source_file
                     and not os.path.isfile(source_file)
+                    and not test
                 ):
                     _qemu_image_create(all_disks[idx])
 
         try:
-            conn.defineXML(salt.utils.stringutils.to_str(ElementTree.tostring(desc)))
+            if not test:
+                conn.defineXML(
+                    salt.utils.stringutils.to_str(ElementTree.tostring(desc))
+                )
             status["definition"] = True
         except libvirt.libvirtError as err:
             conn.close()
@@ -1987,7 +1996,7 @@ def update(
 
         for cmd in commands:
             try:
-                ret = getattr(domain, cmd["cmd"])(*cmd["args"])
+                ret = getattr(domain, cmd["cmd"])(*cmd["args"]) if not test else 0
                 device_type = cmd["device"]
                 if device_type in ["cpu", "mem"]:
                     status[device_type] = not bool(ret)
