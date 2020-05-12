@@ -1580,7 +1580,7 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
                 with patch("salt.modules.network.log", mock_log):
                     self.assertEqual(core.fqdns(), {"fqdns": []})
                     mock_log.debug.assert_called_once()
-                    mock_log.error.assert_called()
+                    mock_log.error.assert_called_once()
 
     @patch.object(salt.utils.platform, "is_windows", MagicMock(return_value=False))
     @patch(
