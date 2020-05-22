@@ -92,18 +92,14 @@ from xml.etree import ElementTree
 from xml.sax import saxutils
 
 # Import third party libs
-import jinja2
 import jinja2.exceptions
 
 # Import salt libs
 import salt.utils.files
 import salt.utils.json
-import salt.utils.network
 import salt.utils.path
 import salt.utils.stringutils
 import salt.utils.templates
-import salt.utils.validate.net
-import salt.utils.versions
 import salt.utils.xmlutil as xmlutil
 import salt.utils.yaml
 from salt._compat import ipaddress
@@ -1910,6 +1906,8 @@ def init(
                     for x in y
                 }
             )
+            if len(hypervisors) == 0:
+                raise SaltInvocationError("No supported hypervisors were found")
             virt_hypervisor = "kvm" if "kvm" in hypervisors else hypervisors[0]
 
         # esxi used to be a possible value for the hypervisor: map it to vmware since it's the same
@@ -3290,24 +3288,21 @@ def get_profiles(hypervisor=None, **kwargs):
             for x in y
         }
     )
-    default_hypervisor = "kvm" if "kvm" in hypervisors else hypervisors[0]
+    if len(hypervisors) == 0:
+        raise SaltInvocationError("No supported hypervisors were found")
 
     if not hypervisor:
-        hypervisor = default_hypervisor
+        hypervisor = "kvm" if "kvm" in hypervisors else hypervisors[0]
     virtconf = __salt__["config.get"]("virt", {})
     for typ in ["disk", "nic"]:
         _func = getattr(sys.modules[__name__], "_{}_profile".format(typ))
         ret[typ] = {
-            "default": _func(
-                "default", hypervisor if hypervisor else default_hypervisor
-            )
+            "default": _func("default", hypervisor)
         }
         if typ in virtconf:
             ret.setdefault(typ, {})
             for prf in virtconf[typ]:
-                ret[typ][prf] = _func(
-                    prf, hypervisor if hypervisor else default_hypervisor
-                )
+                ret[typ][prf] = _func(prf, hypervisor)
     return ret
 
 
