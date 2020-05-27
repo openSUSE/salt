@@ -1477,22 +1477,24 @@ def logout(*registries):
     # this usecase (see https://github.com/docker/docker-py/issues/1091)
 
     # To logout of all known (to Salt) docker registries, they have to be collected first
-    registry_auth = __salt__["config.get"]("docker-registries", {})
+    registry_auth = __pillar__.get("docker-registries", {})
     ret = {"retcode": 0}
     errors = ret.setdefault("Errors", [])
     if not isinstance(registry_auth, dict):
         errors.append("'docker-registries' Pillar value must be a dictionary")
         registry_auth = {}
-    for reg_name, reg_conf in six.iteritems(
-        __salt__["config.option"]("*-docker-registries", wildcard=True)
-    ):
+    for key, data in six.iteritems(__pillar__):
         try:
-            registry_auth.update(reg_conf)
-        except TypeError:
-            errors.append(
-                "Docker registry '{0}' was not specified as a "
-                "dictionary".format(reg_name)
-            )
+            if key.endswith("-docker-registries"):
+                try:
+                    registry_auth.update(data)
+                except TypeError:
+                    errors.append(
+                        "Docker registry '{0}' was not specified as a "
+                        "dictionary".format(key)
+                    )
+        except AttributeError:
+            pass
 
     # If no registries passed, we will logout of all known registries
     if not registries:
