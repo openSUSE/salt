@@ -2042,6 +2042,7 @@ class ClearFuncs(TransportMethods):
     expose_methods = (
         "ping",
         "publish",
+        "publish_batch",
         "get_token",
         "mk_token",
         "wheel",
