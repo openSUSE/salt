@@ -1906,7 +1906,7 @@ class ClearFuncs(TransportMethods):
     # These methods will be exposed to the transport layer by
     # MWorker._handle_clear
     expose_methods = (
-        'ping', 'publish', 'get_token', 'mk_token', 'wheel', 'runner',
+        'ping', 'publish', 'publish_batch', 'get_token', 'mk_token', 'wheel', 'runner',
     )
 
     # The ClearFuncs object encapsulates the functions that can be executed in
