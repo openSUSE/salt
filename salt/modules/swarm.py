@@ -30,9 +30,13 @@ from __future__ import absolute_import, unicode_literals, print_function
 # Import Salt libs
 import salt.utils.json
 
+HAS_DOCKER = False
+
 try:
     import docker
-    HAS_DOCKER = True
+
+    if hasattr(docker, "from_env"):
+        HAS_DOCKER = True
 except ImportError:
     HAS_DOCKER = False
 
