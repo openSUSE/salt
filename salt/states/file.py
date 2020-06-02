@@ -4884,16 +4884,8 @@ def comment(name, regex, char='#', backup='.bak'):
     # remove (?i)-like flags, ^ and $
     unanchor_regex = re.sub(r'^(\(\?[iLmsux]\))?\^?(.*?)\$?$', r'\2', regex)
 
-    comment_regex = char + unanchor_regex
-
-    # Check if the line is already commented
-    if __salt__['file.search'](name, comment_regex, multiline=True):
-        commented = True
-    else:
-        commented = False
-
     # Make sure the pattern appears in the file before continuing
-    if commented or not __salt__['file.search'](name, regex, multiline=True):
+    if not __salt__['file.search'](name, regex, multiline=True):
         if __salt__['file.search'](name, unanchor_regex, multiline=True):
             ret['comment'] = 'Pattern already commented'
             ret['result'] = True
