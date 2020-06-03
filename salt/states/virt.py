@@ -288,6 +288,7 @@ def defined(
     arch=None,
     boot=None,
     update=True,
+    boot_dev=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -348,6 +349,14 @@ def defined(
 
         .. deprecated:: sodium
 
+    :param boot_dev:
+        Space separated list of devices to boot from sorted by decreasing priority.
+        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+
+        By default, the value will ``"hd"``.
+
+        .. versionadded:: Magnesium
+
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -358,6 +367,7 @@ def defined(
           virt.defined:
             - cpu: 2
             - mem: 2048
+            - boot_dev: network hd
             - disk_profile: prod
             - disks:
               - name: system
@@ -410,6 +420,7 @@ def defined(
                     password=password,
                     boot=boot,
                     test=__opts__["test"],
+                    boot_dev=boot_dev,
                 )
             ret["changes"][name] = status
             if not status.get("definition"):
@@ -444,6 +455,7 @@ def defined(
                     password=password,
                     boot=boot,
                     start=False,
+                    boot_dev=boot_dev,
                 )
             ret["changes"][name] = {"definition": True}
             ret["comment"] = "Domain {} defined".format(name)
@@ -476,6 +488,7 @@ def running(
     os_type=None,
     arch=None,
     boot=None,
+    boot_dev=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -587,6 +600,14 @@ def running(
 
         .. versionadded:: 3000
 
+    :param boot_dev:
+        Space separated list of devices to boot from sorted by decreasing priority.
+        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+
+        By default, the value will ``"hd"``.
+
+        .. versionadded:: Magnesium
+
     .. rubric:: Example States
 
     Make sure an already-defined virtual machine called ``domain_name`` is running:
@@ -605,6 +626,7 @@ def running(
             - cpu: 2
             - mem: 2048
             - disk_profile: prod
+            - boot_dev: network hd
             - disks:
               - name: system
                 size: 8192
@@ -653,6 +675,7 @@ def running(
         arch=arch,
         boot=boot,
         update=update,
+        boot_dev=boot_dev,
         connection=connection,
         username=username,
         password=password,

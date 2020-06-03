@@ -650,6 +650,7 @@ def _gen_xml(
     arch,
     graphics=None,
     boot=None,
+    boot_dev=None,
     **kwargs
 ):
     """
@@ -683,12 +684,7 @@ def _gen_xml(
             graphics = None
     context["graphics"] = graphics
 
-    if "boot_dev" in kwargs:
-        context["boot_dev"] = []
-        for dev in kwargs["boot_dev"].split():
-            context["boot_dev"].append(dev)
-    else:
-        context["boot_dev"] = ["hd"]
+    context["boot_dev"] = boot_dev.split() if boot_dev is not None else ["hd"]
 
     context["boot"] = boot if boot else {}
 
@@ -1609,6 +1605,7 @@ def init(
     os_type=None,
     arch=None,
     boot=None,
+    boot_dev=None,
     **kwargs
 ):
     """
@@ -1692,6 +1689,12 @@ def init(
                 'loader': '/usr/share/OVMF/OVMF_CODE.fd',
                 'nvram': '/usr/share/OVMF/OVMF_VARS.ms.fd'
             }
+
+    :param boot_dev:
+        Space separated list of devices to boot from sorted by decreasing priority.
+        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+
+        By default, the value will ``"hd"``.
 
     .. _init-boot-def:
 
@@ -2014,6 +2017,7 @@ def init(
             arch,
             graphics,
             boot,
+            boot_dev,
             **kwargs
         )
         conn.defineXML(vm_xml)
@@ -2241,6 +2245,7 @@ def update(
     live=True,
     boot=None,
     test=False,
+    boot_dev=None,
     **kwargs
 ):
     """
@@ -2296,6 +2301,14 @@ def update(
                 nvram: null
 
         .. versionadded:: 3000
+
+    :param boot_dev:
+        Space separated list of devices to boot from sorted by decreasing priority.
+        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+
+        By default, the value will ``"hd"``.
+
+        .. versionadded:: Magnesium
 
     :param test: run in dry-run mode if set to True
 
@@ -2426,6 +2439,18 @@ def update(
                 child_tag.set("template", child_tag.text)
                 child_tag.text = None
 
+            need_update = True
+
+    # Check the os/boot tags
+    if boot_dev is not None:
+        boot_nodes = parent_tag.findall("boot")
+        old_boot_devs = [node.get("dev") for node in boot_nodes]
+        new_boot_devs = boot_dev.split()
+        if old_boot_devs != new_boot_devs:
+            for boot_node in boot_nodes:
+                parent_tag.remove(boot_node)
+            for dev in new_boot_devs:
+                ElementTree.SubElement(parent_tag, "boot", attrib={"dev": dev})
             need_update = True
 
     # Update the memory, note that libvirt outputs all memory sizes in KiB
