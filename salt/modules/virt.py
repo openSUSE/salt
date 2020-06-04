@@ -1783,7 +1783,6 @@ def update(name,
            graphics=None,
            live=True,
            boot=None,
-           test=False,
            **kwargs):
     '''
     Update the definition of an existing domain.
@@ -1836,10 +1835,6 @@ def update(name,
 
         .. versionadded:: 3000
 
-    :param test: run in dry-run mode if set to True
-
-        .. versionadded:: sodium
-
     :return:
 
         Returns a dictionary indicating the status of what has been done. It is structured in
@@ -1885,8 +1880,8 @@ def update(name,
         boot = _handle_remote_boot_params(boot)
 
     new_desc = ElementTree.fromstring(_gen_xml(name,
-                                               cpu or 0,
-                                               mem or 0,
+                                               cpu,
+                                               mem,
                                                all_disks,
                                                _get_merged_nics(hypervisor, nic_profile, interfaces),
                                                hypervisor,
@@ -1978,12 +1973,11 @@ def update(name,
         if changes['disk']:
             for idx, item in enumerate(changes['disk']['sorted']):
                 source_file = all_disks[idx]['source_file']
-                if item in changes['disk']['new'] and source_file and not os.path.isfile(source_file) and not test:
+                if item in changes['disk']['new'] and source_file and not os.path.isfile(source_file):
                     _qemu_image_create(all_disks[idx])
 
         try:
-            if not test:
-                conn.defineXML(salt.utils.stringutils.to_str(ElementTree.tostring(desc)))
+            conn.defineXML(salt.utils.stringutils.to_str(ElementTree.tostring(desc)))
             status['definition'] = True
         except libvirt.libvirtError as err:
             conn.close()
@@ -2016,7 +2010,7 @@ def update(name,
 
         for cmd in commands:
             try:
-                ret = getattr(domain, cmd['cmd'])(*cmd['args']) if not test else 0
+                ret = getattr(domain, cmd['cmd'])(*cmd['args'])
                 device_type = cmd['device']
                 if device_type in ['cpu', 'mem']:
                     status[device_type] = not bool(ret)
