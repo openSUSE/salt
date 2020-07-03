@@ -63,10 +63,8 @@ A polkit rule like the following one will allow `salt` user to connect to libvir
 .. versionadded:: 2019.2.0
 """
 
-
 import logging
 
-# Import salt libs
 import salt.utils.event
 
 # pylint: disable=no-name-in-module,import-error
