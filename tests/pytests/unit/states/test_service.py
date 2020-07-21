@@ -316,6 +316,22 @@ def test_running():
                         assert service.__context__ == {"service.state": "running"}
 
 
+def test_running_in_offline_mode():
+    """
+    Tests the case in which a service.running state is executed on an offline environemnt
+
+    """
+    name = "thisisnotarealservice"
+    with patch.object(service, "_offline", MagicMock(return_value=True)):
+        ret = service.running(name=name)
+        assert ret == {
+            "changes": {},
+            "comment": "Running in OFFLINE mode. Nothing to do",
+            "result": True,
+            "name": name,
+        }
+
+
 def test_dead():
     """
     Test to ensure that the named service is dead
@@ -449,6 +465,22 @@ def test_dead_with_missing_service():
         assert ret == {
             "changes": {},
             "comment": "The named service {} is not available".format(name),
+            "result": True,
+            "name": name,
+        }
+
+
+def test_dead_in_offline_mode():
+    """
+    Tests the case in which a service.dead state is executed on an offline environemnt
+
+    """
+    name = "thisisnotarealservice"
+    with patch.object(service, "_offline", MagicMock(return_value=True)):
+        ret = service.dead(name=name)
+        assert ret == {
+            "changes": {},
+            "comment": "Running in OFFLINE mode. Nothing to do",
             "result": True,
             "name": name,
         }
@@ -664,6 +696,8 @@ def test_running_with_reload():
             service.__utils__, utils
         ), patch.dict(
             service.__opts__, {"test": False}
+        ), patch(
+            "salt.utils.systemd.offline", MagicMock(return_value=False)
         ):
             service.dead(service_name, enable=False)
             result = service.running(name=service_name, enable=True, reload=False)
