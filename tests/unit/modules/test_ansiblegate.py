@@ -177,3 +177,18 @@ description:
                 except AssertionError:
                     proc.assert_any_call(['echo', '{"ANSIBLE_MODULE_ARGS": {"_raw_params": "arg_1", "kwarg1": "foobar"}}'], stdout=-1, timeout=1200)
                 assert ret == {"completed": True, "timeout": 1200}
+
+    @patch('salt.utils.path.which', MagicMock(return_value=True))
+    def test_ansible_playbooks_return_retcode(self):
+        '''
+        Test ansible.playbooks execution module function include retcode in the return.
+        :return:
+        '''
+        ref_out = {
+                'retcode': 0,
+                'stdout': '{"foo": "bar"}'
+        }
+        cmd_run_all = MagicMock(return_value=ref_out)
+        with patch.dict(ansible.__salt__, {'cmd.run_all': cmd_run_all}):
+            ret = ansible.playbooks("fake-playbook.yml")
+            assert 'retcode' in ret
