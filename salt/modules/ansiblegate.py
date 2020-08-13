@@ -381,9 +381,9 @@ def playbooks(playbook, rundir=None, check=False, diff=False, extra_vars=None,
         'cwd': rundir,
         'cmd': ' '.join(command)
     }
-    ret = __salt__['cmd.run_all'](**cmd_kwargs)
-    log.debug('Ansible Playbook Return: %s', ret)
-    retdata = json.loads(ret['stdout'])
-    if ret['retcode']:
-        __context__['retcode'] = ret['retcode']
+    ret = __salt__["cmd.run_all"](**cmd_kwargs)
+    log.debug("Ansible Playbook Return: %s", ret)
+    retdata = json.loads(ret["stdout"])
+    if 'retcode' in ret:
+        __context__["retcode"] = retdata["retcode"] = ret["retcode"]
     return retdata
