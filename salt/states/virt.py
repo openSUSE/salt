@@ -286,6 +286,7 @@ def defined(
     os_type=None,
     arch=None,
     boot=None,
+    numatune=None,
     update=True,
     boot_dev=None,
     stop_on_reboot=False,
@@ -393,6 +394,21 @@ def defined(
 
         .. versionadded:: Aluminium
 
+    :param numatune:
+        The optional numatune element provides details of how to tune the performance of a NUMA host via controlling NUMA
+        policy for domain process. The optional ``memory`` element specifies how to allocate memory for the domain process
+        on a NUMA host. ``memnode`` elements can specify memory allocation policies per each guest NUMA node. The definition
+        used in the dictionary can be found at :ref:`init-cpu-def`.
+
+        .. versionadded:: Aluminium
+
+        .. code-block:: python
+
+            {
+                'memory': {'mode': 'strict', 'nodeset': '0-11'},
+                'memnodes': {0: {'mode': 'strict', 'nodeset': 1}, 1: {'mode': 'preferred', 'nodeset': 2}}
+            }
+
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -455,6 +471,7 @@ def defined(
                     username=username,
                     password=password,
                     boot=boot,
+                    numatune=numatune,
                     test=__opts__["test"],
                     boot_dev=boot_dev,
                     stop_on_reboot=stop_on_reboot,
@@ -491,6 +508,7 @@ def defined(
                     username=username,
                     password=password,
                     boot=boot,
+                    numatune=numatune,
                     start=False,
                     boot_dev=boot_dev,
                     stop_on_reboot=stop_on_reboot,
@@ -528,6 +546,7 @@ def running(
     boot=None,
     boot_dev=None,
     stop_on_reboot=False,
+    numatune=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -671,6 +690,18 @@ def running(
 
         .. versionadded:: Aluminium
 
+    :param numatune:
+        The optional numatune element provides details of how to tune the performance of a NUMA host via controlling NUMA
+        policy for domain process. The optional ``memory`` element specifies how to allocate memory for the domain process
+        on a NUMA host. ``memnode`` elements can specify memory allocation policies per each guest NUMA node. The definition
+        used in the dictionary can be found at :ref:`init-cpu-def`.
+
+        To update any numatune parameters, specify the new value. To remove any ``numatune`` parameters, pass a None object,
+        for instance: 'numatune': ``None``. Please note that ``None`` is mapped to ``null`` in sls file, pass ``null`` in
+        sls file instead.
+
+        .. versionadded:: Aluminium
+
     .. rubric:: Example States
 
     Make sure an already-defined virtual machine called ``domain_name`` is running:
@@ -740,6 +771,7 @@ def running(
         update=update,
         boot_dev=boot_dev,
         stop_on_reboot=stop_on_reboot,
+        numatune=numatune,
         connection=connection,
         username=username,
         password=password,
