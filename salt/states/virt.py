@@ -33,8 +33,6 @@ except ImportError:
 
 __virtualname__ = "virt"
 
-log = logging.getLogger(__name__)
-
 
 def __virtual__():
     """
@@ -42,6 +40,7 @@ def __virtual__():
 
     :return:
     """
+
     if "virt.node_info" in __salt__:
         return __virtualname__
     return (False, "virt module could not be loaded")
@@ -332,19 +331,15 @@ def defined(
         but ``x86_64`` is prefed over ``i686``. Only used when creating a new virtual machine.
 
     :param boot:
-        Specifies kernel for the virtual machine, as well as boot parameters
-        for the virtual machine. This is an optionl parameter, and all of the
-        keys are optional within the dictionary. If a remote path is provided
-        to kernel or initrd, salt will handle the downloading of the specified
-        remote fild, and will modify the XML accordingly.
+        Specifies kernel, initial ramdisk and kernel command line parameters for the virtual machine.
+        This is an optional parameter, all of the keys are optional within the dictionary.
 
-        .. code-block:: python
+        Refer to :ref:`init-boot-def` for the complete boot parameters description.
 
-            {
-                'kernel': '/root/f8-i386-vmlinuz',
-                'initrd': '/root/f8-i386-initrd',
-                'cmdline': 'console=ttyS0 ks=http://example.com/f8-i386/os/'
-            }
+        To update any boot parameters, specify the new path for each. To remove any boot parameters,
+        pass a None object, for instance: 'kernel': ``None``.
+
+        .. versionadded:: 3000
 
     :param update: set to ``False`` to prevent updating a defined domain. (Default: ``True``)
 
@@ -461,7 +456,6 @@ def running(
     name,
     cpu=None,
     mem=None,
-    image=None,
     vm_type=None,
     disk_profile=None,
     disks=None,
@@ -487,23 +481,7 @@ def running(
 
     :param name: name of the virtual machine to run
     :param cpu: number of CPUs for the virtual machine to create
-    :param mem: Amount of memory to allocate to the virtual machine in MiB. Since 3002, a dictionary can be used to
-        contain detailed configuration which support memory allocation or tuning. Supported parameters are ``boot``,
-        ``current``, ``max``, ``slots``, ``hard_limit``, ``soft_limit``, ``swap_hard_limit`` and ``min_guarantee``. The
-        structure of the dictionary is documented in  :ref:`init-mem-def`. Both decimal and binary base are supported.
-        Detail unit specification is documented  in :ref:`virt-units`. Please note that the value for ``slots`` must be
-        an integer.
-
-        To remove any parameters, pass a None object, for instance: 'soft_limit': ``None``. Please note  that ``None``
-        is mapped to ``null`` in sls file, pass ``null`` in sls file instead.
-
-        .. code-block:: yaml
-
-            - mem:
-                hard_limit: null
-                soft_limit: null
-
-        .. versionchanged:: 3002
+    :param mem: amount of memory in MiB for the new virtual machine
     :param vm_type: force virtual machine type for the new VM. The default value is taken from
         the host capabilities. This could be useful for example to use ``'qemu'`` type instead
         of the ``'kvm'`` one.
@@ -648,32 +626,10 @@ def running(
 
     """
     merged_disks = disks
-    if image:
-        default_disks = [{"system": {}}]
-        disknames = ["system"]
-        if disk_profile:
-            disklist = copy.deepcopy(
-                __salt__["config.get"]("virt:disk", {}).get(disk_profile, default_disks)
-            )
-            disknames = disklist.keys()
-        disk = {"name": disknames[0], "image": image}
-        if merged_disks:
-            first_disk = [d for d in merged_disks if d.get("name") == disknames[0]]
-            if first_disk and "image" not in first_disk[0]:
-                first_disk[0]["image"] = image
-            else:
-                merged_disks.append(disk)
-        else:
-            merged_disks = [disk]
-        salt.utils.versions.warn_until(
-            "Sodium",
-            "'image' parameter has been deprecated. Rather use the 'disks' parameter "
-            "to override or define the image. 'image' will be removed in {version}.",
-        )
 
     if not update:
         salt.utils.versions.warn_until(
-            "Magnesium",
+            "Aluminium",
             "'update' parameter has been deprecated. Future behavior will be the one of update=True"
             "It will be removed in {version}.",
         )
@@ -1414,141 +1370,6 @@ def pool_running(
             is_running = info.get(name, {}).get("state", "stopped") == "running"
             if is_running:
                 if updated:
-                    action = "restarted"
-                    if not __opts__["test"]:
-                        __salt__["virt.pool_stop"](
-                            name,
-                            connection=connection,
-                            username=username,
-                            password=password,
-                        )
-                    # if the disk or LV group is already existing build will fail (issue #56454)
-                    if ptype in BUILDABLE_POOL_TYPES - {"disk", "logical"}:
-                        if not __opts__["test"]:
-                            __salt__["virt.pool_build"](
-                                name,
-                                connection=connection,
-                                username=username,
-                                password=password,
-                            )
-                        action = "built, {}".format(action)
-                else:
-                    action = "already running"
-                    result = True
-
-            if not is_running or updated or defined:
-                if not __opts__["test"]:
-                    __salt__["virt.pool_start"](
-                        name,
-                        connection=connection,
-                        username=username,
-                        password=password,
-                    )
-
-            comment = "Pool {}".format(name)
-            change = "Pool"
-            if name in ret["changes"]:
-                comment = "{},".format(ret["comment"])
-                change = "{},".format(ret["changes"][name])
-
-            if action != "already running":
-                ret["changes"][name] = "{} {}".format(change, action)
-
-            ret["comment"] = "{} {}".format(comment, action)
-            ret["result"] = result
-
-        except libvirt.libvirtError as err:
-            ret["comment"] = err.get_error_message()
-            ret["result"] = False
-
-    return ret
-
-
-def pool_running(
-    name,
-    ptype=None,
-    target=None,
-    permissions=None,
-    source=None,
-    transient=False,
-    autostart=True,
-    connection=None,
-    username=None,
-    password=None,
-):
-    """
-    Defines and starts a new pool with specified arguments.
-
-    .. versionadded:: 2019.2.0
-
-    :param ptype: libvirt pool type
-    :param target: full path to the target device or folder. (Default: ``None``)
-    :param permissions:
-        target permissions. See :ref:`pool-define-permissions` for more details on this structure.
-    :param source:
-        dictionary containing keys matching the ``source_*`` parameters in function
-        :func:`salt.modules.virt.pool_define`.
-    :param transient:
-        when set to ``True``, the pool will be automatically undefined after being stopped. (Default: ``False``)
-    :param autostart:
-        Whether to start the pool when booting the host. (Default: ``True``)
-    :param start:
-        When ``True``, define and start the pool, otherwise the pool will be left stopped.
-    :param connection: libvirt connection URI, overriding defaults
-    :param username: username to connect with, overriding defaults
-    :param password: password to connect with, overriding defaults
-
-    .. code-block:: yaml
-
-        pool_name:
-          virt.pool_running
-
-    .. code-block:: yaml
-
-        pool_name:
-          virt.pool_running:
-            - ptype: netfs
-            - target: /mnt/cifs
-            - permissions:
-                - mode: 0770
-                - owner: 1000
-                - group: 100
-            - source:
-                dir: samba_share
-                hosts:
-                  - one.example.com
-                  - two.example.com
-                format: cifs
-            - autostart: True
-
-    """
-    ret = pool_defined(
-        name,
-        ptype=ptype,
-        target=target,
-        permissions=permissions,
-        source=source,
-        transient=transient,
-        autostart=autostart,
-        connection=connection,
-        username=username,
-        password=password,
-    )
-    defined = name in ret["changes"] and ret["changes"][name].startswith("Pool defined")
-    updated = name in ret["changes"] and ret["changes"][name].startswith("Pool updated")
-
-    result = True if not __opts__["test"] else None
-    if ret["result"] is None or ret["result"]:
-        try:
-            info = __salt__["virt.pool_info"](
-                name, connection=connection, username=username, password=password
-            )
-            action = "started"
-            # In the corner case where test=True and the pool wasn't defined
-            # we may get not get our pool in the info dict and that is normal.
-            is_running = info.get(name, {}).get("state", "stopped") == "running"
-            if is_running:
-                if updated:
                     action = "built, restarted"
                     if not __opts__["test"]:
                         __salt__["virt.pool_stop"](
@@ -1798,7 +1619,7 @@ def volume_defined(
                 format: raw
             - nocow: True
 
-    .. versionadded:: 3001
+    .. versionadded:: Sodium
     """
     ret = {"name": name, "changes": {}, "result": True, "comment": ""}
 
