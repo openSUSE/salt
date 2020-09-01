@@ -628,7 +628,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         diskp = virt._disk_profile(self.mock_conn, "default", "kvm", [], "hello")
         nicp = virt._nic_profile("default", "kvm")
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "kvm", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "kvm",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         self.assertEqual(root.attrib["type"], "kvm")
@@ -661,7 +669,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         diskp = virt._disk_profile(self.mock_conn, "default", "vmware", [], "hello")
         nicp = virt._nic_profile("default", "vmware")
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "vmware", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "vmware",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         self.assertEqual(root.attrib["type"], "vmware")
@@ -758,7 +774,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             )
             nicp = virt._nic_profile("noeffect", "vmware")
             xml_data = virt._gen_xml(
-                self.mock_conn, "hello", 1, 512, diskp, nicp, "vmware", "hvm", "x86_64",
+                self.mock_conn,
+                "hello",
+                1,
+                512,
+                diskp,
+                nicp,
+                "vmware",
+                "hvm",
+                "x86_64",
             )
             root = ET.fromstring(xml_data)
             self.assertEqual(root.attrib["type"], "vmware")
@@ -791,7 +815,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             diskp = virt._disk_profile(self.mock_conn, "noeffect", "kvm", [], "hello")
             nicp = virt._nic_profile("noeffect", "kvm")
             xml_data = virt._gen_xml(
-                self.mock_conn, "hello", 1, 512, diskp, nicp, "kvm", "hvm", "x86_64",
+                self.mock_conn,
+                "hello",
+                1,
+                512,
+                diskp,
+                nicp,
+                "kvm",
+                "hvm",
+                "x86_64",
             )
             root = ET.fromstring(xml_data)
             self.assertEqual(root.attrib["type"], "kvm")
@@ -974,7 +1006,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         )
         nicp = virt._nic_profile(None, "kvm")
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "kvm", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "kvm",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         disk = root.findall(".//disk")[0]
@@ -1023,7 +1063,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             "test-vm",
         )
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "kvm", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "kvm",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         disk = root.findall(".//disk")[0]
@@ -1083,7 +1131,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             "test-vm",
         )
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "kvm", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "kvm",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         self.assertDictEqual(
@@ -1131,7 +1187,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             "test-vm",
         )
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "kvm", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "kvm",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         disk = root.findall(".//disk")[0]
@@ -1140,6 +1204,79 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         self.assertEqual("test-vdb", source.attrib["pool"])
         self.assertEqual("vdb2", source.attrib["volume"])
         self.assertEqual("raw", disk.find("driver").get("type"))
+
+    def test_get_xml_volume_xen_dir(self):
+        """
+        Test virt._gen_xml generating disks for a Xen hypervisor
+        """
+        self.mock_conn.listStoragePools.return_value = ["default"]
+        pool_mock = MagicMock()
+        pool_mock.XMLDesc.return_value = "<pool type='dir'/>"
+        volume_xml = "<volume><target><path>/path/to/images/hello_system</path></target></volume>"
+        pool_mock.storageVolLookupByName.return_value.XMLDesc.return_value = volume_xml
+        self.mock_conn.storagePoolLookupByName.return_value = pool_mock
+        diskp = virt._disk_profile(
+            self.mock_conn,
+            None,
+            "xen",
+            [{"name": "system", "pool": "default"}],
+            "hello",
+        )
+        xml_data = virt._gen_xml(
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            [],
+            "xen",
+            "hvm",
+            "x86_64",
+        )
+        root = ET.fromstring(xml_data)
+        disk = root.findall(".//disk")[0]
+        self.assertEqual(disk.attrib["type"], "file")
+        self.assertEqual(
+            "/path/to/images/hello_system", disk.find("source").attrib["file"]
+        )
+
+    def test_get_xml_volume_xen_block(self):
+        """
+        Test virt._gen_xml generating disks for a Xen hypervisor
+        """
+        self.mock_conn.listStoragePools.return_value = ["default"]
+        pool_mock = MagicMock()
+        pool_mock.listVolumes.return_value = ["vol01"]
+        volume_xml = "<volume><target><path>/dev/to/vol01</path></target></volume>"
+        pool_mock.storageVolLookupByName.return_value.XMLDesc.return_value = volume_xml
+        self.mock_conn.storagePoolLookupByName.return_value = pool_mock
+
+        for pool_type in ["logical", "disk", "iscsi", "scsi"]:
+            pool_mock.XMLDesc.return_value = "<pool type='{}'><source><device path='/dev/sda'/></source></pool>".format(
+                pool_type
+            )
+            diskp = virt._disk_profile(
+                self.mock_conn,
+                None,
+                "xen",
+                [{"name": "system", "pool": "default", "source_file": "vol01"}],
+                "hello",
+            )
+            xml_data = virt._gen_xml(
+                self.mock_conn,
+                "hello",
+                1,
+                512,
+                diskp,
+                [],
+                "xen",
+                "hvm",
+                "x86_64",
+            )
+            root = ET.fromstring(xml_data)
+            disk = root.findall(".//disk")[0]
+            self.assertEqual(disk.attrib["type"], "block")
+            self.assertEqual("/dev/to/vol01", disk.find("source").attrib["dev"])
 
     def test_gen_xml_cdrom(self):
         """
@@ -1171,7 +1308,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         )
         nicp = virt._nic_profile(None, "kvm")
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "kvm", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "kvm",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         disk = root.findall(".//disk")[1]
@@ -1200,7 +1345,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         diskp = virt._disk_profile(self.mock_conn, "default", "vmware", [], "hello")
         nicp = virt._nic_profile("default", "vmware")
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "vmware", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "vmware",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         controllers = root.findall(".//devices/controller")
@@ -1215,7 +1368,15 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         diskp = virt._disk_profile(self.mock_conn, "default", "kvm", [], "hello")
         nicp = virt._nic_profile("default", "kvm")
         xml_data = virt._gen_xml(
-            self.mock_conn, "hello", 1, 512, diskp, nicp, "kvm", "hvm", "x86_64",
+            self.mock_conn,
+            "hello",
+            1,
+            512,
+            diskp,
+            nicp,
+            "kvm",
+            "hvm",
+            "x86_64",
         )
         root = ET.fromstring(xml_data)
         controllers = root.findall(".//devices/controller")
@@ -1704,7 +1865,8 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
                             for call in create_calls
                         ]
                         self.assertEqual(
-                            ["test vm_system", "test vm_test"], vol_names,
+                            ["test vm_system", "test vm_test"],
+                            vol_names,
                         )
 
                         stream_mock.sendAll.assert_called_once()
@@ -3680,7 +3842,8 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             "44454c4c-3400-105a-8033-b3c04f4b344a", caps["host"]["host"]["uuid"]
         )
         self.assertEqual(
-            {"qemu", "kvm"}, {domainCaps["domain"] for domainCaps in caps["domains"]},
+            {"qemu", "kvm"},
+            {domainCaps["domain"] for domainCaps in caps["domains"]},
         )
 
     def test_network_tag(self):
