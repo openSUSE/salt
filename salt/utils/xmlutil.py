@@ -25,7 +25,7 @@ def _to_dict(xmltree):
     """
     Converts an XML ElementTree to a dictionary that only contains items.
     This is the default behavior in version 2017.7. This will default to prevent
-    unexpected parsing issues on modules dependent on this.
+    unexpected parsing issues on modules dependant on this.
     """
     # If this object has no children, the for..loop below will return nothing
     # for it, so just return a single dict representing it.
@@ -298,7 +298,7 @@ def change_xml(doc, data, mapping):
                 if convert_fn:
                     new_value = convert_fn(new_value)
 
-                if str(current_value) != str(new_value):
+                if current_value != new_value:
                     set_fn(node, new_value)
                     need_update = True
             else:

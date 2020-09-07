@@ -94,17 +94,13 @@ from xml.sax import saxutils
 import jinja2.exceptions
 import salt.utils.files
 import salt.utils.json
-import salt.utils.network
 import salt.utils.path
 import salt.utils.stringutils
 import salt.utils.templates
-import salt.utils.validate.net
-import salt.utils.versions
 import salt.utils.xmlutil as xmlutil
 import salt.utils.yaml
 from salt._compat import ipaddress
 from salt.exceptions import CommandExecutionError, SaltInvocationError
-from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
 from salt.ext.six.moves.urllib.parse import urlparse, urlunparse
 from salt.utils.virt import check_remote, download_remote
@@ -647,6 +643,7 @@ def _gen_xml(
     arch,
     graphics=None,
     boot=None,
+    boot_dev=None,
     **kwargs
 ):
     """
@@ -680,14 +677,16 @@ def _gen_xml(
             graphics = None
     context["graphics"] = graphics
 
-    if "boot_dev" in kwargs:
-        context["boot_dev"] = []
-        for dev in kwargs["boot_dev"].split():
-            context["boot_dev"].append(dev)
-    else:
-        context["boot_dev"] = ["hd"]
+    context["boot_dev"] = boot_dev.split() if boot_dev is not None else ["hd"]
 
     context["boot"] = boot if boot else {}
+
+    # if efi parameter is specified, prepare os_attrib
+    efi_value = context["boot"].get("efi", None) if boot else None
+    if efi_value is True:
+        context["boot"]["os_attrib"] = "firmware='efi'"
+    elif efi_value is not None and type(efi_value) != bool:
+        raise SaltInvocationError("Invalid efi value")
 
     if os_type == "xen":
         # Compute the Xen PV boot method
@@ -1519,17 +1518,24 @@ def _handle_remote_boot_params(orig_boot):
     new_boot = orig_boot.copy()
     keys = orig_boot.keys()
     cases = [
+        {"efi"},
+        {"kernel", "initrd", "efi"},
+        {"kernel", "initrd", "cmdline", "efi"},
         {"loader", "nvram"},
         {"kernel", "initrd"},
         {"kernel", "initrd", "cmdline"},
-        {"loader", "nvram", "kernel", "initrd"},
-        {"loader", "nvram", "kernel", "initrd", "cmdline"},
+        {"kernel", "initrd", "loader", "nvram"},
+        {"kernel", "initrd", "cmdline", "loader", "nvram"},
     ]
 
     try:
         if keys in cases:
             for key in keys:
-                if orig_boot.get(key) is not None and check_remote(orig_boot.get(key)):
+                if key == "efi" and type(orig_boot.get(key)) == bool:
+                    new_boot[key] = orig_boot.get(key)
+                elif orig_boot.get(key) is not None and check_remote(
+                    orig_boot.get(key)
+                ):
                     if saltinst_dir is None:
                         os.makedirs(CACHE_DIR)
                         saltinst_dir = CACHE_DIR
@@ -1537,10 +1543,39 @@ def _handle_remote_boot_params(orig_boot):
             return new_boot
         else:
             raise SaltInvocationError(
-                "Invalid boot parameters, (kernel, initrd) or/and (loader, nvram) must be both present"
+                "Invalid boot parameters,It has to follow this combination: [(kernel, initrd) or/and cmdline] or/and [(loader, nvram) or efi]"
             )
     except Exception as err:  # pylint: disable=broad-except
         raise err
+
+
+def _handle_efi_param(boot, desc):
+    """
+    Checks if boot parameter contains efi boolean value, if so, handles the firmware attribute.
+    :param boot: The boot parameters passed to the init or update functions.
+    :param desc: The XML description of that domain.
+    :return: A boolean value.
+    """
+    efi_value = boot.get("efi", None) if boot else None
+    parent_tag = desc.find("os")
+    os_attrib = parent_tag.attrib
+
+    # newly defined vm without running, loader tag might not be filled yet
+    if efi_value is False and os_attrib != {}:
+        parent_tag.attrib.pop("firmware", None)
+        return True
+
+    # check the case that loader tag might be present. This happens after the vm ran
+    elif type(efi_value) == bool and os_attrib == {}:
+        if efi_value is True and parent_tag.find("loader") is None:
+            parent_tag.set("firmware", "efi")
+        if efi_value is False and parent_tag.find("loader") is not None:
+            parent_tag.remove(parent_tag.find("loader"))
+            parent_tag.remove(parent_tag.find("nvram"))
+        return True
+    elif type(efi_value) != bool:
+        raise SaltInvocationError("Invalid efi value")
+    return False
 
 
 def init(
@@ -1563,6 +1598,7 @@ def init(
     os_type=None,
     arch=None,
     boot=None,
+    boot_dev=None,
     **kwargs
 ):
     """
@@ -1632,7 +1668,8 @@ def init(
         This is an optional parameter, all of the keys are optional within the dictionary. The structure of
         the dictionary is documented in :ref:`init-boot-def`. If a remote path is provided to kernel or initrd,
         salt will handle the downloading of the specified remote file and modify the XML accordingly.
-        To boot VM with UEFI, specify loader and nvram path.
+        To boot VM with UEFI, specify loader and nvram path or specify 'efi': ``True`` if your libvirtd version
+        is >= 5.2.0 and QEMU >= 3.0.0.
 
         .. versionadded:: 3000
 
@@ -1645,6 +1682,12 @@ def init(
                 'loader': '/usr/share/OVMF/OVMF_CODE.fd',
                 'nvram': '/usr/share/OVMF/OVMF_VARS.ms.fd'
             }
+
+    :param boot_dev:
+        Space separated list of devices to boot from sorted by decreasing priority.
+        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+
+        By default, the value will ``"hd"``.
 
     .. _init-boot-def:
 
@@ -1670,6 +1713,11 @@ def init(
         The path to the UEFI data template. The file will be copied when creating the virtual machine.
 
         .. versionadded:: sodium
+
+    efi
+       A boolean value.
+
+       .. versionadded:: sodium
 
     .. _init-nic-def:
 
@@ -1855,6 +1903,8 @@ def init(
                     for x in y
                 }
             )
+            if len(hypervisors) == 0:
+                raise SaltInvocationError("No supported hypervisors were found")
             virt_hypervisor = "kvm" if "kvm" in hypervisors else hypervisors[0]
 
         # esxi used to be a possible value for the hypervisor: map it to vmware since it's the same
@@ -1962,8 +2012,10 @@ def init(
             arch,
             graphics,
             boot,
+            boot_dev,
             **kwargs
         )
+        log.debug("New virtual machine definition: %s", vm_xml)
         conn.defineXML(vm_xml)
     except libvirt.libvirtError as err:
         conn.close()
@@ -2189,6 +2241,7 @@ def update(
     live=True,
     boot=None,
     test=False,
+    boot_dev=None,
     **kwargs
 ):
     """
@@ -2248,10 +2301,27 @@ def update(
 
         Refer to :ref:`init-boot-def` for the complete boot parameter description.
 
-        To update any boot parameters, specify the new path for each. To remove any boot parameters,
-        pass a None object, for instance: 'kernel': ``None``.
+        To update any boot parameters, specify the new path for each. To remove any boot parameters, pass ``None`` object,
+        for instance: 'kernel': ``None``. To switch back to BIOS boot, specify ('loader': ``None`` and 'nvram': ``None``)
+        or 'efi': ``False``. Please note that ``None`` is mapped to ``null`` in sls file, pass ``null`` in sls file instead.
+
+        SLS file Example:
+
+        .. code-block:: yaml
+
+            - boot:
+                loader: null
+                nvram: null
 
         .. versionadded:: 3000
+
+    :param boot_dev:
+        Space separated list of devices to boot from sorted by decreasing priority.
+        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+
+        By default, the value will ``"hd"``.
+
+        .. versionadded:: Magnesium
 
     :param test: run in dry-run mode if set to True
 
@@ -2327,67 +2397,54 @@ def update(
         cpu_node.set("current", str(cpu))
         need_update = True
 
+    def _set_loader(node, value):
+        salt.utils.xmlutil.set_node_text(node, value)
+        if value is not None:
+            node.set("readonly", "yes")
+            node.set("type", "pflash")
+
+    def _set_nvram(node, value):
+        node.set("template", value)
+
+    def _set_with_mib_unit(node, value):
+        node.text = str(value)
+        node.set("unit", "MiB")
+
     # Update the kernel boot parameters
-    boot_tags = ["kernel", "initrd", "cmdline", "loader", "nvram"]
-    parent_tag = desc.find("os")
+    params_mapping = [
+        {"path": "boot:kernel", "xpath": "os/kernel"},
+        {"path": "boot:initrd", "xpath": "os/initrd"},
+        {"path": "boot:cmdline", "xpath": "os/cmdline"},
+        {"path": "boot:loader", "xpath": "os/loader", "set": _set_loader},
+        {"path": "boot:nvram", "xpath": "os/nvram", "set": _set_nvram},
+        # Update the memory, note that libvirt outputs all memory sizes in KiB
+        {
+            "path": "mem",
+            "xpath": "memory",
+            "get": lambda n: int(n.text) / 1024,
+            "set": _set_with_mib_unit,
+        },
+        {
+            "path": "mem",
+            "xpath": "currentMemory",
+            "get": lambda n: int(n.text) / 1024,
+            "set": _set_with_mib_unit,
+        },
+        {
+            "path": "boot_dev:{dev}",
+            "xpath": "os/boot[$dev]",
+            "get": lambda n: n.get("dev"),
+            "set": lambda n, v: n.set("dev", v),
+            "del": salt.utils.xmlutil.del_attribute("dev"),
+        },
+    ]
 
-    # We need to search for each possible subelement, and update it.
-    for tag in boot_tags:
-        # The Existing Tag...
-        found_tag = parent_tag.find(tag)
-
-        # The new value
-        boot_tag_value = boot.get(tag, None) if boot else None
-
-        # Existing tag is found and values don't match
-        if found_tag is not None and found_tag.text != boot_tag_value:
-
-            # If the existing tag is found, but the new value is None
-            # remove it. If the existing tag is found, and the new value
-            # doesn't match update it. In either case, mark for update.
-            if boot_tag_value is None and boot is not None and parent_tag is not None:
-                parent_tag.remove(found_tag)
-            else:
-                found_tag.text = boot_tag_value
-
-            # If the existing tag is loader or nvram, we need to update the corresponding attribute
-            if found_tag.tag == "loader" and boot_tag_value is not None:
-                found_tag.set("readonly", "yes")
-                found_tag.set("type", "pflash")
-
-            if found_tag.tag == "nvram" and boot_tag_value is not None:
-                found_tag.set("template", found_tag.text)
-                found_tag.text = None
-
-            need_update = True
-
-            # Need to check for parent tag, and add it if it does not exist.
-            # Add a subelement and set the value to the new value, and then
-            # mark for update.
-            if parent_tag is not None:
-                child_tag = ElementTree.SubElement(parent_tag, tag)
-            else:
-                new_parent_tag = ElementTree.Element("os")
-                child_tag = ElementTree.SubElement(new_parent_tag, tag)
-
-            child_tag.text = boot_tag_value
-
-            # If the newly created tag is loader or nvram, we need to update the corresponding attribute
-            if child_tag.tag == "loader":
-                child_tag.set("readonly", "yes")
-                child_tag.set("type", "pflash")
-
-            if child_tag.tag == "nvram":
-                child_tag.set("template", child_tag.text)
-                child_tag.text = None
-
-    # Update the memory, note that libvirt outputs all memory sizes in KiB
-    for mem_node_name in ["memory", "currentMemory"]:
-        mem_node = desc.find(mem_node_name)
-        if mem and int(mem_node.text) != mem * 1024:
-            mem_node.text = str(mem)
-            mem_node.set("unit", "MiB")
-            need_update = True
+    data = {k: v for k, v in locals().items() if bool(v)}
+    if boot_dev:
+        data["boot_dev"] = {i + 1: dev for i, dev in enumerate(boot_dev.split())}
+    need_update = need_update or salt.utils.xmlutil.change_xml(
+        desc, data, params_mapping
+    )
 
     # Update the XML definition with the new disks and diff changes
     devices_node = desc.find("devices")
@@ -2434,9 +2491,9 @@ def update(
                         _disk_volume_create(conn, all_disks[idx])
 
             if not test:
-                conn.defineXML(
-                    salt.utils.stringutils.to_str(ElementTree.tostring(desc))
-                )
+                xml_desc = ElementTree.tostring(desc)
+                log.debug("Update virtual machine definition: %s", xml_desc)
+                conn.defineXML(salt.utils.stringutils.to_str(xml_desc))
             status["definition"] = True
         except libvirt.libvirtError as err:
             conn.close()
@@ -3218,24 +3275,19 @@ def get_profiles(hypervisor=None, **kwargs):
             for x in y
         }
     )
-    default_hypervisor = "kvm" if "kvm" in hypervisors else hypervisors[0]
+    if len(hypervisors) == 0:
+        raise SaltInvocationError("No supported hypervisors were found")
 
     if not hypervisor:
-        hypervisor = default_hypervisor
+        hypervisor = "kvm" if "kvm" in hypervisors else hypervisors[0]
     virtconf = __salt__["config.get"]("virt", {})
     for typ in ["disk", "nic"]:
         _func = getattr(sys.modules[__name__], "_{}_profile".format(typ))
-        ret[typ] = {
-            "default": _func(
-                "default", hypervisor if hypervisor else default_hypervisor
-            )
-        }
+        ret[typ] = {"default": _func("default", hypervisor)}
         if typ in virtconf:
             ret.setdefault(typ, {})
             for prf in virtconf[typ]:
-                ret[typ][prf] = _func(
-                    prf, hypervisor if hypervisor else default_hypervisor
-                )
+                ret[typ][prf] = _func(prf, hypervisor)
     return ret
 
 
@@ -4043,7 +4095,7 @@ def purge(vm_, dirs=False, removables=False, **kwargs):
             directories.add(os.path.dirname(disks[disk]["file"]))
         else:
             # We may have a volume to delete here
-            matcher = re.match("^(?P<pool>[^/]+)/(?P<volume>.*)$", disks[disk]["file"],)
+            matcher = re.match("^(?P<pool>[^/]+)/(?P<volume>.*)$", disks[disk]["file"])
             if matcher:
                 pool_name = matcher.group("pool")
                 pool = None
@@ -5431,7 +5483,7 @@ def list_networks(**kwargs):
 
 def network_info(name=None, **kwargs):
     """
-    Return informations on a virtual network provided its name.
+    Return information on a virtual network provided its name.
 
     :param name: virtual network name
     :param connection: libvirt connection URI, overriding defaults
@@ -6028,15 +6080,19 @@ def _pool_set_secret(
         if secret_type:
             # Get the previously defined secret if any
             secret = None
-            if usage:
-                usage_type = (
-                    libvirt.VIR_SECRET_USAGE_TYPE_CEPH
-                    if secret_type == "ceph"
-                    else libvirt.VIR_SECRET_USAGE_TYPE_ISCSI
-                )
-                secret = conn.secretLookupByUsage(usage_type, usage)
-            elif uuid:
-                secret = conn.secretLookupByUUIDString(uuid)
+            try:
+                if usage:
+                    usage_type = (
+                        libvirt.VIR_SECRET_USAGE_TYPE_CEPH
+                        if secret_type == "ceph"
+                        else libvirt.VIR_SECRET_USAGE_TYPE_ISCSI
+                    )
+                    secret = conn.secretLookupByUsage(usage_type, usage)
+                elif uuid:
+                    secret = conn.secretLookupByUUIDString(uuid)
+            except libvirt.libvirtError as err:
+                # For some reason the secret has been removed. Don't fail since we'll recreate it
+                log.info("Secret not found: %s", err.get_error_message())
 
             # Create secret if needed
             if not secret:
@@ -6288,7 +6344,7 @@ def list_pools(**kwargs):
 
 def pool_info(name=None, **kwargs):
     """
-    Return informations on a storage pool provided its name.
+    Return information on a storage pool provided its name.
 
     :param name: libvirt storage pool name
     :param connection: libvirt connection URI, overriding defaults
@@ -6505,22 +6561,6 @@ def pool_delete(name, **kwargs):
     conn = __get_conn(**kwargs)
     try:
         pool = conn.storagePoolLookupByName(name)
-        desc = ElementTree.fromstring(pool.XMLDesc())
-
-        # Is there a secret that we generated and would need to be removed?
-        # Don't remove the other secrets
-        auth_node = desc.find("source/auth")
-        if auth_node is not None:
-            auth_types = {
-                "ceph": libvirt.VIR_SECRET_USAGE_TYPE_CEPH,
-                "iscsi": libvirt.VIR_SECRET_USAGE_TYPE_ISCSI,
-            }
-            secret_type = auth_types[auth_node.get("type")]
-            secret_usage = auth_node.find("secret").get("usage")
-            if secret_type and "pool_{}".format(name) == secret_usage:
-                secret = conn.secretLookupByUsage(secret_type, secret_usage)
-                secret.undefine()
-
         return not bool(pool.delete(libvirt.VIR_STORAGE_POOL_DELETE_NORMAL))
     finally:
         conn.close()

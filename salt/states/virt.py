@@ -33,6 +33,8 @@ except ImportError:
 
 __virtualname__ = "virt"
 
+log = logging.getLogger(__name__)
+
 
 def __virtual__():
     """
@@ -285,6 +287,7 @@ def defined(
     arch=None,
     boot=None,
     update=True,
+    boot_dev=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -345,6 +348,14 @@ def defined(
 
         .. deprecated:: sodium
 
+    :param boot_dev:
+        Space separated list of devices to boot from sorted by decreasing priority.
+        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+
+        By default, the value will ``"hd"``.
+
+        .. versionadded:: Magnesium
+
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -355,6 +366,7 @@ def defined(
           virt.defined:
             - cpu: 2
             - mem: 2048
+            - boot_dev: network hd
             - disk_profile: prod
             - disks:
               - name: system
@@ -407,6 +419,7 @@ def defined(
                     password=password,
                     boot=boot,
                     test=__opts__["test"],
+                    boot_dev=boot_dev,
                 )
             ret["changes"][name] = status
             if not status.get("definition"):
@@ -441,6 +454,7 @@ def defined(
                     password=password,
                     boot=boot,
                     start=False,
+                    boot_dev=boot_dev,
                 )
             ret["changes"][name] = {"definition": True}
             ret["comment"] = "Domain {} defined".format(name)
@@ -473,6 +487,7 @@ def running(
     os_type=None,
     arch=None,
     boot=None,
+    boot_dev=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -584,6 +599,14 @@ def running(
 
         .. versionadded:: 3000
 
+    :param boot_dev:
+        Space separated list of devices to boot from sorted by decreasing priority.
+        Values can be ``hd``, ``fd``, ``cdrom`` or ``network``.
+
+        By default, the value will ``"hd"``.
+
+        .. versionadded:: Magnesium
+
     .. rubric:: Example States
 
     Make sure an already-defined virtual machine called ``domain_name`` is running:
@@ -651,6 +674,7 @@ def running(
         arch=arch,
         boot=boot,
         update=update,
+        boot_dev=boot_dev,
         connection=connection,
         username=username,
         password=password,
@@ -1218,14 +1242,24 @@ def pool_defined(
 
                 action = ""
                 if info[name]["state"] != "running":
-                    if not __opts__["test"]:
-                        __salt__["virt.pool_build"](
-                            name,
-                            connection=connection,
-                            username=username,
-                            password=password,
-                        )
-                    action = ", built"
+                    if ptype in BUILDABLE_POOL_TYPES:
+                        if not __opts__["test"]:
+                            # Storage pools build like disk or logical will fail if the disk or LV group
+                            # was already existing. Since we can't easily figure that out, just log the
+                            # possible libvirt error.
+                            try:
+                                __salt__["virt.pool_build"](
+                                    name,
+                                    connection=connection,
+                                    username=username,
+                                    password=password,
+                                )
+                            except libvirt.libvirtError as err:
+                                log.warning(
+                                    "Failed to build libvirt storage pool: %s",
+                                    err.get_error_message(),
+                                )
+                        action = ", built"
 
                 action = (
                     "{}, autostart flag changed".format(action)
@@ -1261,9 +1295,22 @@ def pool_defined(
                     password=password,
                 )
 
-                __salt__["virt.pool_build"](
-                    name, connection=connection, username=username, password=password
-                )
+                if ptype in BUILDABLE_POOL_TYPES:
+                    # Storage pools build like disk or logical will fail if the disk or LV group
+                    # was already existing. Since we can't easily figure that out, just log the
+                    # possible libvirt error.
+                    try:
+                        __salt__["virt.pool_build"](
+                            name,
+                            connection=connection,
+                            username=username,
+                            password=password,
+                        )
+                    except libvirt.libvirtError as err:
+                        log.warning(
+                            "Failed to build libvirt storage pool: %s",
+                            err.get_error_message(),
+                        )
             if needs_autostart:
                 ret["changes"][name] = "Pool defined, marked for autostart"
                 ret["comment"] = "Pool {} defined, marked for autostart".format(name)
@@ -1370,7 +1417,7 @@ def pool_running(
             is_running = info.get(name, {}).get("state", "stopped") == "running"
             if is_running:
                 if updated:
-                    action = "built, restarted"
+                    action = "restarted"
                     if not __opts__["test"]:
                         __salt__["virt.pool_stop"](
                             name,
@@ -1378,13 +1425,16 @@ def pool_running(
                             username=username,
                             password=password,
                         )
-                    if not __opts__["test"]:
-                        __salt__["virt.pool_build"](
-                            name,
-                            connection=connection,
-                            username=username,
-                            password=password,
-                        )
+                    # if the disk or LV group is already existing build will fail (issue #56454)
+                    if ptype in BUILDABLE_POOL_TYPES - {"disk", "logical"}:
+                        if not __opts__["test"]:
+                            __salt__["virt.pool_build"](
+                                name,
+                                connection=connection,
+                                username=username,
+                                password=password,
+                            )
+                        action = "built, {}".format(action)
                 else:
                     action = "already running"
                     result = True
