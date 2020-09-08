@@ -301,7 +301,7 @@ def change_xml(doc, data, mapping):
                 if convert_fn:
                     new_value = convert_fn(new_value)
 
-                if current_value != new_value:
+                if six.text_type(current_value) != six.text_type(new_value):
                     set_fn(node, new_value)
                     need_update = True
             else:
