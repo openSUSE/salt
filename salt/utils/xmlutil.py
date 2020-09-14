@@ -9,6 +9,7 @@ from xml.etree import ElementTree
 
 # Import salt libs
 import salt.utils.data
+from salt.ext import six
 
 
 def _conv_name(x):
@@ -147,7 +148,7 @@ def set_node_text(node, value):
     :param node: the node to set the text to
     :param value: the value to set
     """
-    node.text = str(value)
+    node.text = six.text_type(value)
 
 
 def clean_node(parent_map, node, ignored=None):
