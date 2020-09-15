@@ -4,6 +4,7 @@ Functions for manipulating, inspecting, or otherwise working with data types
 and data structures.
 """
 
+from __future__ import absolute_import, print_function, unicode_literals
 
 # Import Python libs
 import copy
@@ -145,7 +146,7 @@ def compare_dicts(old=None, new=None):
     dict describing the changes that were made.
     """
     ret = {}
-    for key in set(new or {}).union(old or {}):
+    for key in set((new or {})).union((old or {})):
         if key not in old:
             # New key
             ret[key] = {"old": "", "new": new[key]}

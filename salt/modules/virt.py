@@ -88,8 +88,6 @@ import string  # pylint: disable=deprecated-module
 import subprocess
 import sys
 import time
-from xml.etree import ElementTree
-from xml.sax import saxutils
 
 # Import third party libs
 import jinja2.exceptions
@@ -104,6 +102,8 @@ import salt.utils.templates
 import salt.utils.xmlutil as xmlutil
 import salt.utils.yaml
 from salt._compat import ipaddress
+from salt._compat import ElementTree
+from salt._compat import saxutils
 from salt.exceptions import CommandExecutionError, SaltInvocationError
 from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
@@ -1521,7 +1521,7 @@ def _handle_remote_boot_params(orig_boot):
     """
     saltinst_dir = None
     new_boot = orig_boot.copy()
-    keys = orig_boot.keys()
+    keys = set(orig_boot.keys())
     cases = [
         {"efi"},
         {"kernel", "initrd", "efi"},
@@ -2548,7 +2548,7 @@ def update(
                     # Attaching device
                     if source_file:
                         ElementTree.SubElement(
-                            updated_disk, "source", attrib={"file": source_file}
+                            updated_disk, "source", file=source_file
                         )
 
             changes["disk"]["new"] = new_disks
@@ -6626,7 +6626,7 @@ def volume_infos(pool=None, volume=None, **kwargs):
             }
             for pool_obj in pools
         }
-        return {pool_name: volumes for (pool_name, volumes) in six.itermitems(vols) if volumes}
+        return {pool_name: volumes for (pool_name, volumes) in six.iteritems(vols) if volumes}
     except libvirt.libvirtError as err:
         log.debug("Silenced libvirt error: %s", six.text_type(err))
     finally:
