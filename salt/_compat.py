@@ -39,6 +39,7 @@ except Exception:  # pylint: disable=broad-except
 # True if we are running on Python 3.
 PY3 = sys.version_info.major == 3
 
+import xml.sax.saxutils as saxutils
 
 if PY3:
     import builtins

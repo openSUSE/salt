@@ -88,8 +88,6 @@ import string  # pylint: disable=deprecated-module
 import subprocess
 import sys
 import time
-from xml.etree import ElementTree
-from xml.sax import saxutils
 
 # Import third party libs
 import jinja2.exceptions
@@ -104,7 +102,10 @@ import salt.utils.templates
 import salt.utils.xmlutil as xmlutil
 import salt.utils.yaml
 from salt._compat import ipaddress
+from salt._compat import ElementTree
+from salt._compat import saxutils
 from salt.exceptions import CommandExecutionError, SaltInvocationError
+from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
 from salt.ext.six.moves.urllib.parse import urlparse, urlunparse
 from salt.utils.virt import check_remote, download_remote
@@ -657,8 +658,8 @@ def _gen_xml(
     context = {
         "hypervisor": hypervisor,
         "name": name,
-        "cpu": str(cpu),
-        "mem": str(mem),
+        "cpu": six.text_type(cpu),
+        "mem": six.text_type(mem),
     }
     if hypervisor in ["qemu", "kvm"]:
         context["controller_model"] = False
@@ -722,7 +723,7 @@ def _gen_xml(
             "target_dev": _get_disk_target(targets, len(diskp), prefix),
             "disk_bus": disk["model"],
             "format": disk.get("format", "raw"),
-            "index": str(i),
+            "index": six.text_type(i),
         }
         targets.append(disk_context["target_dev"])
         if disk.get("source_file"):
@@ -827,8 +828,8 @@ def _gen_vol_xml(
         "name": name,
         "target": {"permissions": permissions, "nocow": nocow},
         "format": format,
-        "size": str(size),
-        "allocation": str(int(allocation) * 1024),
+        "size": six.text_type(size),
+        "allocation": six.text_type(int(allocation) * 1024),
         "backingStore": backing_store,
     }
     fn_ = "libvirt_volume.jinja"
@@ -1253,7 +1254,7 @@ def _disk_profile(conn, profile, hypervisor, disks, vm_name):
         )
 
         # Transform the list to remove one level of dictionary and add the name as a property
-        disklist = [dict(d, name=name) for disk in disklist for name, d in disk.items()]
+        disklist = [dict(d, name=name) for disk in disklist for name, d in six.iteritems(disk)]
 
     # Merge with the user-provided disks definitions
     if disks:
@@ -1274,7 +1275,7 @@ def _disk_profile(conn, profile, hypervisor, disks, vm_name):
             disk["model"] = "ide"
 
         # Add the missing properties that have defaults
-        for key, val in overlay.items():
+        for key, val in six.iteritems(overlay):
             if key not in disk:
                 disk[key] = val
 
@@ -1422,7 +1423,7 @@ def _complete_nics(interfaces, hypervisor):
         """
         Apply the default overlay to attributes
         """
-        for key, value in overlays[hypervisor].items():
+        for key, value in six.iteritems(overlays[hypervisor]):
             if key not in attributes or not attributes[key]:
                 attributes[key] = value
 
@@ -1449,7 +1450,7 @@ def _nic_profile(profile_name, hypervisor):
         """
         Append dictionary profile data to interfaces list
         """
-        for interface_name, attributes in profile_dict.items():
+        for interface_name, attributes in six.iteritems(profile_dict):
             attributes["name"] = interface_name
             interfaces.append(attributes)
 
@@ -1520,7 +1521,7 @@ def _handle_remote_boot_params(orig_boot):
     """
     saltinst_dir = None
     new_boot = orig_boot.copy()
-    keys = orig_boot.keys()
+    keys = set(orig_boot.keys())
     cases = [
         {"efi"},
         {"kernel", "initrd", "efi"},
@@ -2380,8 +2381,8 @@ def update(
     # Update the cpu
     cpu_node = desc.find("vcpu")
     if cpu and int(cpu_node.text) != cpu:
-        cpu_node.text = str(cpu)
-        cpu_node.set("current", str(cpu))
+        cpu_node.text = six.text_type(cpu)
+        cpu_node.set("current", six.text_type(cpu))
         need_update = True
 
     def _set_loader(node, value):
@@ -2394,7 +2395,7 @@ def update(
         node.set("template", value)
 
     def _set_with_mib_unit(node, value):
-        node.text = str(value)
+        node.text = six.text_type(value)
         node.set("unit", "MiB")
 
     # Update the kernel boot parameters
@@ -2426,7 +2427,7 @@ def update(
         },
     ]
 
-    data = {k: v for k, v in locals().items() if bool(v)}
+    data = {k: v for k, v in six.iteritems(locals()) if bool(v)}
     if boot_dev:
         data["boot_dev"] = {i + 1: dev for i, dev in enumerate(boot_dev.split())}
     need_update = need_update or salt.utils.xmlutil.change_xml(
@@ -2547,7 +2548,7 @@ def update(
                     # Attaching device
                     if source_file:
                         ElementTree.SubElement(
-                            updated_disk, "source", attrib={"file": source_file}
+                            updated_disk, "source", file=source_file
                         )
 
             changes["disk"]["new"] = new_disks
@@ -2609,7 +2610,7 @@ def update(
             except libvirt.libvirtError as err:
                 if "errors" not in status:
                     status["errors"] = []
-                status["errors"].append(str(err))
+                status["errors"].append(six.text_type(err))
 
     conn.close()
     return status
@@ -2823,7 +2824,7 @@ def _node_info(conn):
     info = {
         "cpucores": raw[6],
         "cpumhz": raw[3],
-        "cpumodel": str(raw[0]),
+        "cpumodel": six.text_type(raw[0]),
         "cpus": raw[2],
         "cputhreads": raw[7],
         "numanodes": raw[4],
@@ -3628,7 +3629,7 @@ def _define_vol_xml_str(conn, xml, pool=None):  # pylint: disable=redefined-oute
     poolname = (
         pool if pool else __salt__["config.get"]("virt:storagepool", default_pool)
     )
-    pool = conn.storagePoolLookupByName(str(poolname))
+    pool = conn.storagePoolLookupByName(six.text_type(poolname))
     ret = pool.createXML(xml, 0) is not None
     return ret
 
@@ -3829,7 +3830,7 @@ def seed_non_shared_migrate(disks, force=False):
 
         salt '*' virt.seed_non_shared_migrate <disks>
     """
-    for _, data in disks.items():
+    for _, data in six.iteritems(disks):
         fn_ = data["file"]
         form = data["file format"]
         size = data["virtual size"].split()[1][1:]
@@ -4852,7 +4853,7 @@ def capabilities(**kwargs):
     try:
         caps = _capabilities(conn)
     except libvirt.libvirtError as err:
-        raise CommandExecutionError(str(err))
+        raise CommandExecutionError(six.text_type(err))
     finally:
         conn.close()
     return caps
@@ -5352,7 +5353,7 @@ def network_info(name=None, **kwargs):
             for net in nets
         }
     except libvirt.libvirtError as err:
-        log.debug("Silenced libvirt error: %s", str(err))
+        log.debug("Silenced libvirt error: %s", six.text_type(err))
     finally:
         conn.close()
     return result
@@ -6214,7 +6215,7 @@ def pool_info(name=None, **kwargs):
         ]
         result = {pool.name(): _pool_extract_infos(pool) for pool in pools}
     except libvirt.libvirtError as err:
-        log.debug("Silenced libvirt error: %s", str(err))
+        log.debug("Silenced libvirt error: %s", six.text_type(err))
     finally:
         conn.close()
     return result
@@ -6591,12 +6592,12 @@ def volume_infos(pool=None, volume=None, **kwargs):
             if vol.path():
                 as_backing_store = {
                     path
-                    for (path, all_paths) in backing_stores.items()
+                    for (path, all_paths) in six.iteritems(backing_stores)
                     if vol.path() in all_paths
                 }
                 used_by = [
                     vm_name
-                    for (vm_name, vm_disks) in disks.items()
+                    for (vm_name, vm_disks) in six.iteritems(disks)
                     if vm_disks & as_backing_store or vol.path() in vm_disks
                 ]
 
@@ -6625,9 +6626,9 @@ def volume_infos(pool=None, volume=None, **kwargs):
             }
             for pool_obj in pools
         }
-        return {pool_name: volumes for (pool_name, volumes) in vols.items() if volumes}
+        return {pool_name: volumes for (pool_name, volumes) in six.iteritems(vols) if volumes}
     except libvirt.libvirtError as err:
-        log.debug("Silenced libvirt error: %s", str(err))
+        log.debug("Silenced libvirt error: %s", six.text_type(err))
     finally:
         conn.close()
     return result
