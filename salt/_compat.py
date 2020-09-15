@@ -7,6 +7,7 @@ Salt compatibility code
 import binascii
 import logging
 import sys
+import xml.sax.saxutils as saxutils
 
 from salt.exceptions import SaltException
 from salt.ext.six import binary_type, integer_types, string_types, text_type
@@ -261,21 +262,25 @@ def ip_address(address):
     try:
         return ipaddress.IPv4Address(address)
     except (ipaddress.AddressValueError, ipaddress.NetmaskValueError) as err:
-        log.debug('Error while parsing IPv4 address: %s', address)
+        log.debug("Error while parsing IPv4 address: %s", address)
         log.debug(err)
 
     try:
         return IPv6AddressScoped(address)
     except (ipaddress.AddressValueError, ipaddress.NetmaskValueError) as err:
-        log.debug('Error while parsing IPv6 address: %s', address)
+        log.debug("Error while parsing IPv6 address: %s", address)
         log.debug(err)
 
     if isinstance(address, bytes):
-        raise ipaddress.AddressValueError('{} does not appear to be an IPv4 or IPv6 address. '
-                                          'Did you pass in a bytes (str in Python 2) instead '
-                                          'of a unicode object?'.format(repr(address)))
+        raise ipaddress.AddressValueError(
+            "{} does not appear to be an IPv4 or IPv6 address. "
+            "Did you pass in a bytes (str in Python 2) instead "
+            "of a unicode object?".format(repr(address))
+        )
 
-    raise ValueError('{} does not appear to be an IPv4 or IPv6 address'.format(repr(address)))
+    raise ValueError(
+        "{} does not appear to be an IPv4 or IPv6 address".format(repr(address))
+    )
 
 
 def ip_interface(address):
@@ -302,16 +307,18 @@ def ip_interface(address):
     try:
         return ipaddress.IPv4Interface(address)
     except (ipaddress.AddressValueError, ipaddress.NetmaskValueError) as err:
-        log.debug('Error while getting IPv4 interface for address %s', address)
+        log.debug("Error while getting IPv4 interface for address %s", address)
         log.debug(err)
 
     try:
         return ipaddress.IPv6Interface(address)
     except (ipaddress.AddressValueError, ipaddress.NetmaskValueError) as err:
-        log.debug('Error while getting IPv6 interface for address %s', address)
+        log.debug("Error while getting IPv6 interface for address %s", address)
         log.debug(err)
 
-    raise ValueError('{} does not appear to be an IPv4 or IPv6 interface'.format(address))
+    raise ValueError(
+        "{} does not appear to be an IPv4 or IPv6 interface".format(address)
+    )
 
 
 if ipaddress:

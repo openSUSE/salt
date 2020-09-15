@@ -22,6 +22,7 @@ import salt.utils.files
 import salt.utils.stringutils
 import salt.utils.versions
 from salt.exceptions import CommandExecutionError, SaltInvocationError
+from salt.ext import six
 
 try:
     import libvirt  # pylint: disable=import-error

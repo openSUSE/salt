@@ -45,7 +45,7 @@ class LibvirtMock(MagicMock):  # pylint: disable=too-many-ancestors
         """
 
         def __init__(self, msg):
-            super().__init__(msg)
+            super(Exception, self).__init__(msg)
             self.msg = msg
 
         def get_error_message(self):

@@ -7,6 +7,7 @@ import string  # pylint: disable=deprecated-module
 from xml.etree import ElementTree
 
 import salt.utils.data
+from salt.ext import six
 
 
 def _conv_name(x):
@@ -160,7 +161,7 @@ def clean_node(parent_map, node, ignored=None):
     has_text = node.text is not None and node.text.strip()
     parent = parent_map.get(node)
     if (
-        len(node.attrib.keys() - (ignored or [])) == 0
+        len(set(node.attrib.keys()) - set(ignored or [])) == 0
         and not list(node)
         and not has_text
     ):

@@ -88,8 +88,6 @@ import string  # pylint: disable=deprecated-module
 import subprocess
 import sys
 import time
-from xml.etree import ElementTree
-from xml.sax import saxutils
 
 import jinja2.exceptions
 import salt.utils.files
@@ -99,8 +97,9 @@ import salt.utils.stringutils
 import salt.utils.templates
 import salt.utils.xmlutil as xmlutil
 import salt.utils.yaml
-from salt._compat import ipaddress
+from salt._compat import ElementTree, ipaddress, saxutils
 from salt.exceptions import CommandExecutionError, SaltInvocationError
+from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
 from salt.ext.six.moves.urllib.parse import urlparse, urlunparse
 from salt.utils.virt import check_remote, download_remote
@@ -1516,7 +1515,7 @@ def _handle_remote_boot_params(orig_boot):
     """
     saltinst_dir = None
     new_boot = orig_boot.copy()
-    keys = orig_boot.keys()
+    keys = set(orig_boot.keys())
     cases = [
         {"efi"},
         {"kernel", "initrd", "efi"},
@@ -2559,9 +2558,7 @@ def update(
 
                     # Attaching device
                     if source_file:
-                        ElementTree.SubElement(
-                            updated_disk, "source", attrib={"file": source_file}
-                        )
+                        ElementTree.SubElement(updated_disk, "source", file=source_file)
 
             changes["disk"]["new"] = new_disks
 
