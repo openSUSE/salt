@@ -4,7 +4,6 @@ virt execution module unit tests
 
 # pylint: disable=3rd-party-module-not-gated
 
-# Import python libs
 
 import datetime
 import os
@@ -1858,6 +1857,24 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             },
             virt.update("my_vm"),
         )
+
+        # mem + cpu case
+        define_mock.reset_mock()
+        domain_mock.setMemoryFlags.return_value = 0
+        domain_mock.setVcpusFlags.return_value = 0
+        self.assertEqual(
+            {
+                "definition": True,
+                "disk": {"attached": [], "detached": [], "updated": []},
+                "interface": {"attached": [], "detached": []},
+                "mem": True,
+                "cpu": True,
+            },
+            virt.update("my_vm", mem=2048, cpu=2),
+        )
+        setxml = ET.fromstring(define_mock.call_args[0][0])
+        self.assertEqual("2", setxml.find("vcpu").text)
+        self.assertEqual("2048", setxml.find("memory").text)
 
         # Same parameters passed than in default virt.defined state case
         self.assertEqual(
