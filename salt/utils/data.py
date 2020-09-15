@@ -4,6 +4,7 @@ Functions for manipulating, inspecting, or otherwise working with data types
 and data structures.
 """
 
+from __future__ import absolute_import, print_function, unicode_literals
 
 # Import Python libs
 import copy
@@ -71,7 +72,7 @@ class CaseInsensitiveDict(MutableMapping):
         return self._data[to_lowercase(key)][1]
 
     def __iter__(self):
-        return (item[0] for item in self._data.values())
+        return (item[0] for item in six.itervalues(self._data))
 
     def __eq__(self, rval):
         if not isinstance(rval, Mapping):
@@ -80,20 +81,20 @@ class CaseInsensitiveDict(MutableMapping):
         return dict(self.items_lower()) == dict(CaseInsensitiveDict(rval).items_lower())
 
     def __repr__(self):
-        return repr(dict(self.items()))
+        return repr(dict(six.iteritems(self)))
 
     def items_lower(self):
         """
         Returns a generator iterating over keys and values, with the keys all
         being lowercase.
         """
-        return ((key, val[1]) for key, val in self._data.items())
+        return ((key, val[1]) for key, val in six.iteritems(self._data))
 
     def copy(self):
         """
         Returns a copy of the object
         """
-        return CaseInsensitiveDict(self._data.items())
+        return CaseInsensitiveDict(six.iteritems(self._data))
 
 
 def __change_case(data, attr, preserve_dict_class=False):
@@ -115,7 +116,7 @@ def __change_case(data, attr, preserve_dict_class=False):
                 __change_case(key, attr, preserve_dict_class),
                 __change_case(val, attr, preserve_dict_class),
             )
-            for key, val in data.items()
+            for key, val in six.iteritems(data) 
         )
     if isinstance(data, Sequence):
         return data_type(
@@ -145,7 +146,7 @@ def compare_dicts(old=None, new=None):
     dict describing the changes that were made.
     """
     ret = {}
-    for key in set(new or {}).union(old or {}):
+    for key in set((new or {})).union((old or {})):
         if key not in old:
             # New key
             ret[key] = {"old": "", "new": new[key]}
@@ -205,7 +206,7 @@ def _remove_circular_refs(ob, _seen=None):
     if isinstance(ob, dict):
         res = {
             _remove_circular_refs(k, _seen): _remove_circular_refs(v, _seen)
-            for k, v in ob.items()
+            for k, v in six.iteritems(ob)
         }
     elif isinstance(ob, (list, tuple, set, frozenset)):
         res = type(ob)(_remove_circular_refs(v, _seen) for v in ob)
@@ -336,7 +337,7 @@ def decode_dict(
     )
     # Make sure we preserve OrderedDicts
     ret = data.__class__() if preserve_dict_class else {}
-    for key, value in data.items():
+    for key, value in six.iteritems(data):
         if isinstance(key, tuple):
             key = (
                 decode_tuple(
@@ -592,7 +593,7 @@ def encode_dict(
     # Clean data object before encoding to avoid circular references
     data = _remove_circular_refs(data)
     ret = data.__class__() if preserve_dict_class else {}
-    for key, value in data.items():
+    for key, value in six.iteritems(data):
         if isinstance(key, tuple):
             key = (
                 encode_tuple(key, encoding, errors, keep, preserve_dict_class)
@@ -734,8 +735,8 @@ def filter_by(lookup_dict, lookup, traverse, merge=None, default="default", base
     # lookup_dict keys
     for each in val if isinstance(val, list) else [val]:
         for key in lookup_dict:
-            test_key = key if isinstance(key, str) else str(key)
-            test_each = each if isinstance(each, str) else str(each)
+            test_key = key if isinstance(key, six.string_types) else six.text_type(key)
+            test_each = each if isinstance(each, six.string_types) else six.text_type(each)
             if fnmatch.fnmatchcase(test_each, test_key):
                 ret = lookup_dict[key]
                 break
@@ -851,11 +852,11 @@ def subdict_match(
         # begin with is that (by design) to_unicode will raise a TypeError if a
         # non-string/bytestring/bytearray value is passed.
         try:
-            target = str(target).lower()
+            target = six.text_type(target).lower()
         except UnicodeDecodeError:
             target = salt.utils.stringutils.to_unicode(target).lower()
         try:
-            pattern = str(pattern).lower()
+            pattern = six.text_type(pattern).lower()
         except UnicodeDecodeError:
             pattern = salt.utils.stringutils.to_unicode(pattern).lower()
 
@@ -997,7 +998,7 @@ def repack_dictlist(data, strict=False, recurse=False, key_cb=None, val_cb=None)
     Takes a list of one-element dicts (as found in many SLS schemas) and
     repacks into a single dictionary.
     """
-    if isinstance(data, str):
+    if isinstance(data, six.string_types):
         try:
             data = salt.utils.yaml.safe_load(data)
         except salt.utils.yaml.parser.ParserError as err:
@@ -1009,7 +1010,7 @@ def repack_dictlist(data, strict=False, recurse=False, key_cb=None, val_cb=None)
     if val_cb is None:
         val_cb = lambda x, y: y
 
-    valid_non_dict = ((str,), (int,), float)
+    valid_non_dict = (six.string_types, six.integer_types, float)
     if isinstance(data, list):
         for element in data:
             if isinstance(element, valid_non_dict):
@@ -1067,7 +1068,7 @@ def is_list(value):
 
 
 @jinja_filter("is_iter")
-def is_iter(thing, ignore=(str,)):
+def is_iter(thing, ignore=six.string_types):
     """
     Test if an object is iterable, but not a string type.
 
@@ -1124,10 +1125,10 @@ def is_true(value=None):
         pass
 
     # Now check for truthiness
-    if isinstance(value, ((int,), float)):
+    if isinstance(value, (six.integer_types, float)):
         return value > 0
-    if isinstance(value, str):
-        return str(value).lower() == "true"
+    if isinstance(value, six.string_types):
+        return six.text_type(value).lower() == "true"
     return bool(value)
 
 
@@ -1167,7 +1168,7 @@ def simple_types_filter(data):
     if data is None:
         return data
 
-    simpletypes_keys = ((str,), str, (int,), float, bool)
+    simpletypes_keys = (six.string_types, six.text_type, six.integer_types, float, bool)
     simpletypes_values = tuple(list(simpletypes_keys) + [list, tuple])
 
     if isinstance(data, (list, tuple)):
@@ -1183,7 +1184,7 @@ def simple_types_filter(data):
 
     if isinstance(data, dict):
         simpledict = {}
-        for key, value in data.items():
+        for key, value in six.iteritems(data):
             if key is not None and not isinstance(key, simpletypes_keys):
                 key = repr(key)
             if value is not None and isinstance(value, (dict, list, tuple)):
@@ -1205,8 +1206,8 @@ def stringify(data):
     for item in data:
         if six.PY2 and isinstance(item, str):
             item = salt.utils.stringutils.to_unicode(item)
-        elif not isinstance(item, str):
-            item = str(item)
+        elif not isinstance(item, six.string_types):
+            item = six.text_type(item)
         ret.append(item)
     return ret
 
@@ -1282,7 +1283,7 @@ def filter_falsey(data, recurse_depth=None, ignore_types=()):
 
     if isinstance(data, dict):
         processed_elements = [
-            (key, filter_element(value)) for key, value in data.items()
+            (key, filter_element(value)) for key, value in six.iteritems(data)
         ]
         return type(data)(
             [
@@ -1472,7 +1473,7 @@ def get_value(obj, path, default=None):
             if obj is None:
                 return res
             if isinstance(obj, dict):
-                items = obj.items()
+                items = six.iteritems(obj)
             elif isinstance(obj, list):
                 items = enumerate(obj)
 

@@ -23,6 +23,7 @@ import salt.utils.files
 import salt.utils.stringutils
 import salt.utils.versions
 from salt.exceptions import CommandExecutionError, SaltInvocationError
+from salt.ext import six
 
 try:
     import libvirt  # pylint: disable=import-error
@@ -97,7 +98,7 @@ def keys(name, basepath="/etc/pki", **kwargs):
     # rename them to something hopefully unique to avoid
     # overriding anything existing
     pillar_kwargs = {}
-    for key, value in kwargs.items():
+    for key, value in six.iteritems(kwargs):
         pillar_kwargs["ext_pillar_virt.{}".format(key)] = value
 
     pillar = __salt__["pillar.ext"]({"libvirt": "_"}, pillar_kwargs)
@@ -187,7 +188,7 @@ def _virt_call(
             else:
                 noaction_domains.append(targeted_domain)
         except libvirt.libvirtError as err:
-            ignored_domains.append({"domain": targeted_domain, "issue": str(err)})
+            ignored_domains.append({"domain": targeted_domain, "issue": six.text_type(err)})
     if not changed_domains:
         ret["result"] = not ignored_domains and bool(targeted_domains)
         ret["comment"] = "No changes had happened"
@@ -461,7 +462,7 @@ def defined(
             ret["comment"] = "Domain {} defined".format(name)
     except libvirt.libvirtError as err:
         # Something bad happened when defining / updating the VM, report it
-        ret["comment"] = str(err)
+        ret["comment"] = six.text_type(err)
         ret["result"] = False
 
     return ret
@@ -704,7 +705,7 @@ def running(
 
         except libvirt.libvirtError as err:
             # Something bad happened when starting / updating the VM, report it
-            ret["comment"] = str(err)
+            ret["comment"] = six.text_type(err)
             ret["result"] = False
 
     return ret
@@ -867,7 +868,7 @@ def reverted(
                     }
                 except CommandExecutionError as err:
                     if len(domains) > 1:
-                        ignored_domains.append({"domain": domain, "issue": str(err)})
+                        ignored_domains.append({"domain": domain, "issue": six.text_type(err)})
                 if len(domains) > 1:
                     if result:
                         ret["changes"]["reverted"].append(result)
@@ -885,9 +886,9 @@ def reverted(
             if not ret["changes"]["reverted"]:
                 ret["changes"].pop("reverted")
     except libvirt.libvirtError as err:
-        ret["comment"] = str(err)
+        ret["comment"] = six.text_type(err)
     except CommandExecutionError as err:
-        ret["comment"] = str(err)
+        ret["comment"] = six.text_type(err)
 
     return ret
 
