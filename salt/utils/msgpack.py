@@ -81,6 +81,8 @@ def _sanitize_msgpack_unpack_kwargs(kwargs):
     if version >= (1, 0, 0):
         kwargs.setdefault("raw", True)
         kwargs.setdefault("strict_map_key", False)
+        if "encoding" in kwargs:
+            del kwargs["encoding"]
     return _sanitize_msgpack_kwargs(kwargs)
 
 

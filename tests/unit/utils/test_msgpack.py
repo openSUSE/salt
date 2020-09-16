@@ -200,6 +200,74 @@ class TestMsgpack(TestCase):
             "msgpack functions with no alias in `salt.utils.msgpack`",
         )
 
+    def test_sanitize_msgpack_kwargs(self):
+        """
+        Test helper function _sanitize_msgpack_kwargs
+        """
+        version = salt.utils.msgpack.version
+
+        kwargs = {"strict_map_key": True, "raw": True, "use_bin_type": True}
+        salt.utils.msgpack.version = (0, 6, 0)
+        self.assertEqual(
+            salt.utils.msgpack._sanitize_msgpack_kwargs(kwargs),
+            {"raw": True, "strict_map_key": True, "use_bin_type": True},
+        )
+
+        kwargs = {"strict_map_key": True, "raw": True, "use_bin_type": True}
+        salt.utils.msgpack.version = (0, 5, 2)
+        self.assertEqual(
+            salt.utils.msgpack._sanitize_msgpack_kwargs(kwargs),
+            {"raw": True, "use_bin_type": True},
+        )
+
+        kwargs = {"strict_map_key": True, "raw": True, "use_bin_type": True}
+        salt.utils.msgpack.version = (0, 4, 0)
+        self.assertEqual(
+            salt.utils.msgpack._sanitize_msgpack_kwargs(kwargs), {"use_bin_type": True}
+        )
+
+        kwargs = {"strict_map_key": True, "raw": True, "use_bin_type": True}
+        salt.utils.msgpack.version = (0, 3, 0)
+        self.assertEqual(salt.utils.msgpack._sanitize_msgpack_kwargs(kwargs), {})
+        salt.utils.msgpack.version = version
+
+    def test_sanitize_msgpack_unpack_kwargs(self):
+        """
+        Test helper function _sanitize_msgpack_unpack_kwargs
+        """
+        version = salt.utils.msgpack.version
+
+        kwargs = {"strict_map_key": True, "use_bin_type": True, "encoding": "utf-8"}
+        salt.utils.msgpack.version = (1, 0, 0)
+        self.assertEqual(
+            salt.utils.msgpack._sanitize_msgpack_unpack_kwargs(kwargs.copy()),
+            {"raw": True, "strict_map_key": True, "use_bin_type": True},
+        )
+
+        salt.utils.msgpack.version = (0, 6, 0)
+        self.assertEqual(
+            salt.utils.msgpack._sanitize_msgpack_unpack_kwargs(kwargs.copy()),
+            {"strict_map_key": True, "use_bin_type": True, "encoding": "utf-8"},
+        )
+
+        salt.utils.msgpack.version = (0, 5, 2)
+        self.assertEqual(
+            salt.utils.msgpack._sanitize_msgpack_unpack_kwargs(kwargs.copy()),
+            {"use_bin_type": True, "encoding": "utf-8"},
+        )
+
+        salt.utils.msgpack.version = (0, 4, 0)
+        self.assertEqual(
+            salt.utils.msgpack._sanitize_msgpack_unpack_kwargs(kwargs.copy()),
+            {"use_bin_type": True, "encoding": "utf-8"},
+        )
+        kwargs = {"strict_map_key": True, "use_bin_type": True}
+        salt.utils.msgpack.version = (0, 3, 0)
+        self.assertEqual(
+            salt.utils.msgpack._sanitize_msgpack_unpack_kwargs(kwargs.copy()), {}
+        )
+        salt.utils.msgpack.version = version
+
     def _test_base(self, pack_func, unpack_func):
         """
         In msgpack, 'dumps' is an alias for 'packb' and 'loads' is an alias for 'unpackb'.
