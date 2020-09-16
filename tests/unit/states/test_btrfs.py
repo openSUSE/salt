@@ -37,6 +37,7 @@ from tests.support.mock import (
 
 from salt.exceptions import CommandExecutionError
 import salt.states.btrfs as btrfs
+import salt.utils.platform
 
 import pytest
 
