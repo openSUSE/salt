@@ -15,10 +15,12 @@ from tests.support.helpers import (
     SKIP_IF_NOT_RUNNING_PYTEST,
     SaveRequestsPostHandler,
     Webserver,
+    requires_sshd_server,
     slowTest,
 )
 from tests.support.mixins import AdaptedConfigurationTestCaseMixin
 from tests.support.mock import patch
+from tests.support.paths import TMP, TMP_CONF_DIR
 from tests.support.runtests import RUNTIME_VARS
 from tests.support.unit import TestCase, skipIf
 
@@ -178,7 +180,12 @@ class NetapiSSHClientTest(SSHCase):
         """
         opts = AdaptedConfigurationTestCaseMixin.get_config("client_config").copy()
         self.netapi = salt.netapi.NetapiClient(opts)
-        self.priv_file = os.path.join(RUNTIME_VARS.TMP_SSH_CONF_DIR, "client_key")
+        opts = salt.config.client_config(os.path.join(TMP_CONF_DIR, "master"))
+        naopts = copy.deepcopy(opts)
+        naopts["ignore_host_keys"] = True
+        self.netapi = salt.netapi.NetapiClient(naopts)
+
+        self.priv_file = os.path.join(RUNTIME_VARS.TMP_CONF_DIR, "key_test")
         self.rosters = os.path.join(RUNTIME_VARS.TMP_CONF_DIR)
         self.roster_file = os.path.join(self.rosters, "roster")
 
@@ -325,7 +332,7 @@ class NetapiSSHClientTest(SSHCase):
             "roster": "cache",
             "client": "ssh",
             "tgt": "root|id>{} #@127.0.0.1".format(path),
-            "roster_file": self.roster_file,
+            "roster_file": "/tmp/salt-tests-tmpdir/config/roaster",
             "rosters": "/",
             "fun": "test.ping",
             "eauth": "auto",
@@ -355,7 +362,7 @@ class NetapiSSHClientTest(SSHCase):
             "eauth": "auto",
             "username": "saltdev_auto",
             "password": "saltdev",
-            "roster_file": self.roster_file,
+            "roster_file": "/tmp/salt-tests-tmpdir/config/roaster",
             "rosters": "/",
             "ssh_options": ["|id>{} #".format(path), "lol"],
         }
