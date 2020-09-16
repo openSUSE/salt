@@ -26,9 +26,10 @@
 """
 import pytest
 import salt.states.btrfs as btrfs
+import salt.utils.platform
 from salt.exceptions import CommandExecutionError
 from tests.support.mixins import LoaderModuleMockMixin
-from tests.support.mock import NO_MOCK, NO_MOCK_REASON, MagicMock, patch
+from tests.support.mock import MagicMock, patch
 from tests.support.unit import TestCase, skipIf
 
 
