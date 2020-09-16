@@ -8,6 +8,8 @@ from __future__ import absolute_import
 import re
 import os
 import json
+import sys
+import shlex
 import time
 import logging
 import subprocess
@@ -40,10 +42,10 @@ def gen_key(path):
     '''
     Generate a key for use with salt-ssh
     '''
-    cmd = 'ssh-keygen -P "" -f {0} -t rsa -q'.format(path)
+    cmd = ["ssh-keygen", "-P", '""', "-f", path, "-t", "rsa", "-q"]
     if not os.path.isdir(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
-    subprocess.call(cmd, shell=True)
+    subprocess.call(cmd)
 
 
 class Shell(object):
@@ -269,8 +271,7 @@ class Shell(object):
         '''
         try:
             proc = salt.utils.nb_popen.NonBlockingPopen(
-                cmd,
-                shell=True,
+                self._split_cmd(cmd),
                 stderr=subprocess.PIPE,
                 stdout=subprocess.PIPE,
             )
@@ -349,14 +350,28 @@ class Shell(object):
 
         return self._run_cmd(cmd)
 
+    def _split_cmd(self, cmd):
+        """
+        Split a command string so that it is suitable to pass to Popen without
+        shell=True. This prevents shell injection attacks in the options passed
+        to ssh or some other command.
+        """
+        try:
+            ssh_part, cmd_part = cmd.split("/bin/sh")
+        except ValueError:
+            cmd_lst = shlex.split(cmd)
+        else:
+            cmd_lst = shlex.split(ssh_part)
+            cmd_lst.append("/bin/sh {}".format(cmd_part))
+        return cmd_lst
+
     def _run_cmd(self, cmd, key_accept=False, passwd_retries=3):
         '''
         Execute a shell command via VT. This is blocking and assumes that ssh
         is being run
         '''
         term = salt.utils.vt.Terminal(
-                cmd,
-                shell=True,
+                self._split_cmd(cmd),
                 log_stdout=True,
                 log_stdout_level='trace',
                 log_stderr=True,

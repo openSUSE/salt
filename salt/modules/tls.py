@@ -735,11 +735,12 @@ def create_ca(ca_name,
                 write_key = False
             else:
                 log.info('Saving old CA ssl key in {0}'.format(bck))
-                with salt.utils.fopen(bck, 'w') as bckf:
+                fp = os.open(bck, os.O_CREAT | os.O_RDWR, 0o600)
+                with os.fdopen(fp, 'w') as bckf:
                     bckf.write(old_key)
-                    os.chmod(bck, 0o600)
     if write_key:
-        with salt.utils.fopen(ca_keyp, 'w') as ca_key:
+        fp = os.open(ca_keyp, os.O_CREAT | os.O_RDWR, 0o600)
+        with os.fdopen(fp, 'w') as ca_key:
             ca_key.write(keycontent)
 
     with salt.utils.fopen(certp, 'w') as ca_crt:
@@ -1034,8 +1035,9 @@ def create_csr(ca_name,
     req.sign(key, digest)
 
     # Write private key and request
-    with salt.utils.fopen('{0}/{1}.key'.format(csr_path,
-                                               csr_filename), 'w+') as priv_key:
+    priv_keyp = '{0}/{1}.key'.format(csr_path, csr_filename)
+    fp = os.open(priv_keyp, os.O_CREAT | os.O_RDWR, 0o600)
+    with os.fdopen(fp, 'w+') as priv_key:
         priv_key.write(
             OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, key)
         )
@@ -1175,11 +1177,11 @@ def create_self_signed_cert(tls_dir='tls',
     cert.sign(key, digest)
 
     # Write private key and cert
-    with salt.utils.fopen(
-        '{0}/{1}/certs/{2}.key'.format(cert_base_path(),
-                                       tls_dir, cert_filename),
-        'w+'
-    ) as priv_key:
+    priv_key_path = '{0}/{1}/certs/{2}.key'.format(cert_base_path(),
+                                                   tls_dir,
+                                                   cert_filename)
+    fp = os.open(priv_key_path, os.O_CREAT | os.O_RDWR, 0o600)
+    with os.fdopen(fp, 'w+') as priv_key:
         priv_key.write(
             OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, key)
         )
