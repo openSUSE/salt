@@ -371,6 +371,7 @@ execution modules
     rbac_solaris
     rbenv
     rdp
+    rebootmgr
     redismod
     reg
     rest_pkg
@@ -457,6 +458,7 @@ execution modules
     tls
     tomcat
     trafficserver
+    transactional_update
     travisci
     tuned
     twilio_notify
