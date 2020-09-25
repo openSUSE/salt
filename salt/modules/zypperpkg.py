@@ -1708,6 +1708,15 @@ def upgrade(refresh=True,
                 log.info('Disabling vendor changes')
             else:
                 log.warning('Disabling vendor changes is not supported on this Zypper version')
+        if not novendorchange:
+            # TODO: Grains validation should be moved to Zypper class
+            if __grains__["osrelease_info"][0] > 11:
+                cmd_update.append("--allow-vendor-change")
+                log.info("Enabling vendor changes")
+            else:
+                log.warning(
+                    "Enabling vendor changes is not supported on this Zypper version"
+                )
 
         if no_recommends:
             cmd_update.append('--no-recommends')
