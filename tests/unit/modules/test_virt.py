@@ -1872,7 +1872,8 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         )
         setxml = ET.fromstring(define_mock.call_args[0][0])
         self.assertEqual("2", setxml.find("vcpu").text)
-        self.assertEqual("2048", setxml.find("memory").text)
+        self.assertEqual("2147483648", setxml.find("memory").text)
+        self.assertEqual(2048 * 1024, domain_mock.setMemoryFlags.call_args[0][0])
 
         # Same parameters passed than in default virt.defined state case
         self.assertEqual(
@@ -2032,7 +2033,6 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
                 "definition": True,
                 "disk": {"attached": [], "detached": [], "updated": []},
                 "interface": {"attached": [], "detached": []},
-                "mem": False,
             },
             virt.update("my_vm", mem=memtune),
         )
@@ -2080,7 +2080,7 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         setxml = ET.fromstring(define_mock.call_args[0][0])
         self.assertEqual(setxml.find("memory").text, str(2048 * 1024 ** 2))
         self.assertEqual(setxml.find("memory").get("unit"), "bytes")
-        self.assertEqual(setmem_mock.call_args[0][0], str(2048 * 1024))
+        self.assertEqual(setmem_mock.call_args[0][0], 2048 * 1024)
 
         mem_dict = {"boot": "0.5g", "current": "2g", "max": "1g", "slots": 12}
         self.assertEqual(
@@ -2108,7 +2108,6 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
                 "definition": True,
                 "disk": {"attached": [], "detached": [], "updated": []},
                 "interface": {"attached": [], "detached": []},
-                "mem": True,
             },
             virt.update("my_vm", mem=max_slot_reverse),
         )
@@ -2826,14 +2825,18 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             "min_guarantee": "1 g",
         }
 
+        domain_mock.setMemoryFlags.return_value = 0
         self.assertEqual(
             {
                 "definition": True,
                 "disk": {"attached": [], "detached": [], "updated": []},
                 "interface": {"attached": [], "detached": []},
-                "mem": False,
+                "mem": True,
             },
             virt.update("vm_with_memtune_param", mem=memtune_new_val),
+        )
+        self.assertEqual(
+            domain_mock.setMemoryFlags.call_args[0][0], int(2.5 * 1024 ** 2)
         )
 
         setxml = ET.fromstring(define_mock.call_args[0][0])
@@ -2870,7 +2873,6 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
                 "definition": True,
                 "disk": {"attached": [], "detached": [], "updated": []},
                 "interface": {"attached": [], "detached": []},
-                "mem": False,
             },
             virt.update("vm_with_memtune_param", mem=max_slot_reverse),
         )
@@ -2890,14 +2892,18 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             "min_guarantee": "1 g",
         }
 
+        domain_mock.setMemoryFlags.reset_mock()
         self.assertEqual(
             {
                 "definition": True,
                 "disk": {"attached": [], "detached": [], "updated": []},
                 "interface": {"attached": [], "detached": []},
-                "mem": False,
+                "mem": True,
             },
             virt.update("vm_with_memtune_param", mem=max_swap_none),
+        )
+        self.assertEqual(
+            domain_mock.setMemoryFlags.call_args[0][0], int(2.5 * 1024 ** 2)
         )
 
         setxml = ET.fromstring(define_mock.call_args[0][0])
@@ -2930,7 +2936,6 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
                 "definition": True,
                 "disk": {"attached": [], "detached": [], "updated": []},
                 "interface": {"attached": [], "detached": []},
-                "mem": False,
             },
             virt.update("vm_with_memtune_param", mem=memtune_none),
         )
@@ -2950,7 +2955,6 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
                 "definition": True,
                 "disk": {"attached": [], "detached": [], "updated": []},
                 "interface": {"attached": [], "detached": []},
-                "mem": False,
             },
             virt.update("vm_with_memtune_param", mem=max_none),
         )
