@@ -813,6 +813,7 @@ def _gen_xml(
     graphics=None,
     boot=None,
     boot_dev=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -822,6 +823,7 @@ def _gen_xml(
         "hypervisor": hypervisor,
         "name": name,
         "cpu": six.text_type(cpu),
+        "on_reboot": "destroy" if stop_on_reboot else "restart",
     }
 
     context["mem"] = nesthash()
@@ -1754,6 +1756,7 @@ def init(
     arch=None,
     boot=None,
     boot_dev=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -1839,6 +1842,15 @@ def init(
     :param password: password to connect with, overriding defaults
 
                      .. versionadded:: 2019.2.0
+
+    :param stop_on_reboot:
+        If set to ``True`` the guest will stop instead of rebooting.
+        This is specially useful when creating a virtual machine with an installation cdrom or
+        an autoinstallation needing a special first boot configuration.
+        Defaults to ``False``
+
+        .. versionadded:: Aluminium
+
     :param boot:
         Specifies kernel, initial ramdisk and kernel command line parameters for the virtual machine.
         This is an optional parameter, all of the keys are optional within the dictionary. The structure of
@@ -2219,6 +2231,7 @@ def init(
             graphics,
             boot,
             boot_dev,
+            stop_on_reboot,
             **kwargs
         )
         log.debug("New virtual machine definition: %s", vm_xml)
@@ -2448,6 +2461,7 @@ def update(
     boot=None,
     test=False,
     boot_dev=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -2529,6 +2543,14 @@ def update(
 
         .. versionadded:: Magnesium
 
+    :param stop_on_reboot:
+        If set to ``True`` the guest will stop instead of rebooting.
+        This is specially useful when creating a virtual machine with an installation cdrom or
+        an autoinstallation needing a special first boot configuration.
+        Defaults to ``False``
+
+        .. versionadded:: Aluminium
+
     :param test: run in dry-run mode if set to True
 
         .. versionadded:: sodium
@@ -2592,6 +2614,8 @@ def update(
             desc.find(".//os/type").get("arch"),
             graphics,
             boot,
+            boot_dev,
+            stop_on_reboot,
             **kwargs
         )
     )
@@ -2627,6 +2651,11 @@ def update(
 
     # Update the kernel boot parameters
     params_mapping = [
+        {
+            "path": "stop_on_reboot",
+            "xpath": "on_reboot",
+            "convert": lambda v: "destroy" if v else "restart",
+        },
         {"path": "boot:kernel", "xpath": "os/kernel"},
         {"path": "boot:initrd", "xpath": "os/initrd"},
         {"path": "boot:cmdline", "xpath": "os/cmdline"},
