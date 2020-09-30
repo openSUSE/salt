@@ -813,6 +813,7 @@ def _gen_xml(
     clock=None,
     serials=None,
     consoles=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -823,6 +824,7 @@ def _gen_xml(
         "name": name,
         "hypervisor_features": hypervisor_features or {},
         "clock": clock or {},
+        "on_reboot": "destroy" if stop_on_reboot else "restart",
     }
 
     context["to_kib"] = lambda v: int(_handle_unit(v) / 1024)
@@ -1810,6 +1812,7 @@ def init(
     clock=None,
     serials=None,
     consoles=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -2015,6 +2018,15 @@ def init(
     :param password: password to connect with, overriding defaults
 
                      .. versionadded:: 2019.2.0
+
+    :param stop_on_reboot:
+        If set to ``True`` the guest will stop instead of rebooting.
+        This is specially useful when creating a virtual machine with an installation cdrom or
+        an autoinstallation needing a special first boot configuration.
+        Defaults to ``False``
+
+        .. versionadded:: Aluminium
+
     :param boot:
         Specifies kernel, initial ramdisk and kernel command line parameters for the virtual machine.
         This is an optional parameter, all of the keys are optional within the dictionary. The structure of
@@ -2693,6 +2705,7 @@ def init(
             clock,
             serials,
             consoles,
+            stop_on_reboot,
             **kwargs
         )
         log.debug("New virtual machine definition: %s", vm_xml)
@@ -3019,6 +3032,7 @@ def update(
     clock=None,
     serials=None,
     consoles=None,
+    stop_on_reboot=False,
     **kwargs
 ):
     """
@@ -3128,6 +3142,14 @@ def update(
     :param consoles:
         Dictionary providing details on the consoles device to create. (Default: ``None``)
         See :ref:`init-chardevs-def` for more details on the possible values.
+
+        .. versionadded:: Aluminium
+
+    :param stop_on_reboot:
+        If set to ``True`` the guest will stop instead of rebooting.
+        This is specially useful when creating a virtual machine with an installation cdrom or
+        an autoinstallation needing a special first boot configuration.
+        Defaults to ``False``
 
         .. versionadded:: Aluminium
 
@@ -3257,8 +3279,10 @@ def update(
             graphics,
             boot,
             boot_dev,
+            numatune,
             serial=serials,
             consoles=consoles,
+            stop_on_reboot=stop_on_reboot,
             **kwargs
         )
     )
@@ -3382,6 +3406,11 @@ def update(
     _normalize_cpusets(desc, data)
 
     params_mapping = [
+        {
+            "path": "stop_on_reboot",
+            "xpath": "on_reboot",
+            "convert": lambda v: "destroy" if v else "restart",
+        },
         {"path": "boot:kernel", "xpath": "os/kernel"},
         {"path": "boot:initrd", "xpath": "os/initrd"},
         {"path": "boot:cmdline", "xpath": "os/cmdline"},
