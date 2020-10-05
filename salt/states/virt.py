@@ -11,13 +11,11 @@ for the generation and signing of certificates for systems running libvirt:
       virt.keys
 """
 
-# Import Python libs
 
 import fnmatch
 import logging
 import os
 
-# Import Salt libs
 import salt.utils.args
 import salt.utils.files
 import salt.utils.stringutils
@@ -290,6 +288,8 @@ def defined(
     boot=None,
     update=True,
     boot_dev=None,
+    stop_on_reboot=False,
+    live=True,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -298,7 +298,28 @@ def defined(
 
     :param name: name of the virtual machine to run
     :param cpu: number of CPUs for the virtual machine to create
-    :param mem: amount of memory in MiB for the new virtual machine
+    :param mem: Amount of memory to allocate to the virtual machine in MiB. Since Magnesium, a dictionary can be used to
+        contain detailed configuration which support memory allocation or tuning. Supported parameters are ``boot``,
+        ``current``, ``max``, ``slots``, ``hard_limit``, ``soft_limit``, ``swap_hard_limit`` and ``min_guarantee``. The
+        structure of the dictionary is documented in  :ref:`init-mem-def`. Both decimal and binary base are supported.
+        Detail unit specification is documented  in :ref:`virt-units`. Please note that the value for ``slots`` must be
+        an integer.
+
+        .. code-block:: python
+
+            {
+                'boot': 1g,
+                'current': 1g,
+                'max': 1g,
+                'slots': 10,
+                'hard_limit': '1024'
+                'soft_limit': '512m'
+                'swap_hard_limit': '1g'
+                'min_guarantee': '512mib'
+            }
+
+        .. versionchanged:: Magnesium
+
     :param vm_type: force virtual machine type for the new VM. The default value is taken from
         the host capabilities. This could be useful for example to use ``'qemu'`` type instead
         of the ``'kvm'`` one.
@@ -358,6 +379,20 @@ def defined(
 
         .. versionadded:: Magnesium
 
+    :param stop_on_reboot:
+        If set to ``True`` the guest will stop instead of rebooting.
+        This is specially useful when creating a virtual machine with an installation cdrom or
+        an autoinstallation needing a special first boot configuration.
+        Defaults to ``False``
+
+        .. versionadded:: Aluminium
+
+    :param live:
+        If set to ``False`` the changes will not be applied live to the running instance, but will
+        only apply at the next start. Note that reboot will not take those changes.
+
+        .. versionadded:: Aluminium
+
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -415,13 +450,14 @@ def defined(
                     nic_profile=nic_profile,
                     interfaces=interfaces,
                     graphics=graphics,
-                    live=True,
+                    live=live,
                     connection=connection,
                     username=username,
                     password=password,
                     boot=boot,
                     test=__opts__["test"],
                     boot_dev=boot_dev,
+                    stop_on_reboot=stop_on_reboot,
                 )
             ret["changes"][name] = status
             if not status.get("definition"):
@@ -457,6 +493,7 @@ def defined(
                     boot=boot,
                     start=False,
                     boot_dev=boot_dev,
+                    stop_on_reboot=stop_on_reboot,
                 )
             ret["changes"][name] = {"definition": True}
             ret["comment"] = "Domain {} defined".format(name)
@@ -490,6 +527,7 @@ def running(
     arch=None,
     boot=None,
     boot_dev=None,
+    stop_on_reboot=False,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -498,7 +536,23 @@ def running(
 
     :param name: name of the virtual machine to run
     :param cpu: number of CPUs for the virtual machine to create
-    :param mem: amount of memory in MiB for the new virtual machine
+    :param mem: Amount of memory to allocate to the virtual machine in MiB. Since Magnesium, a dictionary can be used to
+        contain detailed configuration which support memory allocation or tuning. Supported parameters are ``boot``,
+        ``current``, ``max``, ``slots``, ``hard_limit``, ``soft_limit``, ``swap_hard_limit`` and ``min_guarantee``. The
+        structure of the dictionary is documented in  :ref:`init-mem-def`. Both decimal and binary base are supported.
+        Detail unit specification is documented  in :ref:`virt-units`. Please note that the value for ``slots`` must be
+        an integer.
+
+        To remove any parameters, pass a None object, for instance: 'soft_limit': ``None``. Please note  that ``None``
+        is mapped to ``null`` in sls file, pass ``null`` in sls file instead.
+
+        .. code-block:: yaml
+
+            - mem:
+                hard_limit: null
+                soft_limit: null
+
+        .. versionchanged:: Magnesium
     :param vm_type: force virtual machine type for the new VM. The default value is taken from
         the host capabilities. This could be useful for example to use ``'qemu'`` type instead
         of the ``'kvm'`` one.
@@ -609,6 +663,14 @@ def running(
 
         .. versionadded:: Magnesium
 
+    :param stop_on_reboot:
+        If set to ``True`` the guest will stop instead of rebooting.
+        This is specially useful when creating a virtual machine with an installation cdrom or
+        an autoinstallation needing a special first boot configuration.
+        Defaults to ``False``
+
+        .. versionadded:: Aluminium
+
     .. rubric:: Example States
 
     Make sure an already-defined virtual machine called ``domain_name`` is running:
@@ -677,6 +739,7 @@ def running(
         boot=boot,
         update=update,
         boot_dev=boot_dev,
+        stop_on_reboot=stop_on_reboot,
         connection=connection,
         username=username,
         password=password,
