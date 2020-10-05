@@ -48,7 +48,7 @@ class MappedResultMock(MagicMock):
 
 
 @pytest.fixture(autouse=True)
-def setup_loader():
+def setup_loader(request):
     # Create libvirt mock and connection mock
     mock_libvirt = LibvirtMock()
     mock_conn = MagicMock()
@@ -62,7 +62,7 @@ def setup_loader():
         },
         config: {},
     }
-    with pytest.helpers.loader_mock(setup_loader_modules) as loader_mock:
+    with pytest.helpers.loader_mock(request, setup_loader_modules) as loader_mock:
         yield loader_mock
 
 
