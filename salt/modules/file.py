@@ -256,7 +256,7 @@ def group_to_gid(group):
     try:
         if isinstance(group, int):
             return group
-        return grp.getgrnam(group).gr_gid
+        return grp.getgrnam(group.encode('utf-8')).gr_gid
     except KeyError:
         return ''
 
@@ -344,7 +344,7 @@ def user_to_uid(user):
     try:
         if isinstance(user, int):
             return user
-        return pwd.getpwnam(user).pw_uid
+        return pwd.getpwnam(user.encode('utf-8')).pw_uid
     except KeyError:
         return ''
 
@@ -4574,7 +4574,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
         if (salt.utils.platform.is_windows() and
                 user_to_uid(user) != user_to_uid(perms['luser'])
             ) or (
-            not salt.utils.platform.is_windows() and user != perms['luser']
+            not salt.utils.platform.is_windows() and user.encode('utf-8') != perms['luser']
         ):
             perms['cuser'] = user
 
@@ -4584,7 +4584,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
         if (salt.utils.platform.is_windows() and
                 group_to_gid(group) != group_to_gid(perms['lgroup'])
             ) or (
-                not salt.utils.platform.is_windows() and group != perms['lgroup']
+                not salt.utils.platform.is_windows() and group.encode('utf-8') != perms['lgroup']
         ):
             perms['cgroup'] = group
 
@@ -4615,7 +4615,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
                 user != ''
             ) or (
             not salt.utils.platform.is_windows() and
-                user != get_user(name, follow_symlinks=follow_symlinks) and
+                user.encode('utf-8') != get_user(name, follow_symlinks=follow_symlinks) and
                 user != ''
         ):
             if __opts__['test'] is True:
@@ -4635,7 +4635,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
                     get_group(name, follow_symlinks=follow_symlinks)) and
                 group != '') or (
             not salt.utils.platform.is_windows() and
-                group != get_group(name, follow_symlinks=follow_symlinks) and
+                group.encode('utf-8') != get_group(name, follow_symlinks=follow_symlinks) and
                 group != ''
         ):
             if __opts__['test'] is True:
