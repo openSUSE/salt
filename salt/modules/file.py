@@ -4633,10 +4633,10 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
         if (salt.utils.platform.is_windows() and
                 group_to_gid(group) != group_to_gid(
                     get_group(name, follow_symlinks=follow_symlinks)) and
-                user != '') or (
+                group != '') or (
             not salt.utils.platform.is_windows() and
                 group != get_group(name, follow_symlinks=follow_symlinks) and
-                user != ''
+                group != ''
         ):
             if __opts__['test'] is True:
                 ret['changes']['group'] = group
@@ -4644,7 +4644,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
                 ret['result'] = False
                 ret['comment'].append('Failed to change group to {0}'
                                       .format(group))
-        elif 'cgroup' in perms and user != '':
+        elif 'cgroup' in perms and group != '':
             ret['changes']['group'] = group
 
     # Mode changes if needed
