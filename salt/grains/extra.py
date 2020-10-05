@@ -1,16 +1,11 @@
-# -*- coding: utf-8 -*-
-
-from __future__ import absolute_import, print_function, unicode_literals
-
-# Import third party libs
+import glob
 import logging
-
-# Import python libs
 import os
 
-# Import salt libs
+import salt.utils
 import salt.utils.data
 import salt.utils.files
+import salt.utils.path
 import salt.utils.platform
 import salt.utils.yaml
 
@@ -70,7 +65,32 @@ def config():
 
 def suse_backported_capabilities():
     return {
-        '__suse_reserved_pkg_all_versions_support': True,
-        '__suse_reserved_pkg_patches_support': True,
-        '__suse_reserved_saltutil_states_support': True
+        "__suse_reserved_pkg_all_versions_support": True,
+        "__suse_reserved_pkg_patches_support": True,
+        "__suse_reserved_saltutil_states_support": True,
     }
+
+
+def __secure_boot():
+    """Detect if secure-boot is enabled."""
+    enabled = False
+    sboot = glob.glob("/sys/firmware/efi/vars/SecureBoot-*/data")
+    if len(sboot) == 1:
+        with salt.utils.files.fopen(sboot[0], "rb") as fd:
+            enabled = fd.read()[-1:] == b"\x01"
+    return enabled
+
+
+def uefi():
+    """Populate UEFI grains."""
+    grains = {
+        "efi": os.path.exists("/sys/firmware/efi/systab"),
+        "efi-secure-boot": __secure_boot(),
+    }
+
+    return grains
+
+
+def transactional():
+    """Determine if the system in transactional."""
+    return {"transactional": bool(salt.utils.path.which("transactional-update"))}

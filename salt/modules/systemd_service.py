@@ -64,7 +64,10 @@ def __virtual__():
     """
     Only work on systems that have been booted with systemd
     """
-    if __grains__.get("kernel") == "Linux" and salt.utils.systemd.booted(__context__):
+    is_linux = __grains__.get("kernel") == "Linux"
+    is_booted = salt.utils.systemd.booted(__context__)
+    is_offline = salt.utils.systemd.offline(__context__)
+    if is_linux and (is_booted or is_offline):
         return __virtualname__
     return (
         False,
@@ -1447,3 +1450,19 @@ def firstboot(
         raise CommandExecutionError("systemd-firstboot error: {}".format(out["stderr"]))
 
     return True
+
+
+def offline():
+    """
+    .. versionadded:: TBD
+
+    Check if systemd is working in offline mode, where is not possible
+    to talk with PID 1.
+
+    CLI Example:
+
+        salt '*' service.offline
+
+    """
+
+    return salt.utils.systemd.offline(__context__)
