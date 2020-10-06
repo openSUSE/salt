@@ -245,7 +245,7 @@ def group_to_gid(group):
     try:
         if isinstance(group, int):
             return group
-        return grp.getgrnam(group).gr_gid
+        return grp.getgrnam(salt.utils.stringutils.to_str(group)).gr_gid
     except KeyError:
         return ""
 
@@ -336,7 +336,7 @@ def user_to_uid(user):
     try:
         if isinstance(user, int):
             return user
-        return pwd.getpwnam(user).pw_uid
+        return pwd.getpwnam(salt.utils.stringutils.to_str(user)).pw_uid
     except KeyError:
         return ""
 
@@ -5352,8 +5352,8 @@ def check_perms(
             salt.utils.platform.is_windows() and not user_to_uid(user) == cur["uid"]
         ) or (
             not salt.utils.platform.is_windows()
-            and not user == cur["user"]
-            and not user == cur["uid"]
+            and not salt.utils.stringutils.to_str(user) == cur["user"]
+            and not salt.utils.stringutils.to_str(user) == cur["uid"]
         ):
             perms["cuser"] = user
 
@@ -5362,8 +5362,8 @@ def check_perms(
             salt.utils.platform.is_windows() and not group_to_gid(group) == cur["gid"]
         ) or (
             not salt.utils.platform.is_windows()
-            and not group == cur["group"]
-            and not group == cur["gid"]
+            and not salt.utils.stringutils.to_str(group) == cur["group"]
+            and not salt.utils.stringutils.to_str(group) == cur["gid"]
         ):
             perms["cgroup"] = group
 
@@ -5407,8 +5407,8 @@ def check_perms(
             salt.utils.platform.is_windows() and not user_to_uid(user) == post["uid"]
         ) or (
             not salt.utils.platform.is_windows()
-            and not user == post["user"]
-            and not user == post["uid"]
+            and not salt.utils.stringutils.to_str(user) == post["user"]
+            and not salt.utils.stringutils.to_str(user) == post["uid"]
         ):
             if __opts__["test"] is True:
                 ret["changes"]["user"] = user
@@ -5423,8 +5423,8 @@ def check_perms(
             salt.utils.platform.is_windows() and not group_to_gid(group) == post["gid"]
         ) or (
             not salt.utils.platform.is_windows()
-            and not group == post["group"]
-            and not group == post["gid"]
+            and not salt.utils.stringutils.to_str(group) == post["group"]
+            and not salt.utils.stringutils.to_str(group) == post["gid"]
         ):
             if __opts__["test"] is True:
                 ret["changes"]["group"] = group
