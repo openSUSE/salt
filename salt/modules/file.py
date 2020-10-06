@@ -247,7 +247,7 @@ def group_to_gid(group):
     try:
         if isinstance(group, int):
             return group
-        return grp.getgrnam(group).gr_gid
+        return grp.getgrnam(salt.utils.stringutils.to_str(group)).gr_gid
     except KeyError:
         return ""
 
@@ -338,7 +338,7 @@ def user_to_uid(user):
     try:
         if isinstance(user, int):
             return user
-        return pwd.getpwnam(user).pw_uid
+        return pwd.getpwnam(salt.utils.stringutils.to_str(user)).pw_uid
     except KeyError:
         return ""
 
@@ -4977,7 +4977,10 @@ def check_perms(
         if (
             salt.utils.platform.is_windows()
             and user_to_uid(user) != user_to_uid(perms["luser"])
-        ) or (not salt.utils.platform.is_windows() and user != perms["luser"]):
+        ) or (
+            not salt.utils.platform.is_windows()
+            and salt.utils.stringutils.to_str(user) != perms["luser"]
+        ):
             perms["cuser"] = user
 
     if group:
@@ -4986,7 +4989,10 @@ def check_perms(
         if (
             salt.utils.platform.is_windows()
             and group_to_gid(group) != group_to_gid(perms["lgroup"])
-        ) or (not salt.utils.platform.is_windows() and group != perms["lgroup"]):
+        ) or (
+            not salt.utils.platform.is_windows()
+            and salt.utils.stringutils.to_str(group) != perms["lgroup"]
+        ):
             perms["cgroup"] = group
 
     if "cuser" in perms or "cgroup" in perms:
@@ -5017,7 +5023,8 @@ def check_perms(
             and user != ""
         ) or (
             not salt.utils.platform.is_windows()
-            and user != get_user(name, follow_symlinks=follow_symlinks)
+            and salt.utils.stringutils.to_str(user)
+            != get_user(name, follow_symlinks=follow_symlinks)
             and user != ""
         ):
             if __opts__["test"] is True:
@@ -5035,18 +5042,19 @@ def check_perms(
             salt.utils.platform.is_windows()
             and group_to_gid(group)
             != group_to_gid(get_group(name, follow_symlinks=follow_symlinks))
-            and user != ""
+            and group != ""
         ) or (
             not salt.utils.platform.is_windows()
-            and group != get_group(name, follow_symlinks=follow_symlinks)
-            and user != ""
+            and salt.utils.stringutils.to_str(group)
+            != get_group(name, follow_symlinks=follow_symlinks)
+            and group != ""
         ):
             if __opts__["test"] is True:
                 ret["changes"]["group"] = group
             else:
                 ret["result"] = False
                 ret["comment"].append("Failed to change group to {}".format(group))
-        elif "cgroup" in perms and user != "":
+        elif "cgroup" in perms and group != "":
             ret["changes"]["group"] = group
 
     # Mode changes if needed
