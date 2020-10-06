@@ -60,11 +60,10 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
         with salt.utils.files.fopen(
             os.path.join(OS_RELEASE_DIR, "ubuntu-17.10")
         ) as os_release_file:
-            os_release_content = os_release_file.readlines()
-        with patch("salt.utils.files.fopen", mock_open()) as os_release_file:
-            os_release_file.return_value.__iter__.return_value = os_release_content
+            os_release_content = os_release_file.read()
+        with patch("salt.utils.files.fopen", mock_open(read_data=os_release_content)):
             os_release = core._parse_os_release(
-                ["/etc/os-release", "/usr/lib/os-release"]
+                "/etc/os-release", "/usr/lib/os-release"
             )
         self.assertEqual(
             os_release,
@@ -174,7 +173,7 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
     def test_missing_os_release(self):
         with patch("salt.utils.files.fopen", mock_open(read_data={})):
             os_release = core._parse_os_release(
-                ["/etc/os-release", "/usr/lib/os-release"]
+                "/etc/os-release", "/usr/lib/os-release"
             )
         self.assertEqual(os_release, {})
 
