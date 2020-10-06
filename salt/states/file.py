@@ -960,11 +960,11 @@ def _check_dir_meta(name,
         changes['directory'] = 'new'
         return changes
     if (user is not None
-            and user != stats['user']
+            and salt.utils.stringutils.to_str(user) != stats['user']
             and user != stats.get('uid')):
         changes['user'] = user
     if (group is not None
-            and group != stats['group']
+            and salt.utils.stringutils.to_str(group) != stats['group']
             and group != stats.get('gid')):
         changes['group'] = group
     # Normalize the dir mode
