@@ -480,7 +480,11 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
                     ret = zypper.upgrade(dist_upgrade=True)
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
-                    zypper_mock.assert_any_call('dist-upgrade', '--auto-agree-with-licenses')
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--no-allow-vendor-change",
+                    )
 
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
                     ret = zypper.upgrade(dist_upgrade=True, dryrun=True)
@@ -495,14 +499,18 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
                     ret = zypper.upgrade(dist_upgrade=True, fromrepo=["Dummy", "Dummy2"], novendorchange=True)
                     zypper_mock.assert_any_call(
-                        "dist-upgrade", "--auto-agree-with-licenses", "--dry-run"
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--dry-run",
+                        "--no-allow-vendor-change",
                     )
                     zypper_mock.assert_any_call(
                         "dist-upgrade",
                         "--auto-agree-with-licenses",
                         "--dry-run",
-                        "--debug-solver",
+                        "--no-allow-vendor-change",
                     )
+
                 with patch(
                     "salt.modules.zypperpkg.list_pkgs",
                     MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}]),
@@ -667,10 +675,15 @@ Repository 'DUMMY' not found by its alias, number, or URI.
             with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
                 with self.assertRaises(CommandExecutionError) as cmd_exc:
                     ret = zypper.upgrade(dist_upgrade=True, fromrepo=["DUMMY"])
-                self.assertEqual(cmd_exc.exception.info['changes'], {})
-                self.assertEqual(cmd_exc.exception.info['result']['stdout'], zypper_out)
-                zypper_mock.noraise.call.assert_called_with('dist-upgrade', '--auto-agree-with-licenses',
-                                                            '--from', 'DUMMY')
+                self.assertEqual(cmd_exc.exception.info["changes"], {})
+                self.assertEqual(cmd_exc.exception.info["result"]["stdout"], zypper_out)
+                zypper_mock.noraise.call.assert_called_with(
+                    "dist-upgrade",
+                    "--auto-agree-with-licenses",
+                    "--from",
+                    "DUMMY",
+                    "--no-allow-vendor-change",
+                )
 
     def test_upgrade_available(self):
         '''
