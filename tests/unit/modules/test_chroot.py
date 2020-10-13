@@ -83,7 +83,6 @@ class ChrootTestCase(TestCase, LoaderModuleMockMixin):
         self.assertTrue(chroot.create('/chroot'))
         makedirs.assert_called()
 
-    @patch("salt.modules.chroot.exist")
     @patch("salt.utils.files.fopen")
     def test_in_chroot(self, fopen):
         """
