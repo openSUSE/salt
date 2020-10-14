@@ -2738,6 +2738,7 @@ def update(
     ]
 
     data = {k: v for k, v in locals().items() if bool(v)}
+    data["stop_on_reboot"] = stop_on_reboot
     if boot_dev:
         data["boot_dev"] = {i + 1: dev for i, dev in enumerate(boot_dev.split())}
     need_update = (
