@@ -1984,40 +1984,47 @@ def clean_locks(root=None):
 
 def unhold(name=None, pkgs=None, **kwargs):
     '''
-    Remove specified package lock.
+    Remove a package hold.
 
-    root
-        operate on a different root directory.
+    name
+        A package name, or a comma-separated list of package names.  Specify
+        one of ``name`` or ``pkgs``.
+
+    pkgs
+        A list of packages.  Specify one of ``name`` or ``pkgs``.
 
     CLI Example:
 
     .. code-block:: bash
 
-        salt '*' pkg.remove_lock <package name>
-        salt '*' pkg.remove_lock <package1>,<package2>,<package3>
-        salt '*' pkg.remove_lock pkgs='["foo", "bar"]'
+        salt '*' pkg.unhold <package name>
+        salt '*' pkg.unhold <package1>,<package2>,<package3>
+        salt '*' pkg.unhold pkgs='["foo", "bar"]'
     '''
     ret = {}
     root = kwargs.get('root')
     if (not name and not pkgs) or (name and pkgs):
         raise CommandExecutionError('Name or packages must be specified.')
-    elif name:
-        pkgs = [name]
 
     locks = list_locks(root)
     try:
-        pkgs = list(__salt__['pkg_resource.parse_targets'](pkgs)[0].keys())
+        pkgs = list(__salt__['pkg_resource.parse_targets'](name, pkgs)[0].keys())
     except MinionError as exc:
         raise CommandExecutionError(exc)
 
     removed = []
     missing = []
     for pkg in pkgs:
+        ret[pkg] = {'name': pkg, 'changes': {}, 'result': False, 'comment': ''}
         if locks.get(pkg):
             removed.append(pkg)
+            ret[pkg].update(result=True)
             ret[pkg]['comment'] = 'Package {0} is no longer held.'.format(pkg)
+            ret[pkg]['changes']['new'] = ''
+            ret[pkg]['changes']['old'] = 'hold'
         else:
             missing.append(pkg)
+            ret[pkg].update(result=True)
             ret[pkg]['comment'] = 'Package {0} unable to be unheld.'.format(pkg)
 
     if removed:
@@ -2028,7 +2035,13 @@ def unhold(name=None, pkgs=None, **kwargs):
 
 def remove_lock(packages, root=None, **kwargs):  # pylint: disable=unused-argument
     '''
+    .. deprecated:: 3001
+        This function is deprecated. Please use ``unhold()`` instead.
+
     Remove specified package lock.
+
+    packages
+        A package name, or a comma-separated list of package names.
 
     root
         operate on a different root directory.
@@ -2039,7 +2052,6 @@ def remove_lock(packages, root=None, **kwargs):  # pylint: disable=unused-argume
 
         salt '*' pkg.remove_lock <package name>
         salt '*' pkg.remove_lock <package1>,<package2>,<package3>
-        salt '*' pkg.remove_lock pkgs='["foo", "bar"]'
     '''
     salt.utils.versions.warn_until('Sodium', 'This function is deprecated. Please use unhold() instead.')
     locks = list_locks(root)
@@ -2064,35 +2076,32 @@ def remove_lock(packages, root=None, **kwargs):  # pylint: disable=unused-argume
 
 def hold(name=None, pkgs=None, **kwargs):
     '''
-    Add a package lock. Specify packages to lock by exact name.
+    Add a package hold.  Specify one of ``name`` and ``pkgs``.
 
-    root
-        operate on a different root directory.
+    name
+        A package name, or a comma-separated list of package names.  Specify
+        one of ``name`` or ``pkgs``.
+
+    pkgs
+        A list of packages.  Specify one of ``name`` or ``pkgs``.
 
     CLI Example:
 
     .. code-block:: bash
 
-        salt '*' pkg.add_lock <package name>
-        salt '*' pkg.add_lock <package1>,<package2>,<package3>
-        salt '*' pkg.add_lock pkgs='["foo", "bar"]'
-
-    :param name:
-    :param pkgs:
-    :param kwargs:
-    :return:
+        salt '*' pkg.hold <package name>
+        salt '*' pkg.hold <package1>,<package2>,<package3>
+        salt '*' pkg.hold pkgs='["foo", "bar"]'
     '''
     ret = {}
     root = kwargs.get('root')
     if (not name and not pkgs) or (name and pkgs):
         raise CommandExecutionError('Name or packages must be specified.')
-    elif name:
-        pkgs = [name]
 
     locks = list_locks(root=root)
     added = []
     try:
-        pkgs = list(__salt__['pkg_resource.parse_targets'](pkgs)[0].keys())
+        pkgs = list(__salt__['pkg_resource.parse_targets'](name, pkgs)[0].keys())
     except MinionError as exc:
         raise CommandExecutionError(exc)
 
@@ -2100,9 +2109,13 @@ def hold(name=None, pkgs=None, **kwargs):
         ret[pkg] = {'name': pkg, 'changes': {}, 'result': False, 'comment': ''}
         if not locks.get(pkg):
             added.append(pkg)
+            ret[pkg].update(result=True)
             ret[pkg]['comment'] = 'Package {0} is now being held.'.format(pkg)
+            ret[pkg]['changes']['new'] = 'hold'
+            ret[pkg]['changes']['old'] = ''
         else:
             ret[pkg]['comment'] = 'Package {0} is already set to be held.'.format(pkg)
+            ret[pkg].update(result=True)
 
     if added:
         __zypper__(root=root).call('al', *added)
@@ -2112,7 +2125,13 @@ def hold(name=None, pkgs=None, **kwargs):
 
 def add_lock(packages, root=None, **kwargs):  # pylint: disable=unused-argument
     '''
+    .. deprecated:: 3001
+        This function is deprecated. Please use ``hold()`` instead.
+
     Add a package lock. Specify packages to lock by exact name.
+
+    packages
+        A package name, or a comma-separated list of package names.
 
     root
         operate on a different root directory.
@@ -2123,7 +2142,6 @@ def add_lock(packages, root=None, **kwargs):  # pylint: disable=unused-argument
 
         salt '*' pkg.add_lock <package name>
         salt '*' pkg.add_lock <package1>,<package2>,<package3>
-        salt '*' pkg.add_lock pkgs='["foo", "bar"]'
     '''
     salt.utils.versions.warn_until('Sodium', 'This function is deprecated. Please use hold() instead.')
     locks = list_locks(root)
