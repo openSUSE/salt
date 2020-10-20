@@ -4,11 +4,10 @@ Decorators for salt.utils.path
 '''
 from __future__ import absolute_import, print_function, unicode_literals
 
-import functools
-
 # Import Salt libs
 import salt.utils.path
 from salt.exceptions import CommandNotFoundError
+import salt.ext.six
 
 
 def which(exe):
@@ -16,7 +15,7 @@ def which(exe):
     Decorator wrapper for salt.utils.path.which
     '''
     def wrapper(function):
-        @functools.wraps(function)
+        @salt.ext.six.wraps(function)
         def wrapped(*args, **kwargs):
             if salt.utils.path.which(exe) is None:
                 raise CommandNotFoundError(
@@ -34,7 +33,7 @@ def which_bin(exes):
     Decorator wrapper for salt.utils.path.which_bin
     '''
     def wrapper(function):
-        @functools.wraps(function)
+        @salt.ext.six.wraps(function)
         def wrapped(*args, **kwargs):
             if salt.utils.path.which_bin(exes) is None:
                 raise CommandNotFoundError(
