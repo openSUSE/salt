@@ -7,7 +7,7 @@ import salt.modules.rpm_lowpkg as rpm
 import salt.modules.yumpkg as yumpkg
 import salt.utils.platform
 from salt.exceptions import CommandExecutionError, SaltInvocationError
-from tests.support.mock import MagicMock, Mock, patch
+from tests.support.mock import MagicMock, Mock, call, mock_open, patch
 
 try:
     import pytest
@@ -1681,6 +1681,91 @@ def test_get_repo_with_non_existent_repo(list_repos_var):
     with patch_list_repos:
         ret = yumpkg.get_repo(repo, **kwargs)
     assert ret == expected, ret
+
+
+def test_get_repo_keys():
+    salt_mock = {"lowpkg.list_gpg_keys": MagicMock(return_value=True)}
+    with patch.dict(yumpkg.__salt__, salt_mock):
+        assert yumpkg.get_repo_keys(info=True, root="/mnt")
+        salt_mock["lowpkg.list_gpg_keys"].assert_called_once_with(True, "/mnt")
+
+
+def test_add_repo_key_fail():
+    with pytest.raises(SaltInvocationError):
+        yumpkg.add_repo_key()
+
+    with pytest.raises(SaltInvocationError):
+        yumpkg.add_repo_key(path="path", text="text")
+
+
+def test_add_repo_key_path():
+    salt_mock = {
+        "cp.cache_file": MagicMock(return_value="path"),
+        "lowpkg.import_gpg_key": MagicMock(return_value=True),
+    }
+    with patch("salt.utils.files.fopen", mock_open(read_data="text")), patch.dict(
+        yumpkg.__salt__, salt_mock
+    ):
+        assert yumpkg.add_repo_key(path="path", root="/mnt")
+        salt_mock["cp.cache_file"].assert_called_once_with("path", "base")
+        salt_mock["lowpkg.import_gpg_key"].assert_called_once_with("text", "/mnt")
+
+
+def test_add_repo_key_text():
+    salt_mock = {"lowpkg.import_gpg_key": MagicMock(return_value=True)}
+    with patch.dict(yumpkg.__salt__, salt_mock):
+        assert yumpkg.add_repo_key(text="text", root="/mnt")
+        salt_mock["lowpkg.import_gpg_key"].assert_called_once_with("text", "/mnt")
+
+
+def test_del_repo_key():
+    salt_mock = {"lowpkg.remove_gpg_key": MagicMock(return_value=True)}
+    with patch.dict(yumpkg.__salt__, salt_mock):
+        assert yumpkg.del_repo_key(keyid="keyid", root="/mnt")
+        salt_mock["lowpkg.remove_gpg_key"].assert_called_once_with("keyid", "/mnt")
+
+
+def test_pkg_update_dnf():
+    """
+    Tests that the proper CLI options are added when obsoletes=False
+    """
+    name = "foo"
+    old = "1.2.2-1.fc31"
+    new = "1.2.3-1.fc31"
+    cmd_mock = MagicMock(return_value={"retcode": 0})
+    list_pkgs_mock = MagicMock(side_effect=[{name: old}, {name: new}])
+    parse_targets_mock = MagicMock(return_value=({"foo": None}, "repository"))
+    with patch.dict(
+        yumpkg.__salt__,
+        {"cmd.run_all": cmd_mock, "pkg_resource.parse_targets": parse_targets_mock},
+    ), patch.object(yumpkg, "refresh_db", MagicMock()), patch.object(
+        yumpkg, "list_pkgs", list_pkgs_mock
+    ), patch.object(
+        yumpkg, "_yum", MagicMock(return_value="dnf")
+    ), patch(
+        "salt.utils.systemd.has_scope", MagicMock(return_value=False)
+    ):
+        ret = yumpkg.update(name, setopt="obsoletes=0,plugins=0")
+        expected = {name: {"old": old, "new": new}}
+        assert ret == expected, ret
+
+        cmd_mock.assert_called_once_with(
+            [
+                "dnf",
+                "--quiet",
+                "-y",
+                "--setopt",
+                "obsoletes=0",
+                "--setopt",
+                "plugins=0",
+                "--obsoletes=False",
+                "upgrade",
+                "foo",
+            ],
+            env={},
+            output_loglevel="trace",
+            python_shell=False,
+        )
 
 
 def test_call_yum_default():
