@@ -1908,7 +1908,7 @@ def _convert_if_int(value):
     return value
 
 
-def get_repo_keys():
+def get_repo_keys(**kwargs):
     """
     .. versionadded:: 2017.7.0
 
@@ -1990,7 +1990,9 @@ def get_repo_keys():
     return ret
 
 
-def add_repo_key(path=None, text=None, keyserver=None, keyid=None, saltenv="base"):
+def add_repo_key(
+    path=None, text=None, keyserver=None, keyid=None, saltenv="base", **kwargs
+):
     """
     .. versionadded:: 2017.7.0
 
@@ -2016,7 +2018,6 @@ def add_repo_key(path=None, text=None, keyserver=None, keyid=None, saltenv="base
         salt '*' pkg.add_repo_key keyserver='keyserver.example' keyid='0000AAAA'
     """
     cmd = ["apt-key"]
-    kwargs = {}
 
     current_repo_keys = get_repo_keys()
 
