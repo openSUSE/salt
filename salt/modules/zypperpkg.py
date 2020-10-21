@@ -2018,19 +2018,18 @@ def unhold(name=None, pkgs=None, **kwargs):
         if locks.get(pkg):
             removed.append(pkg)
             if __opts__['test']:
-                ret[pkg].update(result=None)
-                ret[pkg]['comment'] = 'Package {0} is set to be unheld.'.format(pkg)
+                ret[pkg].update(result=None, comment='Package {0} is set to be unheld.'.format(pkg))
+            else:
+                ret[pkg].update(result=True, changes={'new': '', 'old': 'hold'},
+                                comment='Package {0} is no longer held.'.format(pkg))
         else:
             ret[pkg]['comment'] = 'Package {0} unable to be unheld.'.format(pkg)
 
     if removed and not __opts__['test']:
         __zypper__(root=root).call('rl', *removed)
-
-        locks = list_locks(root=root)
-        for pkg in removed:
-            if not locks.get(pkg):
-                ret[pkg].update(result=True, changes={'new': '', 'old': 'hold'})
-                ret[pkg]['comment'] = 'Package {0} is no longer held.'.format(pkg)
+        if __zypper__.exit_code:
+            for pkg in removed:
+                ret[pkg].update(result=False, comment='Package {0} was unable to be unheld.'.format(pkg))
 
     return ret
 
@@ -2112,20 +2111,19 @@ def hold(name=None, pkgs=None, **kwargs):
         if not locks.get(pkg):
             added.append(pkg)
             if __opts__['test']:
-                ret[pkg].update(result=None)
-                ret[pkg]['comment'] = 'Package {0} is set to be held.'.format(pkg)
+                ret[pkg].update(result=None, comment='Package {0} is set to be held.'.format(pkg))
+            else:
+                ret[pkg].update(result=True, changes={'new': 'hold', 'old': ''},
+                                comment='Package {0} is now being held.'.format(pkg))
         else:
             ret[pkg]['comment'] = 'Package {0} is already set to be held.'.format(pkg)
             ret[pkg].update(result=True)
 
     if added and not __opts__['test']:
         __zypper__(root=root).call('al', *added)
-
-        locks = list_locks(root=root)
-        for pkg in added:
-            if locks.get(pkg):
-                ret[pkg].update(result=True, changes={'new': 'hold', 'old': ''})
-                ret[pkg]['comment'] = 'Package {0} is now being held.'.format(pkg)
+        if __zypper__.exit_code:
+            for pkg in added:
+                ret[pkg].update(result=False, comment='Package {0} was unable to be held.'.format(pkg))
 
     return ret
 
