@@ -2027,7 +2027,7 @@ def unhold(name=None, pkgs=None, **kwargs):
 
     if removed and not __opts__['test']:
         __zypper__(root=root).call('rl', *removed)
-        if __zypper__.exit_code:
+        if __zypper__.exit_code != 0:
             for pkg in removed:
                 ret[pkg].update(result=False, comment='Package {0} was unable to be unheld.'.format(pkg))
 
@@ -2121,7 +2121,7 @@ def hold(name=None, pkgs=None, **kwargs):
 
     if added and not __opts__['test']:
         __zypper__(root=root).call('al', *added)
-        if __zypper__.exit_code:
+        if __zypper__.exit_code != 0:
             for pkg in added:
                 ret[pkg].update(result=False, comment='Package {0} was unable to be held.'.format(pkg))
 
