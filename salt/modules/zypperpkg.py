@@ -1914,6 +1914,74 @@ def purge(name=None, pkgs=None, root=None, inclusion_detection=False, **kwargs):
     return _uninstall(inclusion_detection, name=name, pkgs=pkgs, root=root)
 
 
+def list_holds(pattern=None, full=True, **kwargs):
+    '''
+    List information on locked packages.
+
+    pattern : \w+(?:[.-][^-]+)*
+        Regular expression used to match the package name
+
+    full : True
+        Show the full hold definition including version and epoch. Set to
+        ``False`` to return just the name of the package(s) being held.
+
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' pkg.list_holds
+        salt '*' pkg.list_holds full=False
+    '''
+    root = kwargs.get('root')
+    ret = []
+    _locks = os.path.join(root, os.path.relpath(LOCKS, os.path.sep)) if root else LOCKS
+    try:
+        inst_info = {}
+        with salt.utils.files.fopen(_locks) as fhr:
+            items = salt.utils.stringutils.to_unicode(fhr.read()).split('\n\n')
+            for meta in [item.split('\n') for item in items]:
+                lock = {}
+                for element in [el for el in meta if el]:
+                    if ':' in element:
+                        lock.update(dict([tuple([i.strip() for i in element.split(':', 1)]), ]))
+                solv_name = lock.get('solvable_name')
+                if solv_name:
+                    inst_pkg = None
+                    try:
+                        inst_pkg = search(solv_name, match=None if '*' in solv_name else 'exact',
+                                          case_sensitive=True if lock.get('case_sensitive', 'on') == 'on' else False,
+                                          installed_only=True, details=True, all_versions=True)
+                    except:
+                        pass
+                    for pkg, pkg_info in inst_pkg.items():
+                        if pkg not in inst_info:
+                            inst_info.update(info_installed(pkg, attr='edition,epoch', all_versions=True))
+                        if isinstance(pkg_info, list) and full:
+                            for attrs in pkg_info:
+                                try:
+                                    pkg_vr = attrs.get('edition')
+                                    epoch = list(filter(lambda p: p.get('edition') == pkg_vr, inst_info[pkg]))[0].get('epoch', 0)
+                                except:
+                                    epoch = 0
+                                ret.append('{0}:{1}:{2}.*'.format(epoch,
+                                           pkg, attrs.get('edition')) if full else pkg)
+                        else:
+                            try:
+                                pkg_vr = pkg_info.get('edition')
+                                epoch = inst_info[pkg][0].get('epoch', 0)
+                            except:
+                                epoch = 0
+                            ret.append('{0}:{1}:{2}.*'.format(epoch,
+                                       pkg, pkg_info.get('edition')) if full else pkg)
+    except IOError:
+        pass
+    except Exception:
+        log.warning('Detected a problem when accessing {}'.format(_locks))
+
+    return ret
+
+
 def list_locks(root=None):
     '''
     List current package locks.
@@ -2481,6 +2549,7 @@ def search(criteria, refresh=False, **kwargs):
             }
 
     root = kwargs.get('root', None)
+    all_versions = kwargs.get('all_versions', False)
 
     if refresh:
         refresh_db(root)
@@ -2510,9 +2579,19 @@ def search(criteria, refresh=False, **kwargs):
 
     out = {}
     for solvable in solvables:
-        out[solvable.getAttribute('name')] = dict()
+        pkg_name = solvable.getAttribute('name')
+        if pkg_name in out:
+            if not all_versions:
+                continue
+            if isinstance(out[pkg_name], dict):
+                out[pkg_name] = list([out[pkg_name]])
+            cur_pkg = dict()
+            out[pkg_name].append(cur_pkg)
+        else:
+            out[pkg_name] = dict()
+            cur_pkg = out[pkg_name]
         for k, v in solvable.attributes.items():
-            out[solvable.getAttribute('name')][k] = v
+            cur_pkg[k] = v
 
     return out
 
