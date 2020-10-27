@@ -33,7 +33,7 @@ configparser==4.0.2       # via importlib-metadata
 contextlib2==0.5.5        # via cherrypy, importlib-metadata
 cookies==2.2.1            # via responses
 croniter==0.3.29
-cryptography==2.6.1
+cryptography==3.2
 dnspython==1.16.0
 docker-pycreds==0.4.0     # via docker
 docker==3.7.2
