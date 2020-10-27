@@ -1918,7 +1918,7 @@ def list_holds(pattern=None, full=True, **kwargs):
     '''
     List information on locked packages.
 
-    pattern : \w+(?:[.-][^-]+)*
+    pattern
         Regular expression used to match the package name
 
     full : True
@@ -1937,7 +1937,7 @@ def list_holds(pattern=None, full=True, **kwargs):
     ret = []
     _locks = os.path.join(root, os.path.relpath(LOCKS, os.path.sep)) if root else LOCKS
     try:
-        inst_info = {}
+        inst_pkgs = {}
         with salt.utils.files.fopen(_locks) as fhr:
             items = salt.utils.stringutils.to_unicode(fhr.read()).split('\n\n')
             for meta in [item.split('\n') for item in items]:
@@ -1945,35 +1945,22 @@ def list_holds(pattern=None, full=True, **kwargs):
                 for element in [el for el in meta if el]:
                     if ':' in element:
                         lock.update(dict([tuple([i.strip() for i in element.split(':', 1)]), ]))
-                solv_name = lock.get('solvable_name')
-                if solv_name:
-                    inst_pkg = None
-                    try:
-                        inst_pkg = search(solv_name, match=None if '*' in solv_name else 'exact',
-                                          case_sensitive=True if lock.get('case_sensitive', 'on') == 'on' else False,
-                                          installed_only=True, details=True, all_versions=True)
-                    except:
-                        pass
-                    for pkg, pkg_info in inst_pkg.items():
-                        if pkg not in inst_info:
-                            inst_info.update(info_installed(pkg, attr='edition,epoch', all_versions=True))
-                        if isinstance(pkg_info, list) and full:
-                            for attrs in pkg_info:
-                                try:
-                                    pkg_vr = attrs.get('edition')
-                                    epoch = list(filter(lambda p: p.get('edition') == pkg_vr, inst_info[pkg]))[0].get('epoch', 0)
-                                except:
-                                    epoch = 0
-                                ret.append('{0}:{1}:{2}.*'.format(epoch,
-                                           pkg, attrs.get('edition')) if full else pkg)
-                        else:
-                            try:
-                                pkg_vr = pkg_info.get('edition')
-                                epoch = inst_info[pkg][0].get('epoch', 0)
-                            except:
-                                epoch = 0
-                            ret.append('{0}:{1}:{2}.*'.format(epoch,
-                                       pkg, pkg_info.get('edition')) if full else pkg)
+                try:
+                    solv_name = lock.get('solvable_name')
+                    for pkg, pkg_info in search(solv_name, match=None if '*' in solv_name else 'exact',
+                                                case_sensitive=True if lock.get('case_sensitive', 'on') == 'on' else False,
+                                                installed_only=True, details=True, all_versions=True).items():
+                        if pkg not in inst_pkgs:
+                            inst_pkgs.update(info_installed(pkg, attr='edition,epoch', all_versions=True))
+                except:
+                    pass
+        pkg_re = re.compile('{0}-\S+'.format(pattern)) if pattern else None
+        for pkg, pkg_editions in inst_pkgs.items():
+            for pkg_info in pkg_editions:
+                pkg_vr = '{0}-{1}.*'.format(pkg, pkg_info.get('edition'))
+                pkg_ret = '{0}:{1}'.format(pkg_info.get('epoch', 0), pkg_vr) if full else pkg
+                if pkg_ret not in ret and (not pkg_re or pkg_re.match(pkg_vr)):
+                    ret.append(pkg_ret)
     except IOError:
         pass
     except Exception:
