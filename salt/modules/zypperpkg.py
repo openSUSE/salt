@@ -2567,18 +2567,17 @@ def search(criteria, refresh=False, **kwargs):
     out = {}
     for solvable in solvables:
         pkg_name = solvable.getAttribute('name')
-        if pkg_name in out:
-            if not all_versions:
-                continue
-            if isinstance(out[pkg_name], dict):
-                out[pkg_name] = list([out[pkg_name]])
-            cur_pkg = dict()
-            out[pkg_name].append(cur_pkg)
+        if pkg_name in out and not all_versions:
+            continue
+        elif pkg_name not in out:
+            out[pkg_name] = list()
+        pkg = dict()
+        if all_versions:
+            out[pkg_name].append(pkg)
         else:
-            out[pkg_name] = dict()
-            cur_pkg = out[pkg_name]
+            out[pkg_name] = pkg
         for k, v in solvable.attributes.items():
-            cur_pkg[k] = v
+            pkg[k] = v
 
     return out
 
