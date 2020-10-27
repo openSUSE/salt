@@ -35,6 +35,8 @@ import salt.utils.stringutils
 import salt.utils.systemd
 import salt.utils.versions
 from salt.exceptions import CommandExecutionError, MinionError, SaltInvocationError
+
+# pylint: disable=import-error,redefined-builtin,no-name-in-module
 from salt.utils.versions import LooseVersion
 
 log = logging.getLogger(__name__)
@@ -135,6 +137,13 @@ class _Zypper:
         self.__systemd_scope = False
         self.__root = None
 
+        # Dist upgrade vendor change support (SLE12+)
+        self.dup_avc = False
+        # Install/Patch/Upgrade vendor change support (SLE15+)
+        self.inst_avc = False
+        # Flag if allow vendor change should be allowed
+        self.avc = False
+
         # Call status
         self.__called = False
 
@@ -179,6 +188,8 @@ class _Zypper:
             self.__no_raise = True
         elif item == "refreshable":
             self.__refresh = True
+        elif item == "allow_vendor_change":
+            return self.__allow_vendor_change
         elif item == "call":
             return self.__call
         else:
@@ -218,6 +229,33 @@ class _Zypper:
     @property
     def pid(self):
         return self.__call_result.get("pid", "")
+
+    def __allow_vendor_change(self, allowvendorchange, novendorchange):
+        if allowvendorchange or not novendorchange:
+            self.refresh_zypper_flags()
+            if self.dup_avc or self.inst_avc:
+                log.info("Enabling vendor change")
+                self.avc = True
+            else:
+                log.warning(
+                    "Enabling/Disabling vendor changes is not supported on this Zypper version"
+                )
+        return self
+
+    def refresh_zypper_flags(self):
+        try:
+            zypp_version = version("zypper")
+            # zypper version 1.11.34 in SLE12 update supports vendor change for only dist upgrade
+            if version_cmp(zypp_version, "1.11.34") >= 0:
+                # zypper version supports vendor change for dist upgrade
+                self.dup_avc = True
+            # zypper version 1.14.8 in SLE15 update supports vendor change in install/patch/upgrading
+            if version_cmp(zypp_version, "1.14.8") >= 0:
+                self.inst_avc = True
+            else:
+                log.error("Failed to compare Zypper version")
+        except Exception as ex:
+            log.error("Unable to get Zypper version: {}".format(ex))
 
     def _is_error(self):
         """
@@ -335,6 +373,15 @@ class _Zypper:
             if self.__systemd_scope:
                 cmd.extend(["systemd-run", "--scope"])
             cmd.extend(self.__cmd)
+
+            if self.avc:
+                for i in ["install", "upgrade", "dist-upgrade"]:
+                    if i in cmd:
+                        if i == "install" and self.inst_avc:
+                            cmd.insert(cmd.index(i) + 1, "--allow-vendor-change")
+                        elif i in ["upgrade", "dist-upgrade"] and self.dup_avc:
+                            cmd.insert(cmd.index(i) + 1, "--allow-vendor-change")
+
             log.debug("Calling Zypper: %s", " ".join(cmd))
             self.__call_result = __salt__["cmd.run_all"](cmd, **kwargs)
             if self._check_result():
@@ -1446,6 +1493,8 @@ def install(
     no_recommends=False,
     root=None,
     inclusion_detection=False,
+    novendorchange=True,
+    allowvendorchange=False,
     **kwargs
 ):
     """
@@ -1492,6 +1541,13 @@ def install(
 
     skip_verify
         Skip the GPG verification check (e.g., ``--no-gpg-checks``)
+
+    novendorchange
+        DEPRECATED(use allowvendorchange): If set to True, do not allow vendor changes. Default: True
+
+    allowvendorchange
+        If set to True, vendor change is allowed. Default: False
+        If both allowvendorchange and novendorchange are passed, only allowvendorchange is used.
 
     version
         Can be either a version number, or the combination of a comparison
@@ -1658,6 +1714,7 @@ def install(
     cmd_install.append(
         kwargs.get("resolve_capabilities") and "--capability" or "--name"
     )
+    # Install / patching / upgrade with vendor change support is only in SLE 15+  opensuse Leap 15+
 
     if not refresh:
         cmd_install.insert(0, "--no-refresh")
@@ -1694,6 +1751,7 @@ def install(
                 systemd_scope=systemd_scope,
                 root=root,
             )
+            .allow_vendor_change(allowvendorchange, novendorchange)
             .call(*cmd)
             .splitlines()
         ):
@@ -1706,7 +1764,9 @@ def install(
     while downgrades:
         cmd = cmd_install + ["--force"] + downgrades[:500]
         downgrades = downgrades[500:]
-        __zypper__(no_repo_failure=ignore_repo_failure, root=root).call(*cmd)
+        __zypper__(no_repo_failure=ignore_repo_failure, root=root).allow_vendor_change(
+            allowvendorchange, novendorchange
+        ).call(*cmd)
 
     _clean_cache()
     new = (
@@ -1737,7 +1797,8 @@ def upgrade(
     dryrun=False,
     dist_upgrade=False,
     fromrepo=None,
-    novendorchange=False,
+    novendorchange=True,
+    allowvendorchange=False,
     skip_verify=False,
     no_recommends=False,
     root=None,
@@ -1776,7 +1837,11 @@ def upgrade(
         Specify a list of package repositories to upgrade from. Default: None
 
     novendorchange
-        If set to True, no allow vendor changes. Default: False
+        DEPRECATED(use allowvendorchange): If set to True, do not allow vendor changes. Default: True
+
+    allowvendorchange
+        If set to True, vendor change is allowed. Default: False
+        If both allowvendorchange and novendorchange are passed, only allowvendorchange is used.
 
     skip_verify
         Skip the GPG verification check (e.g., ``--no-gpg-checks``)
@@ -1823,31 +1888,21 @@ def upgrade(
             cmd_update.extend(["--from" if dist_upgrade else "--repo", repo])
         log.info("Targeting repos: %s", fromrepo)
 
-    if dist_upgrade:
-        if novendorchange:
-            # TODO: Grains validation should be moved to Zypper class
-            if __grains__["osrelease_info"][0] > 11:
-                cmd_update.append("--no-allow-vendor-change")
-                log.info("Disabling vendor changes")
-            else:
-                log.warning(
-                    "Disabling vendor changes is not supported on this Zypper version"
-                )
+    if no_recommends:
+        cmd_update.append("--no-recommends")
+        log.info("Disabling recommendations")
 
-        if no_recommends:
-            cmd_update.append("--no-recommends")
-            log.info("Disabling recommendations")
-
-        if dryrun:
-            # Creates a solver test case for debugging.
-            log.info("Executing debugsolver and performing a dry-run dist-upgrade")
-            __zypper__(systemd_scope=_systemd_scope(), root=root).noraise.call(
-                *cmd_update + ["--debug-solver"]
-            )
+    if dryrun:
+        # Creates a solver test case for debugging.
+        log.info("Executing debugsolver and performing a dry-run dist-upgrade")
+        __zypper__(systemd_scope=_systemd_scope(), root=root).allow_vendor_change(
+            allowvendorchange, novendorchange
+        ).noraise.call(*cmd_update + ["--debug-solver"])
 
     old = list_pkgs(root=root)
-
-    __zypper__(systemd_scope=_systemd_scope(), root=root).noraise.call(*cmd_update)
+    __zypper__(systemd_scope=_systemd_scope(), root=root).allow_vendor_change(
+        allowvendorchange, novendorchange
+    ).noraise.call(*cmd_update)
     _clean_cache()
     new = list_pkgs(root=root)
     ret = salt.utils.data.compare_dicts(old, new)
