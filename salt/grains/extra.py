@@ -76,8 +76,14 @@ def __secure_boot():
     enabled = False
     sboot = glob.glob("/sys/firmware/efi/vars/SecureBoot-*/data")
     if len(sboot) == 1:
-        with salt.utils.files.fopen(sboot[0], "rb") as fd:
-            enabled = fd.read()[-1:] == b"\x01"
+        # The minion is usually running as a privileged user, but is
+        # not the case for the master.  Seems that the master can also
+        # pick the grains, and this file can only be readed by "root"
+        try:
+            with salt.utils.files.fopen(sboot[0], "rb") as fd:
+                enabled = fd.read()[-1:] == b"\x01"
+        except PermissionError:
+            pass
     return enabled
 
 
