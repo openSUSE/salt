@@ -1707,7 +1707,7 @@ def upgrade(
     dryrun=False,
     dist_upgrade=False,
     fromrepo=None,
-    novendorchange=False,
+    novendorchange=True,
     skip_verify=False,
     no_recommends=False,
     root=None,
@@ -1794,19 +1794,18 @@ def upgrade(
         log.info("Targeting repos: %s", fromrepo)
 
     if dist_upgrade:
-        if novendorchange:
-            # TODO: Grains validation should be moved to Zypper class
-            if __grains__["osrelease_info"][0] > 11:
+        # TODO: Grains validation should be moved to Zypper class
+        if __grains__["osrelease_info"][0] > 11:
+            if novendorchange:
                 cmd_update.append("--no-allow-vendor-change")
                 log.info("Disabling vendor changes")
             else:
-                log.warning(
-                    "Disabling vendor changes is not supported on this Zypper version"
-                )
-
-        if no_recommends:
-            cmd_update.append("--no-recommends")
-            log.info("Disabling recommendations")
+                cmd_update.append("--allow-vendor-change")
+                log.info("Enabling vendor changes")
+        else:
+            log.warning(
+                "Enabling/Disabling vendor changes is not supported on this Zypper version"
+            )
 
         if no_recommends:
             cmd_update.append("--no-recommends")
