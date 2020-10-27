@@ -480,7 +480,11 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
                     ret = zypper.upgrade(dist_upgrade=True)
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
-                    zypper_mock.assert_any_call('dist-upgrade', '--auto-agree-with-licenses')
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--no-allow-vendor-change",
+                    )
 
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
                     ret = zypper.upgrade(dist_upgrade=True, dryrun=True)
@@ -489,24 +493,137 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                                                 '--dry-run', '--debug-solver')
 
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
-                    ret = zypper.upgrade(dist_upgrade=True, dryrun=True,
-                                         fromrepo=["Dummy", "Dummy2"], novendorchange=True)
-                    zypper_mock.assert_any_call('dist-upgrade', '--auto-agree-with-licenses', '--dry-run',
-                                                '--from', "Dummy", '--from', 'Dummy2', '--no-allow-vendor-change')
-                    zypper_mock.assert_any_call('dist-upgrade', '--auto-agree-with-licenses', '--dry-run',
-                                                '--from', "Dummy", '--from', 'Dummy2', '--no-allow-vendor-change',
-                                                '--debug-solver')
-
-                with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
                     ret = zypper.upgrade(dist_upgrade=False, fromrepo=["Dummy", "Dummy2"], dryrun=False)
                     zypper_mock.assert_any_call('update', '--auto-agree-with-licenses', '--repo', "Dummy", '--repo', 'Dummy2')
 
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
                     ret = zypper.upgrade(dist_upgrade=True, fromrepo=["Dummy", "Dummy2"], novendorchange=True)
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--dry-run",
+                        "--no-allow-vendor-change",
+                    )
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--dry-run",
+                        "--no-allow-vendor-change",
+                    )
+
+                with patch(
+                    "salt.modules.zypperpkg.list_pkgs",
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}]),
+                ):
+                    ret = zypper.upgrade(
+                        dist_upgrade=True,
+                        dryrun=True,
+                        fromrepo=["Dummy", "Dummy2"],
+                        novendorchange=False,
+                    )
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--dry-run",
+                        "--from",
+                        "Dummy",
+                        "--from",
+                        "Dummy2",
+                        "--allow-vendor-change",
+                    )
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--dry-run",
+                        "--from",
+                        "Dummy",
+                        "--from",
+                        "Dummy2",
+                        "--allow-vendor-change",
+                        "--debug-solver",
+                    )
+
+
+                with patch(
+                    "salt.modules.zypperpkg.list_pkgs",
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}]),
+                ):
+                    ret = zypper.upgrade(
+                        dist_upgrade=True,
+                        dryrun=True,
+                        fromrepo=["Dummy", "Dummy2"],
+                        novendorchange=True,
+                    )
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--dry-run",
+                        "--from",
+                        "Dummy",
+                        "--from",
+                        "Dummy2",
+                        "--no-allow-vendor-change",
+                    )
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--dry-run",
+                        "--from",
+                        "Dummy",
+                        "--from",
+                        "Dummy2",
+                        "--no-allow-vendor-change",
+                        "--debug-solver",
+                    )
+
+                with patch(
+                    "salt.modules.zypperpkg.list_pkgs",
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}]),
+                ):
+                    ret = zypper.upgrade(
+                        dist_upgrade=False, fromrepo=["Dummy", "Dummy2"], dryrun=False
+                    )
+                    zypper_mock.assert_any_call(
+                        "update",
+                        "--auto-agree-with-licenses",
+                        "--repo",
+                        "Dummy",
+                        "--repo",
+                        "Dummy2",
+                    )
+
+                with patch(
+                    "salt.modules.zypperpkg.list_pkgs",
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}]),
+                ):
+                    ret = zypper.upgrade(
+                        dist_upgrade=True,
+                        fromrepo=["Dummy", "Dummy2"],
+                        novendorchange=True,
+                    )
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
                     zypper_mock.assert_any_call('dist-upgrade', '--auto-agree-with-licenses', '--from', "Dummy",
                                                 '--from', 'Dummy2', '--no-allow-vendor-change')
 
+                with patch(
+                    "salt.modules.zypperpkg.list_pkgs",
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}]),
+                ):
+                    ret = zypper.upgrade(
+                        dist_upgrade=True,
+                        fromrepo=["Dummy", "Dummy2"],
+                        novendorchange=False,
+                    )
+                    self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                        "--from",
+                        "Dummy",
+                        "--from",
+                        "Dummy2",
+                        "--allow-vendor-change",
+                    )
     def test_upgrade_kernel(self):
         '''
         Test kernel package upgrade success.
@@ -558,10 +675,15 @@ Repository 'DUMMY' not found by its alias, number, or URI.
             with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
                 with self.assertRaises(CommandExecutionError) as cmd_exc:
                     ret = zypper.upgrade(dist_upgrade=True, fromrepo=["DUMMY"])
-                self.assertEqual(cmd_exc.exception.info['changes'], {})
-                self.assertEqual(cmd_exc.exception.info['result']['stdout'], zypper_out)
-                zypper_mock.noraise.call.assert_called_with('dist-upgrade', '--auto-agree-with-licenses',
-                                                            '--from', 'DUMMY')
+                self.assertEqual(cmd_exc.exception.info["changes"], {})
+                self.assertEqual(cmd_exc.exception.info["result"]["stdout"], zypper_out)
+                zypper_mock.noraise.call.assert_called_with(
+                    "dist-upgrade",
+                    "--auto-agree-with-licenses",
+                    "--from",
+                    "DUMMY",
+                    "--no-allow-vendor-change",
+                )
 
     def test_upgrade_available(self):
         '''
