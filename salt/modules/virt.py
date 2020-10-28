@@ -793,11 +793,11 @@ def _handle_unit(s, def_unit="m"):
     return int(value)
 
 
-def nesthash():
+def nesthash(value=None):
     """
     create default dict that allows arbitrary level of nesting
     """
-    return collections.defaultdict(nesthash)
+    return collections.defaultdict(nesthash, value or {})
 
 
 def _gen_xml(
@@ -826,6 +826,9 @@ def _gen_xml(
         "on_reboot": "destroy" if stop_on_reboot else "restart",
     }
 
+    context["to_kib"] = lambda v: int(_handle_unit(v) / 1024)
+    context["yesno"] = lambda v: "yes" if v else "no"
+
     context["mem"] = nesthash()
     if isinstance(mem, int):
         mem = int(mem) * 1024  # MB
@@ -843,73 +846,7 @@ def _gen_xml(
     if isinstance(cpu, int):
         context["cpu"]["maximum"] = str(cpu)
     elif isinstance(cpu, dict):
-        # preprocess the cpu context, make attributes directly usable in jinja template.
-        if cpu:
-            context["cpu"]["maximum"] = cpu.get("maximum")
-            for tag in cpu:
-                if cpu.get(tag):
-                    if tag in [
-                        "placement",
-                        "cpuset",
-                        "current",
-                        "match",
-                        "mode",
-                        "check",
-                    ]:
-                        context["cpu"][tag] = "{}='{}'".format(tag, cpu.get(tag))
-                    elif tag == "vcpus":
-                        vcpus_param = cpu.get(tag)
-                        for vcpu_id in vcpus_param:
-                            if vcpus_param.get(vcpu_id):
-                                for k, v in vcpus_param.get(vcpu_id).items():
-                                    if v is not None:
-                                        if k in ["hotpluggable", "enabled"]:
-                                            context["cpu"]["vcpus"][vcpu_id][
-                                                k
-                                            ] = "{}='{}'".format(
-                                                k, "yes" if v else "no"
-                                            )
-                                        else:
-                                            context["cpu"]["vcpus"][vcpu_id][
-                                                k
-                                            ] = "{}='{}'".format(k, v)
-                    elif tag in ["model", "topology", "cache"]:
-                        for k, v in cpu.get(tag).items():
-                            if not (tag == "model" and k == "name"):
-                                if v:
-                                    context["cpu"][tag][k] = "{}='{}'".format(k, v)
-                            else:
-                                if v:
-                                    context["cpu"][tag][k] = v
-                    elif tag == "numa":
-                        numa_param = cpu.get(tag)
-                        for cell_id in numa_param:
-                            if numa_param.get(cell_id):
-                                for k, v in numa_param[cell_id].items():
-                                    if k == "memory":
-                                        if v:
-                                            context["cpu"]["numa"][cell_id][
-                                                k
-                                            ] = "{}='{}'".format(
-                                                k, int(_handle_unit(v) / 1024)
-                                            )
-                                    elif k == "distances":
-                                        if v:
-                                            context["cpu"]["numa"][cell_id][k] = v
-                                    else:
-                                        if v is not None:
-                                            if k == "discard":
-                                                context["cpu"]["numa"][cell_id][
-                                                    k
-                                                ] = "{}='{}'".format(
-                                                    k, "yes" if v else "no"
-                                                )
-                                            else:
-                                                context["cpu"]["numa"][cell_id][
-                                                    k
-                                                ] = "{}='{}'".format(k, v)
-                    else:
-                        context["cpu"][tag] = cpu.get(tag)
+        context["cpu"] = nesthash(cpu)
 
     if hypervisor in ["qemu", "kvm"]:
         context["numatune"] = numatune if numatune else {}
