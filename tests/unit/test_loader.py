@@ -1149,12 +1149,14 @@ class LoaderMultipleGlobalTest(ModuleCase):
             copy.deepcopy(opts),
             pack={},
             tag="module",
+            loaded_base_name="salt.loader1",
         )
         self.loader2 = salt.loader.LazyLoader(
             salt.loader._module_dirs(copy.deepcopy(opts), "modules", "module"),
             copy.deepcopy(opts),
             pack={},
             tag="module",
+            loaded_base_name="salt.loader2",
         )
 
     def tearDown(self):
@@ -1188,6 +1190,7 @@ class LoaderCleanupTest(ModuleCase):
             copy.deepcopy(opts),
             pack={},
             tag="module",
+            loaded_base_name="salt.test",
         )
 
     def tearDown(self):
