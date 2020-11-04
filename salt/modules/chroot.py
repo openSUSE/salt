@@ -192,10 +192,11 @@ def call(root, function, *args, **kwargs):
             if isinstance(local, dict) and 'retcode' in local:
                 __context__['retcode'] = local['retcode']
             return local.get('return', data)
-        except (KeyError, ValueError):
+        except ValueError:
             return {
                 'result': False,
-                'comment': "Can't parse container command output"
+                'retcode': ret['retcode'],
+                'comment': {'stdout': ret['stdout'], 'stderr': ret['stderr']},
             }
     finally:
         __utils__['files.rm_rf'](thin_dest_path)
