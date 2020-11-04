@@ -145,13 +145,14 @@ class ChrootTestCase(TestCase, LoaderModuleMockMixin):
         utils_mock = {
             'thin.gen_thin': MagicMock(return_value='/salt-thin.tgz'),
             'files.rm_rf': MagicMock(),
-            'json.find_json': MagicMock(return_value={'return': {}})
+            'json.find_json': MagicMock(side_effect=ValueError())
         }
         salt_mock = {
             'cmd.run': MagicMock(return_value=''),
             'config.option': MagicMock(),
             'cmd.run_chroot': MagicMock(return_value={
                 'retcode': 1,
+                'stdout': '',
                 'stderr': 'Error',
             }),
         }
@@ -159,7 +160,8 @@ class ChrootTestCase(TestCase, LoaderModuleMockMixin):
                 patch.dict(chroot.__salt__, salt_mock):
             self.assertEqual(chroot.call('/chroot', 'test.ping'), {
                 'result': False,
-                'comment': "Can't parse container command output"
+                'retcode': 1,
+                'comment': {'stdout': '', 'stderr': 'Error'},
             })
             utils_mock['thin.gen_thin'].assert_called_once()
             salt_mock['config.option'].assert_called()
