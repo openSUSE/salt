@@ -3118,10 +3118,10 @@ def update(
     data = {k: v for k, v in six.iteritems(locals()) if bool(v)}
     data["stop_on_reboot"] = stop_on_reboot
     if boot_dev:
-        data["boot_dev"] = {i + 1: dev for i, dev in enumerate(boot_dev.split())}
-    need_update = salt.utils.xmlutil.change_xml(
-        desc, data, params_mapping
-    ) or need_update
+        data["boot_dev"] = boot_dev.split()
+    need_update = (
+        salt.utils.xmlutil.change_xml(desc, data, params_mapping) or need_update
+    )
 
     # Update the XML definition with the new disks and diff changes
     devices_node = desc.find("devices")
