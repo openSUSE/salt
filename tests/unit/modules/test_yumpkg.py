@@ -10,15 +10,17 @@ from tests.support.unit import TestCase, skipIf
 from tests.support.mock import (
     Mock,
     MagicMock,
+    mock_open,
     patch,
 )
 
 # Import Salt libs
-from salt.exceptions import CommandExecutionError
+from salt.exceptions import CommandExecutionError, SaltInvocationError
 import salt.modules.rpm_lowpkg as rpm
 from salt.ext import six
 import salt.modules.yumpkg as yumpkg
 import salt.modules.pkg_resource as pkg_resource
+import salt.utils.platform
 
 try:
     import pytest
@@ -799,8 +801,45 @@ class YumTestCase(TestCase, LoaderModuleMockMixin):
             with pytest.raises(CommandExecutionError):
                 yumpkg._get_yum_config()
 
+    def test_get_repo_keys(self):
+        salt_mock = {"lowpkg.list_gpg_keys": MagicMock(return_value=True)}
+        with patch.dict(yumpkg.__salt__, salt_mock):
+            self.assertTrue(yumpkg.get_repo_keys(info=True, root="/mnt"))
+            salt_mock["lowpkg.list_gpg_keys"].assert_called_once_with(True, "/mnt")
 
-@skipIf(pytest is None, 'PyTest is missing')
+    def test_add_repo_key_fail(self):
+        with self.assertRaises(SaltInvocationError):
+            yumpkg.add_repo_key()
+
+        with self.assertRaises(SaltInvocationError):
+            yumpkg.add_repo_key(path="path", text="text")
+
+    def test_add_repo_key_path(self):
+        salt_mock = {
+            "cp.cache_file": MagicMock(return_value="path"),
+            "lowpkg.import_gpg_key": MagicMock(return_value=True),
+        }
+        with patch("salt.utils.files.fopen", mock_open(read_data="text")), patch.dict(
+            yumpkg.__salt__, salt_mock
+        ):
+            self.assertTrue(yumpkg.add_repo_key(path="path", root="/mnt"))
+            salt_mock["cp.cache_file"].assert_called_once_with("path", "base")
+            salt_mock["lowpkg.import_gpg_key"].assert_called_once_with("text", "/mnt")
+
+    def test_add_repo_key_text(self):
+        salt_mock = {"lowpkg.import_gpg_key": MagicMock(return_value=True)}
+        with patch.dict(yumpkg.__salt__, salt_mock):
+            self.assertTrue(yumpkg.add_repo_key(text="text", root="/mnt"))
+            salt_mock["lowpkg.import_gpg_key"].assert_called_once_with("text", "/mnt")
+
+    def test_del_repo_key(self):
+        salt_mock = {"lowpkg.remove_gpg_key": MagicMock(return_value=True)}
+        with patch.dict(yumpkg.__salt__, salt_mock):
+            self.assertTrue(yumpkg.del_repo_key(keyid="keyid", root="/mnt"))
+            salt_mock["lowpkg.remove_gpg_key"].assert_called_once_with("keyid", "/mnt")
+
+
+@skipIf(pytest is None, "PyTest is missing")
 class YumUtilsTestCase(TestCase, LoaderModuleMockMixin):
     '''
     Yum/Dnf utils tests.

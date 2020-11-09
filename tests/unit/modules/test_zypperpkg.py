@@ -22,7 +22,7 @@ from tests.support.mock import (
 import salt.utils.files
 import salt.modules.zypperpkg as zypper
 import salt.modules.pkg_resource as pkg_resource
-from salt.exceptions import CommandExecutionError
+from salt.exceptions import CommandExecutionError, SaltInvocationError
 
 # Import 3rd-party libs
 from salt.ext.six.moves import configparser
@@ -1728,3 +1728,41 @@ pattern() = package-c"""
                 python_shell=False,
                 env={"ZYPP_READONLY_HACK": "1"},
             )
+            self.assertEqual(zypper.__context__, {"pkg.other_data": None})
+
+    def test_get_repo_keys(self):
+        salt_mock = {"lowpkg.list_gpg_keys": MagicMock(return_value=True)}
+        with patch.dict(zypper.__salt__, salt_mock):
+            self.assertTrue(zypper.get_repo_keys(info=True, root="/mnt"))
+            salt_mock["lowpkg.list_gpg_keys"].assert_called_once_with(True, "/mnt")
+
+    def test_add_repo_key_fail(self):
+        with self.assertRaises(SaltInvocationError):
+            zypper.add_repo_key()
+
+        with self.assertRaises(SaltInvocationError):
+            zypper.add_repo_key(path="path", text="text")
+
+    def test_add_repo_key_path(self):
+        salt_mock = {
+            "cp.cache_file": MagicMock(return_value="path"),
+            "lowpkg.import_gpg_key": MagicMock(return_value=True),
+        }
+        with patch("salt.utils.files.fopen", mock_open(read_data="text")), patch.dict(
+            zypper.__salt__, salt_mock
+        ):
+            self.assertTrue(zypper.add_repo_key(path="path", root="/mnt"))
+            salt_mock["cp.cache_file"].assert_called_once_with("path", "base")
+            salt_mock["lowpkg.import_gpg_key"].assert_called_once_with("text", "/mnt")
+
+    def test_add_repo_key_text(self):
+        salt_mock = {"lowpkg.import_gpg_key": MagicMock(return_value=True)}
+        with patch.dict(zypper.__salt__, salt_mock):
+            self.assertTrue(zypper.add_repo_key(text="text", root="/mnt"))
+            salt_mock["lowpkg.import_gpg_key"].assert_called_once_with("text", "/mnt")
+
+    def test_del_repo_key(self):
+        salt_mock = {"lowpkg.remove_gpg_key": MagicMock(return_value=True)}
+        with patch.dict(zypper.__salt__, salt_mock):
+            self.assertTrue(zypper.del_repo_key(keyid="keyid", root="/mnt"))
+            salt_mock["lowpkg.remove_gpg_key"].assert_called_once_with("keyid", "/mnt")
