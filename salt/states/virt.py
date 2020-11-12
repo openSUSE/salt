@@ -290,6 +290,7 @@ def defined(
     numatune=None,
     update=True,
     boot_dev=None,
+    hypervisor_features=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -519,6 +520,16 @@ def defined(
                 'memnodes': {0: {'mode': 'strict', 'nodeset': 1}, 1: {'mode': 'preferred', 'nodeset': 2}}
             }
 
+    :param hypervisor_features:
+        Enable or disable hypervisor-specific features on the virtual machine.
+
+        .. versionadded:: Aluminium
+
+        .. code-block:: yaml
+
+            hypervisor_features:
+              kvm-hint-dedicated: True
+
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -584,6 +595,7 @@ def defined(
                     numatune=numatune,
                     test=__opts__["test"],
                     boot_dev=boot_dev,
+                    hypervisor_features=hypervisor_features,
                 )
             ret["changes"][name] = status
             if not status.get("definition"):
@@ -620,6 +632,7 @@ def defined(
                     numatune=numatune,
                     start=False,
                     boot_dev=boot_dev,
+                    hypervisor_features=hypervisor_features,
                 )
             ret["changes"][name] = {"definition": True}
             ret["comment"] = "Domain {} defined".format(name)
@@ -654,6 +667,7 @@ def running(
     boot=None,
     boot_dev=None,
     numatune=None,
+    hypervisor_features=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -820,6 +834,16 @@ def running(
 
         .. versionadded:: Aluminium
 
+    :param hypervisor_features:
+        Enable or disable hypervisor-specific features on the virtual machine.
+
+        .. versionadded:: Aluminium
+
+        .. code-block:: yaml
+
+            hypervisor_features:
+              kvm-hint-dedicated: True
+
     .. rubric:: Example States
 
     Make sure an already-defined virtual machine called ``domain_name`` is running:
@@ -889,6 +913,7 @@ def running(
         update=update,
         boot_dev=boot_dev,
         numatune=numatune,
+        hypervisor_features=hypervisor_features,
         connection=connection,
         username=username,
         password=password,

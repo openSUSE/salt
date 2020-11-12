@@ -809,6 +809,7 @@ def _gen_xml(
     boot=None,
     boot_dev=None,
     numatune=None,
+    hypervisor_features=None,
     **kwargs
 ):
     """
@@ -817,6 +818,7 @@ def _gen_xml(
     context = {
         "hypervisor": hypervisor,
         "name": name,
+        "hypervisor_features": hypervisor_features or {},
     }
 
     context["to_kib"] = lambda v: int(_handle_unit(v) / 1024)
@@ -1754,6 +1756,7 @@ def init(
     boot=None,
     boot_dev=None,
     numatune=None,
+    hypervisor_features=None,
     **kwargs
 ):
     """
@@ -1999,6 +2002,16 @@ def init(
                 'memory': {'mode': 'strict', 'nodeset': '0-11'},
                 'memnodes': {0: {'mode': 'strict', 'nodeset': 1}, 1: {'mode': 'preferred', 'nodeset': 2}}
             }
+
+    :param hypervisor_features:
+        Enable or disable hypervisor-specific features on the virtual machine.
+
+        .. versionadded:: Aluminium
+
+        .. code-block:: yaml
+
+            hypervisor_features:
+              kvm-hint-dedicated: True
 
     .. _init-cpu-def:
 
@@ -2518,6 +2531,7 @@ def init(
             boot,
             boot_dev,
             numatune,
+            hypervisor_features,
             **kwargs
         )
         log.debug("New virtual machine definition: %s", vm_xml)
@@ -2748,6 +2762,7 @@ def update(
     numatune=None,
     test=False,
     boot_dev=None,
+    hypervisor_features=None,
     **kwargs
 ):
     """
@@ -2851,6 +2866,16 @@ def update(
     :param test: run in dry-run mode if set to True
 
         .. versionadded:: sodium
+
+    :param hypervisor_features:
+        Enable or disable hypervisor-specific features on the virtual machine.
+
+        .. versionadded:: Aluminium
+
+        .. code-block:: yaml
+
+            hypervisor_features:
+              kvm-hint-dedicated: True
 
     :return:
 
@@ -3168,6 +3193,12 @@ def update(
                 "numatune/memnode[@cellid='$id']",
                 "nodeset",
                 ["cellid"],
+            ),
+            xmlutil.attribute(
+                "hypervisor_features:kvm-hint-dedicated",
+                "features/kvm/hint-dedicated",
+                "state",
+                convert=lambda v: "on" if v else "off",
             ),
         ]
 
