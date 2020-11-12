@@ -291,6 +291,7 @@ def defined(
     boot_dev=None,
     stop_on_reboot=False,
     live=True,
+    hypervisor_features=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -534,6 +535,16 @@ def defined(
                 'memnodes': {0: {'mode': 'strict', 'nodeset': 1}, 1: {'mode': 'preferred', 'nodeset': 2}}
             }
 
+    :param hypervisor_features:
+        Enable or disable hypervisor-specific features on the virtual machine.
+
+        .. versionadded:: Aluminium
+
+        .. code-block:: yaml
+
+            hypervisor_features:
+              kvm-hint-dedicated: True
+
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -600,6 +611,7 @@ def defined(
                     test=__opts__["test"],
                     boot_dev=boot_dev,
                     stop_on_reboot=stop_on_reboot,
+                    hypervisor_features=hypervisor_features,
                 )
             ret["changes"][name] = status
             if not status.get("definition"):
@@ -637,6 +649,7 @@ def defined(
                     start=False,
                     boot_dev=boot_dev,
                     stop_on_reboot=stop_on_reboot,
+                    hypervisor_features=hypervisor_features,
                 )
             ret["changes"][name] = {"definition": True}
             ret["comment"] = "Domain {} defined".format(name)
@@ -672,6 +685,7 @@ def running(
     boot_dev=None,
     stop_on_reboot=False,
     numatune=None,
+    hypervisor_features=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -846,6 +860,16 @@ def running(
 
         .. versionadded:: Aluminium
 
+    :param hypervisor_features:
+        Enable or disable hypervisor-specific features on the virtual machine.
+
+        .. versionadded:: Aluminium
+
+        .. code-block:: yaml
+
+            hypervisor_features:
+              kvm-hint-dedicated: True
+
     .. rubric:: Example States
 
     Make sure an already-defined virtual machine called ``domain_name`` is running:
@@ -916,6 +940,7 @@ def running(
         boot_dev=boot_dev,
         stop_on_reboot=stop_on_reboot,
         numatune=numatune,
+        hypervisor_features=hypervisor_features,
         connection=connection,
         username=username,
         password=password,
