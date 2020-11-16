@@ -818,7 +818,7 @@ def migrated(name, keys=True, drop=False, method=None, **kwargs):
         if method == "copy":
             _copy_repository_to(name)
         else:
-            __salt__["pkg.mod_repo"](repo, **dict(repo_info), root=name)
+            __salt__["pkg.mod_repo"](repo, root=name, **dict(repo_info))
     for repo, _ in repos_to_drop:
         __salt__["pkg.del_repo"](repo, root=name)
 
