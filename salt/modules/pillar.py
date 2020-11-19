@@ -269,7 +269,7 @@ def items(*args, **kwargs):
 
     pillar = salt.pillar.get_pillar(
         __opts__,
-        __grains__,
+        dict(__grains__),
         __opts__['id'],
         pillar_override=pillar_override,
         pillarenv=pillarenv)
@@ -444,7 +444,7 @@ def raw(key=None):
     if key:
         ret = __pillar__.get(key, {})
     else:
-        ret = __pillar__
+        ret = dict(__pillar__)
 
     return ret
 

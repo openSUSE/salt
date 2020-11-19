@@ -44,6 +44,7 @@ from salt.loader import minion_mods
 from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
 from salt.exceptions import SaltInvocationError
+import salt.loader_context
 import salt.utils.stringutils
 import salt.utils.versions
 
@@ -65,6 +66,8 @@ log = logging.getLogger(__name__)
 
 __salt__ = None
 __virtualname__ = 'boto'
+__salt_loader__ = salt.loader_context.LoaderContext()
+__context__ = __salt_loader__.named_context("__context__", {})
 
 
 def __virtual__():

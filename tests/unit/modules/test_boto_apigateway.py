@@ -14,6 +14,7 @@ from tests.support.mock import MagicMock, patch
 
 # Import Salt libs
 import salt.loader
+import salt.loader_context
 import salt.modules.boto_apigateway as boto_apigateway
 from salt.utils.versions import LooseVersion
 
@@ -174,15 +175,10 @@ class BotoApiGatewayTestCaseBase(TestCase, LoaderModuleMockMixin):
 
     def setup_loader_modules(self):
         self.opts = opts = salt.config.DEFAULT_MINION_OPTS.copy()
-        utils = salt.loader.utils(
-            opts,
-            whitelist=['boto3', 'args', 'systemd', 'path', 'platform'])
-        return {
-            boto_apigateway: {
-                '__opts__': opts,
-                '__utils__': utils,
-            }
-        }
+        self.utils = salt.loader.utils(
+            opts, whitelist=["boto3", "args", "systemd", "path", "platform"]
+        )
+        return {boto_apigateway: {"__opts__": opts, "__utils__": self.utils}}
 
     def setUp(self):
         TestCase.setUp(self)
@@ -205,6 +201,7 @@ class BotoApiGatewayTestCaseBase(TestCase, LoaderModuleMockMixin):
         self.conn = MagicMock()
         session_instance.client.return_value = self.conn
         self.addCleanup(delattr, self, 'conn')
+        self.addCleanup(delattr, self, 'utils')
 
 
 class BotoApiGatewayTestCaseMixin(object):
@@ -392,6 +389,24 @@ class BotoApiGatewayTestCase(BotoApiGatewayTestCaseBase, BotoApiGatewayTestCaseM
         self.assertEqual(api['name'], 'unit-testing123')
         self.assertEqual(api['description'], 'unit-testing1234')
 
+    def test_that_when_creating_a_rest_api_fails_the_create_api_method_returns_error(
+        self,
+    ):
+        """
+        test True for rest api creation error.
+        """
+        self.conn.create_rest_api.side_effect = ClientError(
+            error_content, "create_rest_api"
+        )
+        create_api_result = boto_apigateway.create_api(
+            name="unit-testing123", description="unit-testing1234", **conn_parameters
+        )
+        api = create_api_result.get("restapi")
+        self.assertEqual(
+            create_api_result.get("error").get("message"),
+            error_message.format("create_rest_api"),
+        )
+
     def test_that_when_creating_a_rest_api_fails_the_create_api_method_returns_error(self):
         '''
         test True for rest api creation error.
@@ -541,13 +556,21 @@ class BotoApiGatewayTestCase(BotoApiGatewayTestCaseBase, BotoApiGatewayTestCaseM
         tests that we properly handle errors when create an api key fails.
         '''
 
-        self.conn.create_api_key.side_effect = ClientError(error_content, 'create_api_key')
-        create_api_key_result = boto_apigateway.create_api_key('test-salt-key', 'unit-testing1234')
-        api_key = create_api_key_result.get('apiKey')
+        with salt.loader_context.loader_context(self.utils):
+            self.conn.create_api_key.side_effect = ClientError(
+                error_content, "create_api_key"
+            )
+            create_api_key_result = boto_apigateway.create_api_key(
+                "test-salt-key", "unit-testing1234"
+            )
+            api_key = create_api_key_result.get("apiKey")
 
-        self.assertFalse(api_key)
-        self.assertIs(create_api_key_result.get('created'), False)
-        self.assertEqual(create_api_key_result.get('error').get('message'), error_message.format('create_api_key'))
+            self.assertFalse(api_key)
+            self.assertIs(create_api_key_result.get("created"), False)
+            self.assertEqual(
+                create_api_key_result.get("error").get("message"),
+                error_message.format("create_api_key"),
+            )
 
     def test_that_when_deleting_an_api_key_that_exists_the_delete_api_key_method_returns_true(self):
         '''

@@ -8,11 +8,13 @@ in here
 # Import python libs
 from __future__ import absolute_import, print_function, unicode_literals
 # import sys  # Use if sys is commented out below
+import collections.abc
 import logging
 import gc
 import datetime
 
 # Import salt libs
+import salt.loader_context
 import salt.log
 import salt.transport.frame
 import salt.utils.immutabletypes as immutabletypes
@@ -186,7 +188,9 @@ class Serial(object):
                 return tuple(obj)
             elif isinstance(obj, CaseInsensitiveDict):
                 return dict(obj)
-            # Nothing known exceptions found. Let msgpack raise it's own.
+            elif isinstance(obj, collections.abc.MutableMapping):
+                return dict(obj)
+            # Nothing known exceptions found. Let msgpack raise its own.
             return obj
 
         try:

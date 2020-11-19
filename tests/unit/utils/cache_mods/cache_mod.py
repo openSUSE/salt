@@ -16,4 +16,4 @@ def test_context_module():
         __context__['called'] += 1
     else:
         __context__['called'] = 0
-    return __context__
+    return __context__.value()

@@ -508,12 +508,14 @@ def high(data, test=None, queue=False, **kwargs):
             'is specified.'
         )
     try:
-        st_ = salt.state.State(opts,
-                               pillar_override,
-                               pillar_enc=pillar_enc,
-                               proxy=__proxy__,
-                               context=__context__,
-                               initial_pillar=_get_initial_pillar(opts))
+        st_ = salt.state.State(
+            opts,
+            pillar_override,
+            pillar_enc=pillar_enc,
+            proxy=dict(__proxy__),
+            context=dict(__context__),
+            initial_pillar=_get_initial_pillar(opts),
+        )
     except NameError:
         st_ = salt.state.State(opts,
                                pillar_override,
@@ -548,14 +550,16 @@ def template(tem, queue=False, **kwargs):
 
     opts = salt.utils.state.get_sls_opts(__opts__, **kwargs)
     try:
-        st_ = salt.state.HighState(opts,
-                                   context=__context__,
-                                   proxy=__proxy__,
-                                   initial_pillar=_get_initial_pillar(opts))
+        st_ = salt.state.HighState(
+            opts,
+            context=dict(__context__),
+            proxy=dict(__proxy__),
+            initial_pillar=_get_initial_pillar(opts),
+        )
     except NameError:
-        st_ = salt.state.HighState(opts,
-                                   context=__context__,
-                                   initial_pillar=_get_initial_pillar(opts))
+        st_ = salt.state.HighState(
+            opts, context=dict(__context__), initial_pillar=_get_initial_pillar(opts)
+        )
 
     errors = _get_pillar_errors(kwargs, pillar=st_.opts['pillar'])
     if errors:
@@ -1054,14 +1058,16 @@ def highstate(test=None, queue=False, **kwargs):
         )
 
     try:
-        st_ = salt.state.HighState(opts,
-                                   pillar_override,
-                                   kwargs.get('__pub_jid'),
-                                   pillar_enc=pillar_enc,
-                                   proxy=__proxy__,
-                                   context=__context__,
-                                   mocked=kwargs.get('mock', False),
-                                   initial_pillar=_get_initial_pillar(opts))
+        st_ = salt.state.HighState(
+            opts,
+            pillar_override,
+            kwargs.get("__pub_jid"),
+            pillar_enc=pillar_enc,
+            proxy=dict(__proxy__),
+            context=dict(__context__),
+            mocked=kwargs.get("mock", False),
+            initial_pillar=_get_initial_pillar(opts),
+        )
     except NameError:
         st_ = salt.state.HighState(opts,
                                    pillar_override,
@@ -1299,14 +1305,16 @@ def sls(mods, test=None, exclude=None, queue=False, sync_mods=None, **kwargs):
             )
 
     try:
-        st_ = salt.state.HighState(opts,
-                                   pillar_override,
-                                   kwargs.get('__pub_jid'),
-                                   pillar_enc=pillar_enc,
-                                   proxy=__proxy__,
-                                   context=__context__,
-                                   mocked=kwargs.get('mock', False),
-                                   initial_pillar=_get_initial_pillar(opts))
+        st_ = salt.state.HighState(
+            opts,
+            pillar_override,
+            kwargs.get("__pub_jid"),
+            pillar_enc=pillar_enc,
+            proxy=dict(__proxy__),
+            context=dict(__context__),
+            mocked=kwargs.get("mock", False),
+            initial_pillar=_get_initial_pillar(opts),
+        )
     except NameError:
         st_ = salt.state.HighState(opts,
                                    pillar_override,
@@ -1438,20 +1446,23 @@ def top(topfn, test=None, queue=False, **kwargs):
             'Pillar data must be formatted as a dictionary, unless pillar_enc '
             'is specified.'
         )
-    try:
-        st_ = salt.state.HighState(opts,
-                                   pillar_override,
-                                   pillar_enc=pillar_enc,
-                                   context=__context__,
-                                   proxy=__proxy__,
-                                   initial_pillar=_get_initial_pillar(opts))
+        st_ = salt.state.HighState(
+            opts,
+            pillar_override,
+            pillar_enc=pillar_enc,
+            context=dict(__context__),
+            proxy=dict(__proxy__),
+            initial_pillar=_get_initial_pillar(opts),
+        )
     except NameError:
-        st_ = salt.state.HighState(opts,
-                                   pillar_override,
-                                   pillar_enc=pillar_enc,
-                                   context=__context__,
-                                   initial_pillar=_get_initial_pillar(opts))
-    errors = _get_pillar_errors(kwargs, pillar=st_.opts['pillar'])
+        st_ = salt.state.HighState(
+            opts,
+            pillar_override,
+            pillar_enc=pillar_enc,
+            context=dict(__context__),
+            initial_pillar=_get_initial_pillar(opts),
+        )
+    errors = _get_pillar_errors(kwargs, pillar=st_.opts["pillar"])
     if errors:
         __context__['retcode'] = salt.defaults.exitcodes.EX_PILLAR_FAILURE
         return ['Pillar failed to render with the following messages:'] + errors

@@ -344,7 +344,7 @@ def load_states():
 
     # the loader expects to find pillar & grain data
     __opts__['grains'] = salt.loader.grains(__opts__)
-    __opts__['pillar'] = __pillar__
+    __opts__['pillar'] = __pillar__.value()
     lazy_utils = salt.loader.utils(__opts__)
     lazy_funcs = salt.loader.minion_mods(__opts__, utils=lazy_utils)
     lazy_serializers = salt.loader.serializers(__opts__)

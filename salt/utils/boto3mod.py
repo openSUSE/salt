@@ -43,6 +43,7 @@ from functools import partial
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
 from salt.exceptions import SaltInvocationError
 from salt.ext import six
+import salt.loader_context
 import salt.utils.stringutils
 import salt.utils.versions
 
@@ -67,6 +68,8 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 __virtualname__ = 'boto3'
+__salt_loader__ = salt.loader_context.LoaderContext()
+__context__ = __salt_loader__.named_context("__context__", {})
 
 
 def __virtual__():

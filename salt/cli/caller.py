@@ -228,8 +228,7 @@ class BaseCaller(object):
                     sys.stderr.write(trace)
                 sys.exit(salt.defaults.exitcodes.EX_GENERIC)
             try:
-                retcode = sys.modules[
-                    func.__module__].__context__.get('retcode', 0)
+                retcode = self.minion.executors.pack["__context__"].get("retcode", 0)
             except AttributeError:
                 retcode = salt.defaults.exitcodes.EX_GENERIC
 
