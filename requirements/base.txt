@@ -8,3 +8,4 @@ distro>=1.0.1
 singledispatch==3.4.0.3; python_version < '3.4'
 # Required by Tornado to handle threads stuff.
 futures>=2.0; python_version < '3.0'
+contextvars; python_version < '3.7'

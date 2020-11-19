@@ -260,7 +260,7 @@ def get_function_argspec(func, is_class_method=None):
     if not callable(func):
         raise TypeError("{} is not a callable".format(func))
 
-    if hasattr(func, "__wrapped__"):
+    while hasattr(func, "__wrapped__"):
         func = func.__wrapped__
 
     try:

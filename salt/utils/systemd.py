@@ -7,7 +7,7 @@ import os
 import re
 import subprocess
 
-import salt.utils.path
+import salt.loader_context
 import salt.utils.stringutils
 from salt.exceptions import SaltInvocationError
 
@@ -28,7 +28,7 @@ def booted(context=None):
     keep the logic below from needing to be run again during the same salt run.
     """
     contextkey = "salt.utils.systemd.booted"
-    if isinstance(context, dict):
+    if isinstance(context, (dict, salt.loader_context.NamedLoaderContext)):
         # Can't put this if block on the same line as the above if block,
         # because it willl break the elif below.
         if contextkey in context:
@@ -78,7 +78,7 @@ def version(context=None):
     version.
     """
     contextkey = "salt.utils.systemd.version"
-    if isinstance(context, dict):
+    if isinstance(context, (dict, salt.loader_context.NamedLoaderContext)):
         # Can't put this if block on the same line as the above if block,
         # because it will break the elif below.
         if contextkey in context:

@@ -38,7 +38,6 @@ import salt.utils.stringutils
 import salt.utils.url
 import salt.utils.versions
 from salt.exceptions import CommandExecutionError, SaltInvocationError
-from salt.ext import six
 from salt.loader import _format_cached_grains
 from salt.runners.state import orchestrate as _orchestrate
 from salt.utils.odict import OrderedDict
@@ -519,8 +518,8 @@ def high(data, test=None, queue=False, **kwargs):
             opts,
             pillar_override,
             pillar_enc=pillar_enc,
-            proxy=__proxy__,
-            context=__context__,
+            proxy=dict(__proxy__),
+            context=dict(__context__),
             initial_pillar=_get_initial_pillar(opts),
         )
     except NameError:
@@ -561,13 +560,13 @@ def template(tem, queue=False, **kwargs):
     try:
         st_ = salt.state.HighState(
             opts,
-            context=__context__,
-            proxy=__proxy__,
+            context=dict(__context__),
+            proxy=dict(__proxy__),
             initial_pillar=_get_initial_pillar(opts),
         )
     except NameError:
         st_ = salt.state.HighState(
-            opts, context=__context__, initial_pillar=_get_initial_pillar(opts)
+            opts, context=dict(__context__), initial_pillar=_get_initial_pillar(opts)
         )
 
     errors = _get_pillar_errors(kwargs, pillar=st_.opts["pillar"])
@@ -1090,8 +1089,8 @@ def highstate(test=None, queue=False, **kwargs):
             pillar_override,
             kwargs.get("__pub_jid"),
             pillar_enc=pillar_enc,
-            proxy=__proxy__,
-            context=__context__,
+            proxy=dict(__proxy__),
+            context=dict(__context__),
             mocked=kwargs.get("mock", False),
             initial_pillar=_get_initial_pillar(opts),
         )
@@ -1339,8 +1338,8 @@ def sls(mods, test=None, exclude=None, queue=False, sync_mods=None, **kwargs):
             pillar_override,
             kwargs.get("__pub_jid"),
             pillar_enc=pillar_enc,
-            proxy=__proxy__,
-            context=__context__,
+            proxy=dict(__proxy__),
+            context=dict(__context__),
             mocked=kwargs.get("mock", False),
             initial_pillar=_get_initial_pillar(opts),
         )
@@ -1485,8 +1484,8 @@ def top(topfn, test=None, queue=False, **kwargs):
             opts,
             pillar_override,
             pillar_enc=pillar_enc,
-            context=__context__,
-            proxy=__proxy__,
+            context=dict(__context__),
+            proxy=dict(__proxy__),
             initial_pillar=_get_initial_pillar(opts),
         )
     except NameError:
@@ -1494,7 +1493,7 @@ def top(topfn, test=None, queue=False, **kwargs):
             opts,
             pillar_override,
             pillar_enc=pillar_enc,
-            context=__context__,
+            context=dict(__context__),
             initial_pillar=_get_initial_pillar(opts),
         )
     errors = _get_pillar_errors(kwargs, pillar=st_.opts["pillar"])

@@ -182,10 +182,12 @@ def get_configured_provider():
     """
     Return the first configured instance.
     """
+    try:
+        active_provider = __active_provider_name__.value()
+    except AttributeError:
+        active_provider = __active_provider_name__
     return config.is_provider_configured(
-        __opts__,
-        __active_provider_name__ or __virtualname__,
-        ("url", "user", "password",),
+        __opts__, active_provider or __virtualname__, ("url", "user", "password",),
     )
 
 
