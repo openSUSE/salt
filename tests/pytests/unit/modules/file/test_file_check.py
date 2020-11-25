@@ -17,7 +17,7 @@ def configure_loader_modules():
     return {
         filemod: {
             "__context__": {},
-            "__opts__": {"test": False},
+            "__opts__": {"test": True},
         }
     }
 
@@ -172,7 +172,7 @@ def test_check_managed_changes_follow_symlinks(a_link, tfile):
         ),
         # no user/group changes needed by id
         (
-            {"user": 3001, "group": 4001},
+            {"user": 2001, "group": 1001},
             {},
         ),
     ],
@@ -184,9 +184,9 @@ def test_check_perms_user_group_name_and_id(input, expected):
         stat_out = {
             "user": "luser",
             "group": "lgroup",
-            "uid": 3001,
-            "gid": 4001,
-            "mode": "123",
+            "uid": 2001,
+            "gid": 1001,
+            "mode": "0123",
         }
 
         patch_stats = patch(

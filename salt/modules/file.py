@@ -5346,14 +5346,20 @@ def check_perms(
     is_dir = os.path.isdir(name)
     is_link = os.path.islink(name)
 
+    def __safe_to_str(s):
+        try:
+            return salt.utils.stringutils.to_str(s)
+        except:
+            return salt.utils.stringutils.to_str(str(s))
+
     # Check and make user/group/mode changes, then verify they were successful
     if user:
         if (
             salt.utils.platform.is_windows() and not user_to_uid(user) == cur["uid"]
         ) or (
             not salt.utils.platform.is_windows()
-            and not salt.utils.stringutils.to_str(user) == cur["user"]
-            and not salt.utils.stringutils.to_str(user) == cur["uid"]
+            and not __safe_to_str(user) == cur["user"]
+            and not user == cur["uid"]
         ):
             perms["cuser"] = user
 
@@ -5362,8 +5368,8 @@ def check_perms(
             salt.utils.platform.is_windows() and not group_to_gid(group) == cur["gid"]
         ) or (
             not salt.utils.platform.is_windows()
-            and not salt.utils.stringutils.to_str(group) == cur["group"]
-            and not salt.utils.stringutils.to_str(group) == cur["gid"]
+            and not __safe_to_str(group) == cur["group"]
+            and not group == cur["gid"]
         ):
             perms["cgroup"] = group
 
@@ -5407,8 +5413,8 @@ def check_perms(
             salt.utils.platform.is_windows() and not user_to_uid(user) == post["uid"]
         ) or (
             not salt.utils.platform.is_windows()
-            and not salt.utils.stringutils.to_str(user) == post["user"]
-            and not salt.utils.stringutils.to_str(user) == post["uid"]
+            and not __safe_to_str(user) == post["user"]
+            and not user == post["uid"]
         ):
             if __opts__["test"] is True:
                 ret["changes"]["user"] = user
@@ -5423,8 +5429,8 @@ def check_perms(
             salt.utils.platform.is_windows() and not group_to_gid(group) == post["gid"]
         ) or (
             not salt.utils.platform.is_windows()
-            and not salt.utils.stringutils.to_str(group) == post["group"]
-            and not salt.utils.stringutils.to_str(group) == post["gid"]
+            and not __safe_to_str(group) == post["group"]
+            and not group == post["gid"]
         ):
             if __opts__["test"] is True:
                 ret["changes"]["group"] = group
