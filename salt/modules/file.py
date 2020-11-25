@@ -4567,6 +4567,12 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
     is_dir = os.path.isdir(name)
     is_link = os.path.islink(name)
 
+    def __safe_to_str(s):
+        try:
+            return salt.utils.stringutils.to_str(s)
+        except:
+            return salt.utils.stringutils.to_str(str(s))
+
     # user/group changes if needed, then check if it worked
     if user:
         if isinstance(user, int):
@@ -4574,7 +4580,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
         if (salt.utils.platform.is_windows() and
                 user_to_uid(user) != user_to_uid(perms['luser'])
             ) or (
-            not salt.utils.platform.is_windows() and salt.utils.stringutils.to_str(user) != perms['luser']
+            not salt.utils.platform.is_windows() and __safe_to_str(user) != perms['luser']
         ):
             perms['cuser'] = user
 
@@ -4584,7 +4590,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
         if (salt.utils.platform.is_windows() and
                 group_to_gid(group) != group_to_gid(perms['lgroup'])
             ) or (
-                not salt.utils.platform.is_windows() and salt.utils.stringutils.to_str(group) != perms['lgroup']
+                not salt.utils.platform.is_windows() and __safe_to_str(group) != perms['lgroup']
         ):
             perms['cgroup'] = group
 
@@ -4615,7 +4621,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
                 user != ''
             ) or (
             not salt.utils.platform.is_windows() and
-                salt.utils.stringutils.to_str(user) != get_user(name, follow_symlinks=follow_symlinks) and
+                __safe_to_str(user) != get_user(name, follow_symlinks=follow_symlinks) and
                 user != ''
         ):
             if __opts__['test'] is True:
@@ -4635,7 +4641,7 @@ def check_perms(name, ret, user, group, mode, attrs=None, follow_symlinks=False)
                     get_group(name, follow_symlinks=follow_symlinks)) and
                 group != '') or (
             not salt.utils.platform.is_windows() and
-                salt.utils.stringutils.to_str(group) != get_group(name, follow_symlinks=follow_symlinks) and
+                __safe_to_str(group) != get_group(name, follow_symlinks=follow_symlinks) and
                 group != ''
         ):
             if __opts__['test'] is True:
