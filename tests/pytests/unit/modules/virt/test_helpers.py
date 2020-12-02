@@ -1,3 +1,4 @@
+import salt.utils.xmlutil as xmlutil
 from salt._compat import ElementTree as ET
 
 
