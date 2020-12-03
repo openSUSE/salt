@@ -389,6 +389,8 @@ def managed(name, type, enabled=True, **kwargs):
     # set ranged status
     apply_ranged_setting = False
 
+    is_suse = (__grains__["os_family"] == "Suse")
+
     # Build interface
     try:
         old = __salt__['ip.get_interface'](name)
@@ -428,7 +430,7 @@ def managed(name, type, enabled=True, **kwargs):
         return ret
 
     # Setup up bond modprobe script if required
-    if type == 'bond':
+    if type == 'bond' and not is_suse:
         try:
             old = __salt__['ip.get_bond'](name)
             new = __salt__['ip.build_bond'](name, **kwargs)
@@ -519,22 +521,27 @@ def managed(name, type, enabled=True, **kwargs):
             # Check that there are new slaves for this master
             present_slaves = __salt__['cmd.run'](
                 ['cat', '/sys/class/net/{0}/bonding/slaves'.format(name)]).split()
-            desired_slaves = kwargs['slaves'].split()
+            if isinstance(kwargs['slaves'], list):
+                desired_slaves = kwargs['slaves']
+            else:
+                desired_slaves = kwargs['slaves'].split()
             missing_slaves = set(desired_slaves) - set(present_slaves)
 
             # Enslave only slaves missing in master
             if missing_slaves:
-                ifenslave_path = __salt__['cmd.run'](['which', 'ifenslave']).strip()
-                if ifenslave_path:
-                    log.info("Adding slaves '%s' to the master %s",
-                             ' '.join(missing_slaves), name)
-                    cmd = [ifenslave_path, name] + list(missing_slaves)
-                    __salt__['cmd.run'](cmd, python_shell=False)
-                else:
-                    log.error("Command 'ifenslave' not found")
-                ret['changes']['enslave'] = (
-                    "Added slaves '{0}' to master '{1}'"
-                    .format(' '.join(missing_slaves), name))
+                log.debug("Missing slaves of {0}: {1}".format(name, missing_slaves))
+                if not is_suse:
+                    ifenslave_path = __salt__['cmd.run'](['which', 'ifenslave']).strip()
+                    if ifenslave_path:
+                        log.info("Adding slaves '%s' to the master %s",
+                                 ' '.join(missing_slaves), name)
+                        cmd = [ifenslave_path, name] + list(missing_slaves)
+                        __salt__['cmd.run'](cmd, python_shell=False)
+                    else:
+                        log.error("Command 'ifenslave' not found")
+                    ret['changes']['enslave'] = (
+                        "Added slaves '{0}' to master '{1}'"
+                        .format(' '.join(missing_slaves), name))
             else:
                 log.info("All slaves '%s' are already added to the master %s"
                          ", no actions required",

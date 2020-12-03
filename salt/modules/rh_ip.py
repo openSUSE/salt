@@ -603,7 +603,7 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
     '''
     result = {'name': iface}
     if 'proto' in opts:
-        valid = ['none', 'bootp', 'dhcp']
+        valid = ['none', 'static', 'bootp', 'dhcp']
         if opts['proto'] in valid:
             result['proto'] = opts['proto']
         else:
