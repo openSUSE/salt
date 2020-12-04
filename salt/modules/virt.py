@@ -447,7 +447,7 @@ def _get_nics(dom):
             # driver, source, and match can all have optional attributes
             if re.match("(driver|source|address)", v_node.tag):
                 temp = {}
-                for key, value in v_node.attrib.items():
+                for key, value in six.iteritems(v_node.attrib):
                     temp[key] = value
                 nic[v_node.tag] = temp
             # virtualport needs to be handled separately, to pick up the
@@ -455,7 +455,7 @@ def _get_nics(dom):
             if v_node.tag == "virtualport":
                 temp = {}
                 temp["type"] = v_node.get("type")
-                for key, value in v_node.attrib.items():
+                for key, value in six.iteritems(v_node.attrib):
                     temp[key] = value
                 nic["virtualport"] = temp
         if "mac" not in nic:
@@ -477,7 +477,7 @@ def _get_graphics(dom):
     }
     doc = ElementTree.fromstring(dom.XMLDesc(0))
     for g_node in doc.findall("devices/graphics"):
-        for key, value in g_node.attrib.items():
+        for key, value in six.iteritems(g_node.attrib):
             out[key] = value
     return out
 
@@ -490,7 +490,7 @@ def _get_loader(dom):
     doc = ElementTree.fromstring(dom.XMLDesc(0))
     for g_node in doc.findall("os/loader"):
         out["path"] = g_node.text
-        for key, value in g_node.attrib.items():
+        for key, value in six.iteritems(g_node.attrib):
             out[key] = value
     return out
 
@@ -845,7 +845,7 @@ def _gen_xml(
     context["cpu"] = nesthash()
     context["cputune"] = nesthash()
     if isinstance(cpu, int):
-        context["cpu"]["maximum"] = str(cpu)
+        context["cpu"]["maximum"] = six.text_type(cpu)
     elif isinstance(cpu, dict):
         context["cpu"] = nesthash(cpu)
 
@@ -2932,7 +2932,7 @@ def _expand_cpuset(cpuset):
         return None
 
     if isinstance(cpuset, int):
-        return str(cpuset)
+        return six.text_type(cpuset)
 
     result = set()
     toremove = set()
@@ -2971,11 +2971,11 @@ def _normalize_cpusets(desc, data):
     for child in ["cachetune", "memorytune"]:
         if tuning.get(child):
             new_item = dict()
-            for cpuset, value in tuning[child].items():
+            for cpuset, value in six.iteritems(tuning[child]):
                 if child == "cachetune" and value.get("monitor"):
                     value["monitor"] = {
                         _expand_cpuset(monitor_cpus): monitor
-                        for monitor_cpus, monitor in value["monitor"].items()
+                        for monitor_cpus, monitor in six.iteritems(value["monitor"])
                     }
                 new_item[_expand_cpuset(cpuset)] = value
             tuning[child] = new_item
@@ -3325,8 +3325,8 @@ def update(
         return _handle_unit("{}{}".format(value, unit)) if value else None
 
     def _set_vcpu(node, value):
-        node.text = str(value)
-        node.set("current", str(value))
+        node.text = six.text_type(value)
+        node.set("current", six.text_type(value))
 
     old_mem = int(_get_with_unit(desc.find("memory")) / 1024)
     old_cpu = int(desc.find("./vcpu").text)
@@ -3334,7 +3334,7 @@ def update(
     def _almost_equal(current, new):
         if current is None or new is None:
             return False
-        return abs(current - new) / current < 1e-03
+        return abs(current - new) / float(current) < 1e-03
 
     def _yesno_attribute(path, xpath, attr_name, ignored=None):
         return xmlutil.attribute(
