@@ -827,9 +827,9 @@ def _gen_xml(
     context = {
         "hypervisor": hypervisor,
         "name": name,
-        "on_reboot": "destroy" if stop_on_reboot else "restart",
         "hypervisor_features": hypervisor_features or {},
         "clock": clock or {},
+        "on_reboot": "destroy" if stop_on_reboot else "restart",
     }
 
     context["to_kib"] = lambda v: int(_handle_unit(v) / 1024)
