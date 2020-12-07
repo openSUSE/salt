@@ -35,7 +35,6 @@ import salt.utils.versions
 from salt.exceptions import CommandExecutionError, MinionError, SaltInvocationError
 
 # pylint: disable=import-error,redefined-builtin,no-name-in-module
-from salt.ext import six
 from salt.ext.six.moves import configparser
 from salt.ext.six.moves.urllib.parse import urlparse as _urlparse
 from salt.utils.versions import LooseVersion
@@ -1431,6 +1430,7 @@ def install(
     no_recommends=False,
     root=None,
     inclusion_detection=False,
+    novendorchange=True,
     **kwargs
 ):
     """
@@ -1477,6 +1477,10 @@ def install(
 
     skip_verify
         Skip the GPG verification check (e.g., ``--no-gpg-checks``)
+
+
+    novendorchange
+        Disallow vendor change
 
     version
         Can be either a version number, or the combination of a comparison
@@ -1638,6 +1642,22 @@ def install(
     cmd_install.append(
         kwargs.get("resolve_capabilities") and "--capability" or "--name"
     )
+    if novendorchange:
+        if __grains__["osrelease_info"][0] > 11:
+            cmd_install.append("--no-allow-vendor-change")
+            log.info("Disabling vendor changes")
+        else:
+            log.warning(
+                "Enabling/Disabling vendor changes is not supported on this Zypper version"
+            )
+    else:
+        if __grains__["osrelease_info"][0] > 11:
+            cmd_install.append("--allow-vendor-change")
+            log.info("Enabling vendor changes")
+        else:
+            log.warning(
+                "Enabling/Disabling vendor changes is not supported on this Zypper version"
+            )
 
     if not refresh:
         cmd_install.insert(0, "--no-refresh")
@@ -1649,7 +1669,6 @@ def install(
         cmd_install.extend(fromrepoopt)
     if no_recommends:
         cmd_install.append("--no-recommends")
-
     errors = []
 
     # Split the targets into batches of 500 packages each, so that
@@ -1793,19 +1812,18 @@ def upgrade(
             cmd_update.extend(["--from" if dist_upgrade else "--repo", repo])
         log.info("Targeting repos: %s", fromrepo)
 
-    if dist_upgrade:
-        # TODO: Grains validation should be moved to Zypper class
-        if __grains__["osrelease_info"][0] > 11:
-            if novendorchange:
-                cmd_update.append("--no-allow-vendor-change")
-                log.info("Disabling vendor changes")
-            else:
-                cmd_update.append("--allow-vendor-change")
-                log.info("Enabling vendor changes")
+    # TODO: Grains validation should be moved to Zypper class
+    if __grains__["osrelease_info"][0] > 11:
+        if novendorchange:
+            cmd_update.append("--no-allow-vendor-change")
+            log.info("Disabling vendor changes")
         else:
-            log.warning(
-                "Enabling/Disabling vendor changes is not supported on this Zypper version"
-            )
+            cmd_update.append("--allow-vendor-change")
+            log.info("Enabling vendor changes")
+    else:
+        log.warning(
+            "Enabling/Disabling vendor changes is not supported on this Zypper version"
+        )
 
         if no_recommends:
             cmd_update.append("--no-recommends")
