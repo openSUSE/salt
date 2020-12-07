@@ -957,6 +957,7 @@ class SaltDistribution(distutils.dist.Distribution):
     @property
     def _property_package_data(self):
         package_data = {'salt.templates': ['rh_ip/*.jinja',
+                                           'suse_ip/*.jinja',
                                            'debian_ip/*.jinja',
                                            'virt/*.jinja',
                                            'git/*',
