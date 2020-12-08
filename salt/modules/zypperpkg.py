@@ -3092,3 +3092,28 @@ def del_repo_key(keyid, root=None, **kwargs):
 
     """
     return __salt__["lowpkg.remove_gpg_key"](keyid, root)
+
+
+def services_need_restart(root=None, **kwargs):
+    """
+    .. versionadded:: NEXT
+
+    List services that use files which have been changed by the
+    package manager. It might be needed to restart them.
+
+    root
+        operate on a different root directory.
+
+    CLI Examples:
+
+    .. code-block:: bash
+
+        salt '*' pkg.services_need_restart
+
+    """
+    cmd = ["ps", "-sss"]
+
+    zypper_output = __zypper__(root=root).nolock.call(*cmd)
+    services = zypper_output.split()
+
+    return services

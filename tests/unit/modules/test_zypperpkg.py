@@ -2213,3 +2213,17 @@ pattern() = package-c"""
         with patch.dict(zypper.__salt__, salt_mock):
             self.assertTrue(zypper.del_repo_key(keyid="keyid", root="/mnt"))
             salt_mock["lowpkg.remove_gpg_key"].assert_called_once_with("keyid", "/mnt")
+
+    def test_services_need_restart(self):
+        """
+        Test that zypper ps is used correctly to list services that need to
+        be restarted.
+        """
+        expected = ["salt-minion", "firewalld"]
+        zypper_output = "salt-minion\nfirewalld"
+        zypper_mock = Mock()
+        zypper_mock(root=None).nolock.call = Mock(return_value=zypper_output)
+
+        with patch("salt.modules.zypperpkg.__zypper__", zypper_mock):
+            assert zypper.services_need_restart() == expected
+            zypper_mock(root=None).nolock.call.assert_called_with("ps", "-sss")

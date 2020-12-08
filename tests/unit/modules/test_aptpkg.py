@@ -13,7 +13,6 @@ import textwrap
 import pytest
 import salt.modules.aptpkg as aptpkg
 from salt.exceptions import CommandExecutionError, SaltInvocationError
-from salt.ext import six
 from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.mock import MagicMock, Mock, call, patch
 from tests.support.unit import TestCase, skipIf
@@ -1001,3 +1000,24 @@ class AptUtilsTestCase(TestCase, LoaderModuleMockMixin):
                 # We should attempt to call the cmd 5 times
                 self.assertEqual(cmd_mock.call_count, 5)
                 cmd_mock.has_calls(expected_calls)
+
+    @patch("salt.utils.path.which_bin", Mock(return_value="/usr/sbin/checkrestart"))
+    def test_services_need_restart(self):
+        """
+        Test that checkrestart output is parsed correctly
+        """
+        cr_output = """
+PROCESSES: 24
+PROGRAMS: 17
+PACKAGES: 8
+SERVICE:rsyslog,385,/usr/sbin/rsyslogd
+SERVICE:cups-daemon,390,/usr/sbin/cupsd
+       """
+
+        with patch.dict(
+            aptpkg.__salt__, {"cmd.run_stdout": Mock(return_value=cr_output)}
+        ):
+            assert sorted(aptpkg.services_need_restart()) == [
+                "cups-daemon",
+                "rsyslog",
+            ]
