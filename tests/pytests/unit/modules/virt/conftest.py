@@ -109,7 +109,7 @@ def make_mock_vm():
 
         # Return state as shutdown
         domain_mock.info.return_value = [
-            4,
+            0 if running else 4,
             2048 * 1024,
             1024 * 1024,
             2,
@@ -382,3 +382,11 @@ def make_mock_device():
         return mocked_device
 
     return _make_mock_device
+
+
+@pytest.fixture(params=[True, False], ids=["test", "notest"])
+def test(request):
+    """
+    Run the test with both True and False test values
+    """
+    return request.param
