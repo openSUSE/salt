@@ -298,6 +298,7 @@ def defined(
     consoles=None,
     stop_on_reboot=False,
     live=True,
+    host_devices=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -593,6 +594,13 @@ def defined(
 
         .. versionadded:: Aluminium
 
+    :param host_devices:
+        List of host devices to passthrough to the guest.
+        The value is a list of device names as provided by the :py:func:`~salt.modules.virt.node_devices` function.
+        (Default: ``None``)
+
+        .. versionadded:: Aluminium
+
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -661,6 +669,7 @@ def defined(
                 hypervisor_features=hypervisor_features,
                 clock=clock,
                 stop_on_reboot=stop_on_reboot,
+                host_devices=host_devices,
             )
             ret["changes"][name] = status
             if not status.get("definition"):
@@ -702,6 +711,7 @@ def defined(
                     hypervisor_features=hypervisor_features,
                     clock=clock,
                     stop_on_reboot=stop_on_reboot,
+                    host_devices=host_devices,
                 )
             ret["changes"][name] = {"definition": True}
             ret["comment"] = "Domain {} defined".format(name)
@@ -740,6 +750,7 @@ def running(
     serials=None,
     consoles=None,
     stop_on_reboot=False,
+    host_devices=None,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -953,6 +964,13 @@ def running(
             clock:
               timezone: CEST
 
+    :param host_devices:
+        List of host devices to passthrough to the guest.
+        The value is a list of device names as provided by the :py:func:`~salt.modules.virt.node_devices` function.
+        (Default: ``None``)
+
+        .. versionadded:: Aluminium
+
     .. rubric:: Example States
 
     Make sure an already-defined virtual machine called ``domain_name`` is running:
@@ -1023,6 +1041,7 @@ def running(
         password=password,
         serials=serials,
         consoles=consoles,
+        host_devices=host_devices,
     )
 
     result = True if not __opts__["test"] else None
