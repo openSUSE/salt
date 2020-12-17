@@ -43,8 +43,8 @@ class MappedResultMock(MagicMock):
 
         super().__init__(side_effect=mapped_results)
 
-    def add(self, name):
-        self._instances[name] = MagicMock()
+    def add(self, name, value=None):
+        self._instances[name] = value or MagicMock()
 
 
 @pytest.fixture(autouse=True)
@@ -122,6 +122,8 @@ def make_mock_vm():
         domain_mock.detachDevice.return_value = 0
         domain_mock.setMemoryFlags.return_value = 0
         domain_mock.setVcpusFlags.return_value = 0
+
+        domain_mock.connect.return_value = mocked_conn
 
         return domain_mock
 
@@ -353,6 +355,14 @@ def make_mock_network():
 
         # libvirt defaults the autostart to unset
         net_mock.autostart.return_value = 0
+
+        # Append the network to listAllNetworks return value
+        all_nets = mocked_conn.listAllNetworks.return_value
+        if not isinstance(all_nets, list):
+            all_nets = []
+        all_nets.append(net_mock)
+        mocked_conn.listAllNetworks.return_value = all_nets
+
         return net_mock
 
     return _make_mock_net
