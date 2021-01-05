@@ -21,6 +21,7 @@ import os
 import re
 
 import salt.utils.beacons
+import salt.ext.six
 
 try:
     import pyinotify
@@ -65,19 +66,17 @@ def _get_notifier(config):
     """
     Check the context for the notifier and construct it if not present
     """
-    beacon_name = config.get("_beacon_name", "inotify")
-    notifier = "{}.notifier".format(beacon_name)
-    if notifier not in __context__:
+    if "inotify.notifier" not in __context__:
         __context__["inotify.queue"] = collections.deque()
         wm = pyinotify.WatchManager()
-        __context__[notifier] = pyinotify.Notifier(wm, _enqueue)
+        __context__["inotify.notifier"] = pyinotify.Notifier(wm, _enqueue)
         if (
             "coalesce" in config
             and isinstance(config["coalesce"], bool)
             and config["coalesce"]
         ):
-            __context__[notifier].coalesce_events()
-    return __context__[notifier]
+            __context__["inotify.notifier"].coalesce_events()
+    return __context__["inotify.notifier"]
 
 
 def validate(config):
@@ -253,10 +252,6 @@ def beacon(config):
       affects all paths that are being watched. This is due to this option
       being at the Notifier level in pyinotify.
     """
-
-    whitelist = ["_beacon_name"]
-    config = salt.utils.beacons.remove_hidden_options(config, whitelist)
-
     _config = {}
     list(map(_config.update, config))
 
@@ -280,7 +275,7 @@ def beacon(config):
                     break
                 path = os.path.dirname(path)
 
-            excludes = _config["files"].get(path, {}).get("exclude", "")
+            excludes = _config["files"][path].get("exclude", "")
 
             if excludes and isinstance(excludes, list):
                 for exclude in excludes:
@@ -367,8 +362,6 @@ def beacon(config):
 
 
 def close(config):
-    beacon_name = config.get("_beacon_name", "inotify")
-    notifier = "{}.notifier".format(beacon_name)
-    if notifier in __context__:
-        __context__[notifier].stop()
-        del __context__[notifier]
+    if "inotify.notifier" in __context__:
+        __context__["inotify.notifier"].stop()
+        del __context__["inotify.notifier"]
