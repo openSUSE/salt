@@ -143,7 +143,6 @@ import salt.utils.xmlutil as xmlutil
 import salt.utils.yaml
 from salt._compat import ElementTree, ipaddress, saxutils
 from salt.exceptions import CommandExecutionError, SaltInvocationError
-from salt.ext import six
 from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
 from salt.ext.six.moves.urllib.parse import urlparse, urlunparse
 from salt.utils.virt import check_remote, download_remote
@@ -5414,71 +5413,6 @@ def _parse_domain_caps(caps):
                 result["features"] = features
 
     return result
-
-
-def _parse_domain_caps(caps):
-    """
-    Parse the XML document of domain capabilities into a structure.
-    """
-    result = {
-        "emulator": caps.find("path").text if caps.find("path") is not None else None,
-        "domain": caps.find("domain").text if caps.find("domain") is not None else None,
-        "machine": caps.find("machine").text
-        if caps.find("machine") is not None
-        else None,
-        "arch": caps.find("arch").text if caps.find("arch") is not None else None,
-    }
-
-
-def all_capabilities(**kwargs):
-    """
-    Return the host and domain capabilities in a single call.
-
-    .. versionadded:: 3001
-
-    :param connection: libvirt connection URI, overriding defaults
-    :param username: username to connect with, overriding defaults
-    :param password: password to connect with, overriding defaults
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt '*' virt.all_capabilities
-
-    """
-    conn = __get_conn(**kwargs)
-    try:
-        host_caps = ElementTree.fromstring(conn.getCapabilities())
-        domains = [
-            [
-                (guest.get("arch", {}).get("name", None), key)
-                for key in guest.get("arch", {}).get("domains", {}).keys()
-            ]
-            for guest in [
-                _parse_caps_guest(guest) for guest in host_caps.findall("guest")
-            ]
-        ]
-        flattened = [pair for item in (x for x in domains) for pair in item]
-        result = {
-            "host": {
-                "host": _parse_caps_host(host_caps.find("host")),
-                "guests": [
-                    _parse_caps_guest(guest) for guest in host_caps.findall("guest")
-                ],
-            },
-            "domains": [
-                _parse_domain_caps(
-                    ElementTree.fromstring(
-                        conn.getDomainCapabilities(None, arch, None, domain)
-                    )
-                )
-                for (arch, domain) in flattened
-            ],
-        }
-        return result
-    finally:
-        conn.close()
 
 
 def domain_capabilities(emulator=None, arch=None, machine=None, domain=None, **kwargs):
