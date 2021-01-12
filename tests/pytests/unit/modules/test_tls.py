@@ -5,6 +5,11 @@ import salt.modules.tls as tls
 from tests.support.mock import MagicMock, patch
 
 
+@pytest.fixture
+def configure_loader_modules():
+    return {tls: {}}
+
+
 @pytest.fixture(scope="module")
 def tls_test_data():
     return {
@@ -21,13 +26,6 @@ def tls_test_data():
             "replace": False,
         }
     }
-
-
-@pytest.fixture(autouse=True)
-def setup_loader():
-    setup_loader_modules = {tls: {}}
-    with pytest.helpers.loader_mock(setup_loader_modules) as loader_mock:
-        yield loader_mock
 
 
 def test_create_ca_permissions_on_cert_and_key(tmpdir, tls_test_data):
