@@ -289,8 +289,6 @@ def defined(
     boot=None,
     update=True,
     boot_dev=None,
-    stop_on_reboot=False,
-    live=True,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -380,20 +378,6 @@ def defined(
 
         .. versionadded:: Magnesium
 
-    :param stop_on_reboot:
-        If set to ``True`` the guest will stop instead of rebooting.
-        This is specially useful when creating a virtual machine with an installation cdrom or
-        an autoinstallation needing a special first boot configuration.
-        Defaults to ``False``
-
-        .. versionadded:: Aluminium
-
-    :param live:
-        If set to ``False`` the changes will not be applied live to the running instance, but will
-        only apply at the next start. Note that reboot will not take those changes.
-
-        .. versionadded:: Aluminium
-
     .. rubric:: Example States
 
     Make sure a virtual machine called ``domain_name`` is defined:
@@ -451,14 +435,13 @@ def defined(
                     nic_profile=nic_profile,
                     interfaces=interfaces,
                     graphics=graphics,
-                    live=live,
+                    live=True,
                     connection=connection,
                     username=username,
                     password=password,
                     boot=boot,
                     test=__opts__["test"],
                     boot_dev=boot_dev,
-                    stop_on_reboot=stop_on_reboot,
                 )
             ret["changes"][name] = status
             if not status.get("definition"):
@@ -494,7 +477,6 @@ def defined(
                     boot=boot,
                     start=False,
                     boot_dev=boot_dev,
-                    stop_on_reboot=stop_on_reboot,
                 )
             ret["changes"][name] = {"definition": True}
             ret["comment"] = "Domain {} defined".format(name)
@@ -528,7 +510,6 @@ def running(
     arch=None,
     boot=None,
     boot_dev=None,
-    stop_on_reboot=False,
 ):
     """
     Starts an existing guest, or defines and starts a new VM with specified arguments.
@@ -664,14 +645,6 @@ def running(
 
         .. versionadded:: Magnesium
 
-    :param stop_on_reboot:
-        If set to ``True`` the guest will stop instead of rebooting.
-        This is specially useful when creating a virtual machine with an installation cdrom or
-        an autoinstallation needing a special first boot configuration.
-        Defaults to ``False``
-
-        .. versionadded:: Aluminium
-
     .. rubric:: Example States
 
     Make sure an already-defined virtual machine called ``domain_name`` is running:
@@ -740,7 +713,6 @@ def running(
         boot=boot,
         update=update,
         boot_dev=boot_dev,
-        stop_on_reboot=stop_on_reboot,
         connection=connection,
         username=username,
         password=password,

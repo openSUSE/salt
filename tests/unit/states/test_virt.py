@@ -1,15 +1,21 @@
 """
     :codeauthor: Jayesh Kariya <jayeshk@saltstack.com>
 """
+# Import Python libs
 
 import shutil
 import tempfile
 
+# Import Salt Libs
 import salt.states.virt as virt
 import salt.utils.files
 from salt.exceptions import CommandExecutionError, SaltInvocationError
+
+# Import 3rd-party libs
 from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.mock import MagicMock, mock_open, patch
+
+# Import Salt Testing Libs
 from tests.support.runtests import RUNTIME_VARS
 from tests.support.unit import TestCase
 
@@ -345,7 +351,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                         install=False,
                         pub_key="/path/to/key.pub",
                         priv_key="/path/to/key",
-                        stop_on_reboot=True,
                         connection="someconnection",
                         username="libvirtuser",
                         password="supersecret",
@@ -371,7 +376,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     start=False,
                     pub_key="/path/to/key.pub",
                     priv_key="/path/to/key",
-                    stop_on_reboot=True,
                     connection="someconnection",
                     username="libvirtuser",
                     password="supersecret",
@@ -485,7 +489,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     password=None,
                     boot=None,
                     test=False,
-                    stop_on_reboot=False,
                 )
 
             # Failed definition update case
@@ -556,7 +559,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                         install=False,
                         pub_key="/path/to/key.pub",
                         priv_key="/path/to/key",
-                        stop_on_reboot=False,
                         connection="someconnection",
                         username="libvirtuser",
                         password="supersecret",
@@ -599,7 +601,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     boot=None,
                     test=True,
                     boot_dev=None,
-                    stop_on_reboot=False,
                 )
 
             # No changes case
@@ -635,7 +636,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     boot=None,
                     test=True,
                     boot_dev=None,
-                    stop_on_reboot=False,
                 )
 
     def test_running(self):
@@ -713,7 +713,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     pub_key=None,
                     priv_key=None,
                     boot_dev=None,
-                    stop_on_reboot=False,
                     connection=None,
                     username=None,
                     password=None,
@@ -776,7 +775,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                         pub_key="/path/to/key.pub",
                         priv_key="/path/to/key",
                         boot_dev="network hd",
-                        stop_on_reboot=True,
                         connection="someconnection",
                         username="libvirtuser",
                         password="supersecret",
@@ -802,7 +800,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     pub_key="/path/to/key.pub",
                     priv_key="/path/to/key",
                     boot_dev="network hd",
-                    stop_on_reboot=True,
                     connection="someconnection",
                     username="libvirtuser",
                     password="supersecret",
@@ -948,7 +945,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     boot=None,
                     test=False,
                     boot_dev=None,
-                    stop_on_reboot=False,
                 )
 
             # Failed definition update case
@@ -1022,7 +1018,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                         install=False,
                         pub_key="/path/to/key.pub",
                         priv_key="/path/to/key",
-                        stop_on_reboot=True,
                         connection="someconnection",
                         username="libvirtuser",
                         password="supersecret",
@@ -1069,7 +1064,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     boot=None,
                     test=True,
                     boot_dev=None,
-                    stop_on_reboot=False,
                 )
                 start_mock.assert_not_called()
 
@@ -1107,7 +1101,6 @@ class LibvirtTestCase(TestCase, LoaderModuleMockMixin):
                     boot=None,
                     test=True,
                     boot_dev=None,
-                    stop_on_reboot=False,
                 )
 
     def test_stopped(self):
