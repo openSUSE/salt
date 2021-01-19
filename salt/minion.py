@@ -2385,6 +2385,8 @@ class Minion(MinionBase):
         """
         Refresh the functions and returners.
         """
+        if not hasattr(self, "schedule"):
+            return
         log.debug("Refreshing modules. Notify=%s", notify)
         self.functions, self.returners, _, self.executors = self._load_modules(
             force_refresh, notify=notify
