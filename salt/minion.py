@@ -2190,8 +2190,12 @@ class Minion(MinionBase):
         '''
         Refresh the functions and returners.
         '''
-        log.debug('Refreshing modules. Notify=%s', notify)
-        self.functions, self.returners, _, self.executors = self._load_modules(force_refresh, notify=notify)
+        if not hasattr(self, "schedule"):
+            return
+        log.debug("Refreshing modules. Notify=%s", notify)
+        self.functions, self.returners, _, self.executors = self._load_modules(
+            force_refresh, notify=notify
+        )
 
         self.schedule.functions = self.functions
         self.schedule.returners = self.returners
