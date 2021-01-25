@@ -3325,10 +3325,17 @@ def _get_patches(installed_only=False):
 
     cmd = [_yum(), "--quiet", "updateinfo", "list", "all"]
     ret = __salt__["cmd.run_stdout"](cmd, python_shell=False, env={"SALT_RUNNING": "1"})
+    parsing_errors = False
+
     for line in salt.utils.itertools.split(ret, os.linesep):
-        inst, advisory_id, sev, pkg = re.match(
-            r"([i|\s]) ([^\s]+) +([^\s]+) +([^\s]+)", line
-        ).groups()
+        try:
+            inst, advisory_id, sev, pkg = re.match(
+                r"([i|\s]) ([^\s]+) +([^\s]+) +([^\s]+)", line
+            ).groups()
+        except Exception:  # pylint: disable=broad-except
+            parsing_errors = True
+            continue
+
         if advisory_id not in patches:
             patches[advisory_id] = {
                 "installed": True if inst == "i" else False,
@@ -3338,6 +3345,13 @@ def _get_patches(installed_only=False):
             patches[advisory_id]["summary"].append(pkg)
             if inst != "i":
                 patches[advisory_id]["installed"] = False
+
+    if parsing_errors:
+        log.warning(
+            "Skipped some unexpected output while running '{}' to list patches. Please check output".format(
+                " ".join(cmd)
+            )
+        )
 
     if installed_only:
         patches = {k: v for k, v in patches.items() if v["installed"]}
