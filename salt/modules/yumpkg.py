@@ -3004,9 +3004,16 @@ def _get_patches(installed_only=False):
         python_shell=False,
         env={"SALT_RUNNING": '1'}
     )
+    parsing_errors = False
+
     for line in salt.utils.itertools.split(ret, os.linesep):
-        inst, advisory_id, sev, pkg = re.match(r'([i|\s]) ([^\s]+) +([^\s]+) +([^\s]+)',
-                                               line).groups()
+        try:
+            inst, advisory_id, sev, pkg = re.match(r'([i|\s]) ([^\s]+) +([^\s]+) +([^\s]+)',
+                                                   line).groups()
+        except Exception:
+            parsing_errors = True
+            continue
+
         if not advisory_id in patches:
             patches[advisory_id] = {
                 'installed': True if inst == 'i' else False,
@@ -3016,6 +3023,9 @@ def _get_patches(installed_only=False):
             patches[advisory_id]['summary'].append(pkg)
             if inst != 'i':
                 patches[advisory_id]['installed'] = False
+
+    if parsing_errors:
+        log.warning("Skipped some unexpected output while running '{0}' to list patches. Please check output".format(" ".join(cmd)))
 
     if installed_only:
         patches = dict((k, v) for k, v in patches.items() if v['installed'])
