@@ -267,6 +267,7 @@ class LoadAuth(object):
 
         if rm_tok:
             self.rm_token(tok)
+            return {}
 
         return tdata
 
