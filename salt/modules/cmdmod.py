@@ -66,6 +66,12 @@ def __virtual__():
     return __virtualname__
 
 
+def _log_cmd(cmd):
+    if not isinstance(cmd, list):
+        return cmd.split()[0].strip()
+    return cmd[0].strip()
+
+
 def _check_cb(cb_):
     '''
     If the callback is None or is not callable, return a lambda that returns
@@ -360,7 +366,7 @@ def _run(cmd,
         msg = (
             'Executing command {0}{1}{0} {2}in directory \'{3}\'{4}'.format(
                 '\'' if not isinstance(cmd, list) else '',
-                cmd,
+                _log_cmd(cmd),
                 'as user \'{0}\' '.format(runas) if runas else '',
                 cwd,
                 '. Executing command in the background, no output will be '

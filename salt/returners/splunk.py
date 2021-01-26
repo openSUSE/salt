@@ -11,6 +11,7 @@ Requires the following config values to be specified in config or pillar:
       indexer: <hostname/IP of Splunk indexer>
       sourcetype: <Destination sourcetype for data>
       index: <Destination index for data>
+      verify_ssl: true
 
 Run a test by using ``salt-call test.ping --return splunk``
 
@@ -29,7 +30,6 @@ import time
 import logging
 
 _max_content_bytes = 100000
-http_event_collector_SSL_verify = False
 http_event_collector_debug = False
 
 log = logging.getLogger(__name__)
@@ -58,10 +58,13 @@ def _get_options():
         indexer = __salt__['config.get']('splunk_http_forwarder:indexer')
         sourcetype = __salt__['config.get']('splunk_http_forwarder:sourcetype')
         index = __salt__['config.get']('splunk_http_forwarder:index')
-    except Exception:
+        verify_ssl = __salt__["config.get"](
+            "splunk_http_forwarder:verify_ssl", default=True
+        )
+    except Exception:  # pylint: disable=broad-except
         log.error("Splunk HTTP Forwarder parameters not present in config.")
         return None
-    splunk_opts = {"token": token, "indexer": indexer, "sourcetype": sourcetype, "index": index}
+    splunk_opts = {"token": token, "indexer": indexer, "sourcetype": sourcetype, "index": index, "verify_ssl": verify_ssl}
     return splunk_opts
 
 
@@ -77,9 +80,10 @@ def _send_splunk(event, index_override=None, sourcetype_override=None):
     logging.info('Options: {0}'.format(json.dumps(opts)))
     http_event_collector_key = opts['token']
     http_event_collector_host = opts['indexer']
-    #Set up the collector
-    splunk_event = http_event_collector(http_event_collector_key, http_event_collector_host)
-    #init the payload
+    http_event_collector_verify_ssl = opts["verify_ssl"]
+    # Set up the collector
+    splunk_event = http_event_collector(http_event_collector_key, http_event_collector_host, verify_ssl=http_event_collector_verify_ssl)
+    # init the payload
     payload = {}
 
     #Set up the event metadata
@@ -110,13 +114,15 @@ class http_event_collector(object):
                  host="",
                  http_event_port='8088',
                  http_event_server_ssl=True,
-                 max_bytes=_max_content_bytes):
+                 max_bytes=_max_content_bytes,
+                 verify_ssl=True):
         self.token = token
         self.batchEvents = []
         self.maxByteLength = max_bytes
         self.currentByteLength = 0
+        self.verify_ssl = verify_ssl
 
-           # Set host to specified value or default to localhostname if no value provided
+        # Set host to specified value or default to localhostname if no value provided
         if host:
             self.host = host
         else:
@@ -156,7 +162,10 @@ class http_event_collector(object):
         data.update(payload)
 
         # send event to http event collector
-        r = requests.post(self.server_uri, data=json.dumps(data), headers=headers, verify=http_event_collector_SSL_verify)
+        r = requests.post(self.server_uri,
+                          data=json.dumps(data),
+                          headers=headers,
+                          verify=self.verify_ssl)
 
         # Print debug info if flag set
         if http_event_collector_debug:
@@ -195,6 +204,6 @@ class http_event_collector(object):
 
         if len(self.batchEvents) > 0:
             headers = {'Authorization': 'Splunk '+self.token}
-            r = requests.post(self.server_uri, data=" ".join(self.batchEvents), headers=headers, verify=http_event_collector_SSL_verify)
+            r = requests.post(self.server_uri, data=" ".join(self.batchEvents), headers=headers, verify=self.verify_ssl)
             self.batchEvents = []
             self.currentByteLength = 0

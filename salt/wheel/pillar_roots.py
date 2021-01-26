@@ -105,7 +105,10 @@ def write(data, path, saltenv='base', index=0):
     if os.path.isabs(path):
         return ('The path passed in {0} is not relative to the environment '
                 '{1}').format(path, saltenv)
-    dest = os.path.join(__opts__['pillar_roots'][saltenv][index], path)
+    roots_dir = __opts__['pillar_roots'][saltenv][index]
+    dest = os.path.join(roots_dir, path)
+    if not salt.utils.verify.clean_path(roots_dir, dest):
+        return 'Invalid path'
     dest_dir = os.path.dirname(dest)
     if not os.path.isdir(dest_dir):
         os.makedirs(dest_dir)

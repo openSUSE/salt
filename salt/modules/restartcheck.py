@@ -15,6 +15,7 @@ from __future__ import absolute_import
 # Import python libs
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -394,7 +395,8 @@ def restartcheck(ignorelist=None, blacklist=None, excludepid=None, verbose=True)
 
     for package in packages.keys():
         cmd = cmd_pkg_query + package
-        paths = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        cmd = shlex.split(cmd)
+        paths = subprocess.Popen(cmd, stdout=subprocess.PIPE)
 
         while True:
             line = paths.stdout.readline()

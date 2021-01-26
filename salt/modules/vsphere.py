@@ -992,7 +992,7 @@ def reset_syslog_config(host,
 
 
 def upload_ssh_key(host, username, password, ssh_key=None, ssh_key_file=None,
-                   protocol=None, port=None, certificate_verify=False):
+                   protocol=None, port=None, certificate_verify=None):
     '''
     Upload an ssh key for root to an ESXi host via http PUT.
     This function only works for ESXi, not vCenter.
@@ -1008,7 +1008,7 @@ def upload_ssh_key(host, username, password, ssh_key=None, ssh_key_file=None,
     :param protocol: defaults to https, can be http if ssl is disabled on ESXi
     :param port: defaults to 443 for https
     :param certificate_verify: If true require that the SSL connection present
-                               a valid certificate
+                               a valid certificate. Default: True
     :return: Dictionary with a 'status' key, True if upload is successful.
              If upload is unsuccessful, 'status' key will be False and
              an 'Error' key will have an informative message.
@@ -1024,6 +1024,8 @@ def upload_ssh_key(host, username, password, ssh_key=None, ssh_key_file=None,
         protocol = 'https'
     if port is None:
         port = 443
+    if certificate_verify is None:
+        certificate_verify = True
 
     url = '{0}://{1}:{2}/host/ssh_root_authorized_keys'.format(protocol,
                                                                host,
@@ -1067,7 +1069,7 @@ def get_ssh_key(host,
                 password,
                 protocol=None,
                 port=None,
-                certificate_verify=False):
+                certificate_verify=None):
     '''
     Retrieve the authorized_keys entry for root.
     This function only works for ESXi, not vCenter.
@@ -1078,7 +1080,7 @@ def get_ssh_key(host,
     :param protocol: defaults to https, can be http if ssl is disabled on ESXi
     :param port: defaults to 443 for https
     :param certificate_verify: If true require that the SSL connection present
-                               a valid certificate
+                               a valid certificate. Default: True
     :return: True if upload is successful
 
     CLI Example:
@@ -1092,6 +1094,8 @@ def get_ssh_key(host,
         protocol = 'https'
     if port is None:
         port = 443
+    if certificate_verify is None:
+        certificate_verify = True
 
     url = '{0}://{1}:{2}/host/ssh_root_authorized_keys'.format(protocol,
                                                                host,
@@ -1118,7 +1122,10 @@ def get_ssh_key(host,
     return ret
 
 
-def get_host_datetime(host, username, password, protocol=None, port=None, host_names=None):
+def get_host_datetime(
+    host, username, password, protocol=None, port=None, host_names=None,
+    verify_ssl=True
+):
     '''
     Get the date/time information for a given host or list of host_names.
 
@@ -1148,6 +1155,9 @@ def get_host_datetime(host, username, password, protocol=None, port=None, host_n
         ``host`` location instead. This is useful for when service instance connection
         information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -1159,11 +1169,10 @@ def get_host_datetime(host, username, password, protocol=None, port=None, host_n
         salt '*' vsphere.get_host_datetime my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     for host_name in host_names:
@@ -1175,7 +1184,8 @@ def get_host_datetime(host, username, password, protocol=None, port=None, host_n
     return ret
 
 
-def get_ntp_config(host, username, password, protocol=None, port=None, host_names=None):
+def get_ntp_config(host, username, password, protocol=None, port=None,
+                   host_names=None, verify_ssl=True):
     '''
     Get the NTP configuration information for a given host or list of host_names.
 
@@ -1205,6 +1215,9 @@ def get_ntp_config(host, username, password, protocol=None, port=None, host_name
         ``host`` location instead. This is useful for when service instance connection
         information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -1216,11 +1229,10 @@ def get_ntp_config(host, username, password, protocol=None, port=None, host_name
         salt '*' vsphere.get_ntp_config my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     for host_name in host_names:
@@ -1231,7 +1243,10 @@ def get_ntp_config(host, username, password, protocol=None, port=None, host_name
     return ret
 
 
-def get_service_policy(host, username, password, service_name, protocol=None, port=None, host_names=None):
+def get_service_policy(
+    host, username, password, service_name, protocol=None, port=None,
+    host_names=None, verify_ssl=True,
+):
     '''
     Get the service name's policy for a given host or list of hosts.
 
@@ -1277,6 +1292,9 @@ def get_service_policy(host, username, password, service_name, protocol=None, po
         for the ``host`` location instead. This is useful for when service instance
         connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -1288,13 +1306,26 @@ def get_service_policy(host, username, password, service_name, protocol=None, po
         salt '*' vsphere.get_service_policy my.vcenter.location root bad-password 'ntpd' \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
-    valid_services = ['DCUI', 'TSM', 'SSH', 'ssh', 'lbtd', 'lsassd', 'lwiod', 'netlogond',
-                      'ntpd', 'sfcbd-watchdog', 'snmpd', 'vprobed', 'vpxa', 'xorg']
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
+    valid_services = [
+        'DCUI',
+        'TSM',
+        'SSH',
+        'ssh',
+        'lbtd',
+        'lsassd',
+        'lwiod',
+        'netlogond',
+        'ntpd',
+        'sfcbd-watchdog',
+        'snmpd',
+        'vprobed',
+        'vpxa',
+        'xorg',
+    ]
     host_names = _check_hosts(service_instance, host, host_names)
 
     ret = {}
@@ -1336,7 +1367,10 @@ def get_service_policy(host, username, password, service_name, protocol=None, po
     return ret
 
 
-def get_service_running(host, username, password, service_name, protocol=None, port=None, host_names=None):
+def get_service_running(
+    host, username, password, service_name, protocol=None, port=None,
+    host_names=None, verify_ssl=True,
+):
     '''
     Get the service name's running state for a given host or list of hosts.
 
@@ -1382,6 +1416,9 @@ def get_service_running(host, username, password, service_name, protocol=None, p
         for the ``host`` location instead. This is useful for when service instance
         connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -1393,13 +1430,26 @@ def get_service_running(host, username, password, service_name, protocol=None, p
         salt '*' vsphere.get_service_running my.vcenter.location root bad-password 'ntpd' \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
-    valid_services = ['DCUI', 'TSM', 'SSH', 'ssh', 'lbtd', 'lsassd', 'lwiod', 'netlogond',
-                      'ntpd', 'sfcbd-watchdog', 'snmpd', 'vprobed', 'vpxa', 'xorg']
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
+    valid_services = [
+        'DCUI',
+        'TSM',
+        'SSH',
+        'ssh',
+        'lbtd',
+        'lsassd',
+        'lwiod',
+        'netlogond',
+        'ntpd',
+        'sfcbd-watchdog',
+        'snmpd',
+        'vprobed',
+        'vpxa',
+        'xorg',
+    ]
     host_names = _check_hosts(service_instance, host, host_names)
 
     ret = {}
@@ -1441,7 +1491,10 @@ def get_service_running(host, username, password, service_name, protocol=None, p
     return ret
 
 
-def get_vmotion_enabled(host, username, password, protocol=None, port=None, host_names=None):
+def get_vmotion_enabled(
+    host, username, password, protocol=None, port=None, host_names=None,
+    verify_ssl=True,
+):
     '''
     Get the VMotion enabled status for a given host or a list of host_names. Returns ``True``
     if VMotion is enabled, ``False`` if it is not enabled.
@@ -1472,6 +1525,9 @@ def get_vmotion_enabled(host, username, password, protocol=None, port=None, host
         ``host`` location instead. This is useful for when service instance
         connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -1483,11 +1539,10 @@ def get_vmotion_enabled(host, username, password, protocol=None, port=None, host
         salt '*' vsphere.get_vmotion_enabled my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     for host_name in host_names:
@@ -1501,7 +1556,10 @@ def get_vmotion_enabled(host, username, password, protocol=None, port=None, host
     return ret
 
 
-def get_vsan_enabled(host, username, password, protocol=None, port=None, host_names=None):
+def get_vsan_enabled(
+    host, username, password, protocol=None, port=None, host_names=None,
+    verify_ssl=True,
+):
     '''
     Get the VSAN enabled status for a given host or a list of host_names. Returns ``True``
     if VSAN is enabled, ``False`` if it is not enabled, and ``None`` if a VSAN Host Config
@@ -1533,6 +1591,9 @@ def get_vsan_enabled(host, username, password, protocol=None, port=None, host_na
         ``host`` location instead. This is useful for when service instance
         connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -1544,11 +1605,10 @@ def get_vsan_enabled(host, username, password, protocol=None, port=None, host_na
         salt '*' vsphere.get_vsan_enabled my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     for host_name in host_names:
@@ -1566,7 +1626,10 @@ def get_vsan_enabled(host, username, password, protocol=None, port=None, host_na
     return ret
 
 
-def get_vsan_eligible_disks(host, username, password, protocol=None, port=None, host_names=None):
+def get_vsan_eligible_disks(
+    host, username, password, protocol=None, port=None, host_names=None,
+    verify_ssl=True,
+):
     '''
     Returns a list of VSAN-eligible disks for a given host or list of host_names.
 
@@ -1596,6 +1659,9 @@ def get_vsan_eligible_disks(host, username, password, protocol=None, port=None, 
         for the ``host`` location instead. This is useful for when service instance
         connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -1607,11 +1673,10 @@ def get_vsan_eligible_disks(host, username, password, protocol=None, port=None, 
         salt '*' vsphere.get_vsan_eligible_disks my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     response = _get_vsan_eligible_disks(service_instance, host, host_names)
 
@@ -1639,7 +1704,7 @@ def get_vsan_eligible_disks(host, username, password, protocol=None, port=None, 
     return ret
 
 
-def system_info(host, username, password, protocol=None, port=None):
+def system_info(host, username, password, protocol=None, port=None, verify_ssl=True):
     '''
     Return system information about a VMware environment.
 
@@ -1660,17 +1725,19 @@ def system_info(host, username, password, protocol=None, port=None):
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
 
         salt '*' vsphere.system_info 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     ret = salt.utils.vmware.get_inventory(service_instance).about.__dict__
     if 'apiType' in ret:
         if ret['apiType'] == 'HostAgent':
@@ -1678,9 +1745,10 @@ def system_info(host, username, password, protocol=None, port=None):
     return ret
 
 
-def list_datacenters(host, username, password, protocol=None, port=None):
+def list_datacenters(host, username, password, protocol=None, port=None,
+                     verify_ssl=True):
     '''
-    Returns a list of datacenters for the the specified host.
+    Returns a list of datacenters for the specified host.
 
     host
         The location of the host.
@@ -1698,23 +1766,28 @@ def list_datacenters(host, username, password, protocol=None, port=None):
     port
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
+
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
+    CLI Example:
 
     .. code-block:: bash
 
         salt '*' vsphere.list_datacenters 1.2.3.4 root bad-password
 
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_datacenters(service_instance)
 
 
-def list_clusters(host, username, password, protocol=None, port=None):
+def list_clusters(host, username, password, protocol=None, port=None,
+                  verify_ssl=True):
     '''
-    Returns a list of clusters for the the specified host.
+    Returns a list of clusters for the specified host.
 
     host
         The location of the host.
@@ -1733,24 +1806,27 @@ def list_clusters(host, username, password, protocol=None, port=None):
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
 
-   CLI Example:
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
+    CLI Example:
 
     .. code-block:: bash
 
         salt '*' vsphere.list_clusters 1.2.3.4 root bad-password
 
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_clusters(service_instance)
 
 
-def list_datastore_clusters(host, username, password, protocol=None, port=None):
+def list_datastore_clusters(host, username, password, protocol=None, port=None,
+                           verify_ssl=True):
     '''
-    Returns a list of datastore clusters for the the specified host.
+    Returns a list of datastore clusters for the specified host.
 
     host
         The location of the host.
@@ -1769,23 +1845,26 @@ def list_datastore_clusters(host, username, password, protocol=None, port=None):
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
 
-   CLI Example:
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
+    CLI Example:
 
     .. code-block:: bash
 
         salt '*' vsphere.list_datastore_clusters 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_datastore_clusters(service_instance)
 
 
-def list_datastores(host, username, password, protocol=None, port=None):
+def list_datastores(host, username, password, protocol=None, port=None,
+                    verify_ssl=True):
     '''
-    Returns a list of datastores for the the specified host.
+    Returns a list of datastores for the specified host.
 
     host
         The location of the host.
@@ -1804,23 +1883,26 @@ def list_datastores(host, username, password, protocol=None, port=None):
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
 
-   CLI Example:
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
+    CLI Example:
 
     .. code-block:: bash
 
         salt '*' vsphere.list_datastores 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_datastores(service_instance)
 
 
-def list_hosts(host, username, password, protocol=None, port=None):
+def list_hosts(host, username, password, protocol=None, port=None,
+               verify_ssl=True):
     '''
-    Returns a list of hosts for the the specified VMware environment.
+    Returns a list of hosts for the specified VMware environment.
 
     host
         The location of the host.
@@ -1839,23 +1921,26 @@ def list_hosts(host, username, password, protocol=None, port=None):
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
 
-   CLI Example:
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
+    CLI Example:
 
     .. code-block:: bash
 
         salt '*' vsphere.list_hosts 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_hosts(service_instance)
 
 
-def list_resourcepools(host, username, password, protocol=None, port=None):
+def list_resourcepools(host, username, password, protocol=None, port=None,
+                       verify_ssl=True):
     '''
-    Returns a list of resource pools for the the specified host.
+    Returns a list of resource pools for the specified host.
 
     host
         The location of the host.
@@ -1873,6 +1958,9 @@ def list_resourcepools(host, username, password, protocol=None, port=None):
     port
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
+
+    verify_ssl
+        Verify the SSL certificate. Default: True
 
     CLI Example:
 
@@ -1880,17 +1968,17 @@ def list_resourcepools(host, username, password, protocol=None, port=None):
 
         salt '*' vsphere.list_resourcepools 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_resourcepools(service_instance)
 
 
-def list_networks(host, username, password, protocol=None, port=None):
+def list_networks(host, username, password, protocol=None, port=None,
+                  verify_ssl=True):
     '''
-    Returns a list of networks for the the specified host.
+    Returns a list of networks for the specified host.
 
     host
         The location of the host.
@@ -1908,6 +1996,9 @@ def list_networks(host, username, password, protocol=None, port=None):
     port
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
+
+    verify_ssl
+        Verify the SSL certificate. Default: True
 
     CLI Example:
 
@@ -1915,17 +2006,17 @@ def list_networks(host, username, password, protocol=None, port=None):
 
         salt '*' vsphere.list_networks 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_networks(service_instance)
 
 
-def list_vms(host, username, password, protocol=None, port=None):
+def list_vms(host, username, password, protocol=None, port=None,
+             verify_ssl=True):
     '''
-    Returns a list of VMs for the the specified host.
+    Returns a list of VMs for the specified host.
 
     host
         The location of the host.
@@ -1943,6 +2034,9 @@ def list_vms(host, username, password, protocol=None, port=None):
     port
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
+
+    verify_ssl
+        Verify the SSL certificate. Default: True
 
     CLI Example:
 
@@ -1950,17 +2044,17 @@ def list_vms(host, username, password, protocol=None, port=None):
 
         salt '*' vsphere.list_vms 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_vms(service_instance)
 
 
-def list_folders(host, username, password, protocol=None, port=None):
+def list_folders(host, username, password, protocol=None, port=None,
+                 verify_ssl=True):
     '''
-    Returns a list of folders for the the specified host.
+    Returns a list of folders for the specified host.
 
     host
         The location of the host.
@@ -1978,6 +2072,9 @@ def list_folders(host, username, password, protocol=None, port=None):
     port
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
+
+    verify_ssl
+        Verify the SSL certificate. Default: True
 
     CLI Example:
 
@@ -1985,17 +2082,17 @@ def list_folders(host, username, password, protocol=None, port=None):
 
         salt '*' vsphere.list_folders 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_folders(service_instance)
 
 
-def list_dvs(host, username, password, protocol=None, port=None):
+def list_dvs(host, username, password, protocol=None, port=None,
+             verify_ssl=True):
     '''
-    Returns a list of distributed virtual switches for the the specified host.
+    Returns a list of distributed virtual switches for the specified host.
 
     host
         The location of the host.
@@ -2013,6 +2110,9 @@ def list_dvs(host, username, password, protocol=None, port=None):
     port
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
+
+    verify_ssl
+        Verify the SSL certificate. Default: True
 
     CLI Example:
 
@@ -2020,17 +2120,17 @@ def list_dvs(host, username, password, protocol=None, port=None):
 
         salt '*' vsphere.list_dvs 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_dvs(service_instance)
 
 
-def list_vapps(host, username, password, protocol=None, port=None):
+def list_vapps(host, username, password, protocol=None, port=None,
+               verify_ssl=True):
     '''
-    Returns a list of vApps for the the specified host.
+    Returns a list of vApps for the specified host.
 
     host
         The location of the host.
@@ -2048,6 +2148,9 @@ def list_vapps(host, username, password, protocol=None, port=None):
     port
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
+
+    verify_ssl
+        Verify the SSL certificate. Default: True
 
     CLI Example:
 
@@ -2056,15 +2159,15 @@ def list_vapps(host, username, password, protocol=None, port=None):
         # List vapps from all minions
         salt '*' vsphere.list_vapps 1.2.3.4 root bad-password
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     return salt.utils.vmware.list_vapps(service_instance)
 
 
-def list_ssds(host, username, password, protocol=None, port=None, host_names=None):
+def list_ssds(host, username, password, protocol=None, port=None,
+              host_names=None, verify_ssl=True):
     '''
     Returns a list of SSDs for the given host or list of host_names.
 
@@ -2094,6 +2197,9 @@ def list_ssds(host, username, password, protocol=None, port=None, host_names=Non
         ``host`` location instead. This is useful for when service instance
         connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2105,11 +2211,10 @@ def list_ssds(host, username, password, protocol=None, port=None, host_names=Non
         salt '*' vsphere.list_ssds my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     names = []
@@ -2123,7 +2228,8 @@ def list_ssds(host, username, password, protocol=None, port=None, host_names=Non
     return ret
 
 
-def list_non_ssds(host, username, password, protocol=None, port=None, host_names=None):
+def list_non_ssds(host, username, password, protocol=None, port=None,
+                  host_names=None, verify_ssl=True):
     '''
     Returns a list of Non-SSD disks for the given host or list of host_names.
 
@@ -2160,6 +2266,9 @@ def list_non_ssds(host, username, password, protocol=None, port=None, host_names
         ``host`` location instead. This is useful for when service instance
         connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2171,11 +2280,10 @@ def list_non_ssds(host, username, password, protocol=None, port=None, host_names
         salt '*' vsphere.list_non_ssds my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     names = []
@@ -2189,7 +2297,10 @@ def list_non_ssds(host, username, password, protocol=None, port=None, host_names
     return ret
 
 
-def set_ntp_config(host, username, password, ntp_servers, protocol=None, port=None, host_names=None):
+def set_ntp_config(
+    host, username, password, ntp_servers, protocol=None, port=None,
+    host_names=None, verify_ssl=True
+):
     '''
     Set NTP configuration for a given host of list of host_names.
 
@@ -2223,6 +2334,9 @@ def set_ntp_config(host, username, password, ntp_servers, protocol=None, port=No
         ``host`` location instead. This is useful for when service instance connection
         information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2234,11 +2348,10 @@ def set_ntp_config(host, username, password, ntp_servers, protocol=None, port=No
         salt '*' vsphere.ntp_configure my.vcenter.location root bad-password '[192.174.1.100, 192.174.1.200]' \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     if not isinstance(ntp_servers, list):
         raise CommandExecutionError('\'ntp_servers\' must be a list.')
 
@@ -2267,13 +2380,10 @@ def set_ntp_config(host, username, password, ntp_servers, protocol=None, port=No
     return ret
 
 
-def service_start(host,
-                  username,
-                  password,
-                  service_name,
-                  protocol=None,
-                  port=None,
-                  host_names=None):
+def service_start(
+    host, username, password, service_name, protocol=None, port=None,
+    host_names=None, verify_ssl=True
+):
     '''
     Start the named service for the given host or list of hosts.
 
@@ -2319,6 +2429,9 @@ def service_start(host,
         location instead. This is useful for when service instance connection information
         is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2330,11 +2443,10 @@ def service_start(host,
         salt '*' vsphere.service_start my.vcenter.location root bad-password 'ntpd' \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     valid_services = ['DCUI', 'TSM', 'SSH', 'ssh', 'lbtd', 'lsassd', 'lwiod', 'netlogond',
                       'ntpd', 'sfcbd-watchdog', 'snmpd', 'vprobed', 'vpxa', 'xorg']
@@ -2376,13 +2488,10 @@ def service_start(host,
     return ret
 
 
-def service_stop(host,
-                 username,
-                 password,
-                 service_name,
-                 protocol=None,
-                 port=None,
-                 host_names=None):
+def service_stop(
+    host, username, password, service_name, protocol=None, port=None,
+    host_names=None, verify_ssl=True,
+):
     '''
     Stop the named service for the given host or list of hosts.
 
@@ -2428,6 +2537,9 @@ def service_stop(host,
         location instead. This is useful for when service instance connection information
         is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2439,11 +2551,10 @@ def service_stop(host,
         salt '*' vsphere.service_stop my.vcenter.location root bad-password 'ssh' \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     valid_services = ['DCUI', 'TSM', 'SSH', 'ssh', 'lbtd', 'lsassd', 'lwiod', 'netlogond',
                       'ntpd', 'sfcbd-watchdog', 'snmpd', 'vprobed', 'vpxa', 'xorg']
@@ -2485,13 +2596,10 @@ def service_stop(host,
     return ret
 
 
-def service_restart(host,
-                    username,
-                    password,
-                    service_name,
-                    protocol=None,
-                    port=None,
-                    host_names=None):
+def service_restart(
+    host, username, password, service_name, protocol=None, port=None,
+    host_names=None, verify_ssl=True,
+):
     '''
     Restart the named service for the given host or list of hosts.
 
@@ -2537,6 +2645,9 @@ def service_restart(host,
         location instead. This is useful for when service instance connection information
         is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2548,11 +2659,10 @@ def service_restart(host,
         salt '*' vsphere.service_restart my.vcenter.location root bad-password 'ntpd' \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     valid_services = ['DCUI', 'TSM', 'SSH', 'ssh', 'lbtd', 'lsassd', 'lwiod', 'netlogond',
                       'ntpd', 'sfcbd-watchdog', 'snmpd', 'vprobed', 'vpxa', 'xorg']
@@ -2594,14 +2704,17 @@ def service_restart(host,
     return ret
 
 
-def set_service_policy(host,
-                       username,
-                       password,
-                       service_name,
-                       service_policy,
-                       protocol=None,
-                       port=None,
-                       host_names=None):
+def set_service_policy(
+    host,
+    username,
+    password,
+    service_name,
+    service_policy,
+    protocol=None,
+    port=None,
+    host_names=None,
+    verify_ssl=True
+):
     '''
     Set the service name's policy for a given host or list of hosts.
 
@@ -2650,6 +2763,9 @@ def set_service_policy(host,
         for the ``host`` location instead. This is useful for when service instance
         connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2661,11 +2777,10 @@ def set_service_policy(host,
         salt '*' vsphere.set_service_policy my.vcenter.location root bad-password 'ntpd' 'automatic' \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     valid_services = ['DCUI', 'TSM', 'SSH', 'ssh', 'lbtd', 'lsassd', 'lwiod', 'netlogond',
                       'ntpd', 'sfcbd-watchdog', 'snmpd', 'vprobed', 'vpxa', 'xorg']
@@ -2721,7 +2836,10 @@ def set_service_policy(host,
     return ret
 
 
-def update_host_datetime(host, username, password, protocol=None, port=None, host_names=None):
+def update_host_datetime(
+    host, username, password, protocol=None, port=None, host_names=None,
+    verify_ssl=True
+):
     '''
     Update the date/time on the given host or list of host_names. This function should be
     used with caution since network delays and execution delays can result in time skews.
@@ -2752,6 +2870,9 @@ def update_host_datetime(host, username, password, protocol=None, port=None, hos
         location instead. This is useful for when service instance connection
         information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2763,11 +2884,10 @@ def update_host_datetime(host, username, password, protocol=None, port=None, hos
         salt '*' vsphere.update_date_time my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     for host_name in host_names:
@@ -2786,7 +2906,10 @@ def update_host_datetime(host, username, password, protocol=None, port=None, hos
     return ret
 
 
-def update_host_password(host, username, password, new_password, protocol=None, port=None):
+def update_host_password(
+    host, username, password, new_password, protocol=None, port=None,
+    verify_ssl=True
+):
     '''
     Update the password for a given host.
 
@@ -2812,6 +2935,9 @@ def update_host_password(host, username, password, new_password, protocol=None, 
         Optionally set to alternate port if the host is not using the default
         port. Default port is ``443``.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2819,11 +2945,10 @@ def update_host_password(host, username, password, new_password, protocol=None, 
         salt '*' vsphere.update_host_password my.esxi.host root original-bad-password new-bad-password
 
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     # Get LocalAccountManager object
     account_manager = salt.utils.vmware.get_inventory(service_instance).accountManager
 
@@ -2847,7 +2972,10 @@ def update_host_password(host, username, password, new_password, protocol=None, 
     return True
 
 
-def vmotion_disable(host, username, password, protocol=None, port=None, host_names=None):
+def vmotion_disable(
+    host, username, password, protocol=None, port=None, host_names=None,
+    verify_ssl=True
+):
     '''
     Disable vMotion for a given host or list of host_names.
 
@@ -2877,6 +3005,9 @@ def vmotion_disable(host, username, password, protocol=None, port=None, host_nam
         location instead. This is useful for when service instance connection
         information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2888,11 +3019,10 @@ def vmotion_disable(host, username, password, protocol=None, port=None, host_nam
         salt '*' vsphere.vmotion_disable my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     for host_name in host_names:
@@ -2914,7 +3044,10 @@ def vmotion_disable(host, username, password, protocol=None, port=None, host_nam
     return ret
 
 
-def vmotion_enable(host, username, password, protocol=None, port=None, host_names=None, device='vmk0'):
+def vmotion_enable(
+    host, username, password, protocol=None, port=None, host_names=None,
+    device='vmk0', verify_ssl=True
+):
     '''
     Enable vMotion for a given host or list of host_names.
 
@@ -2948,6 +3081,9 @@ def vmotion_enable(host, username, password, protocol=None, port=None, host_name
         The device that uniquely identifies the VirtualNic that will be used for
         VMotion for each host. Defaults to ``vmk0``.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -2959,11 +3095,10 @@ def vmotion_enable(host, username, password, protocol=None, port=None, host_name
         salt '*' vsphere.vmotion_enable my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     ret = {}
     for host_name in host_names:
@@ -2985,7 +3120,8 @@ def vmotion_enable(host, username, password, protocol=None, port=None, host_name
     return ret
 
 
-def vsan_add_disks(host, username, password, protocol=None, port=None, host_names=None):
+def vsan_add_disks(host, username, password, protocol=None, port=None,
+                   host_names=None, verify_ssl=True):
     '''
     Add any VSAN-eligible disks to the VSAN System for the given host or list of host_names.
 
@@ -3016,6 +3152,9 @@ def vsan_add_disks(host, username, password, protocol=None, port=None, host_name
         VSAN system for the ``host`` location instead. This is useful for when service
         instance connection information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -3027,11 +3166,10 @@ def vsan_add_disks(host, username, password, protocol=None, port=None, host_name
         salt '*' vsphere.vsan_add_disks my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     host_names = _check_hosts(service_instance, host, host_names)
     response = _get_vsan_eligible_disks(service_instance, host, host_names)
 
@@ -3087,7 +3225,8 @@ def vsan_add_disks(host, username, password, protocol=None, port=None, host_name
     return ret
 
 
-def vsan_disable(host, username, password, protocol=None, port=None, host_names=None):
+def vsan_disable(host, username, password, protocol=None, port=None,
+                 host_names=None, verify_ssl=True):
     '''
     Disable VSAN for a given host or list of host_names.
 
@@ -3117,6 +3256,9 @@ def vsan_disable(host, username, password, protocol=None, port=None, host_names=
         location instead. This is useful for when service instance connection
         information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -3128,11 +3270,10 @@ def vsan_disable(host, username, password, protocol=None, port=None, host_names=
         salt '*' vsphere.vsan_disable my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     # Create a VSAN Configuration Object and set the enabled attribute to True
     vsan_config = vim.vsan.host.ConfigInfo()
     vsan_config.enabled = False
@@ -3170,7 +3311,8 @@ def vsan_disable(host, username, password, protocol=None, port=None, host_names=
     return ret
 
 
-def vsan_enable(host, username, password, protocol=None, port=None, host_names=None):
+def vsan_enable(host, username, password, protocol=None, port=None,
+                host_names=None, verify_ssl=True):
     '''
     Enable VSAN for a given host or list of host_names.
 
@@ -3200,6 +3342,9 @@ def vsan_enable(host, username, password, protocol=None, port=None, host_names=N
         location instead. This is useful for when service instance connection
         information is used for a single ESXi host.
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+
     CLI Example:
 
     .. code-block:: bash
@@ -3211,11 +3356,10 @@ def vsan_enable(host, username, password, protocol=None, port=None, host_names=N
         salt '*' vsphere.vsan_enable my.vcenter.location root bad-password \
         host_names='[esxi-1.host.com, esxi-2.host.com]'
     '''
-    service_instance = salt.utils.vmware.get_service_instance(host=host,
-                                                              username=username,
-                                                              password=password,
-                                                              protocol=protocol,
-                                                              port=port)
+    service_instance = salt.utils.vmware.get_service_instance(
+        host=host, username=username, password=password, protocol=protocol,
+        port=port, verify_ssl=verify_ssl,
+    )
     # Create a VSAN Configuration Object and set the enabled attribute to True
     vsan_config = vim.vsan.host.ConfigInfo()
     vsan_config.enabled = True

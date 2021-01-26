@@ -199,10 +199,10 @@ def gen_thin(cachedir, extra_mods='', overwrite=False, so_mods='',
     if _six.PY3:
         # Let's check for the minimum python 2 version requirement, 2.6
         py_shell_cmd = (
-            python2_bin + ' -c \'from __future__ import print_function; import sys; '
-            'print("{0}.{1}".format(*(sys.version_info[:2])));\''
+            python2_bin, "-c" ,"rom __future__ import print_function; import sys; "
+            "print('{0}.{1}'.format(*(sys.version_info[:2])));"
         )
-        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, shell=True)
+        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE)
         stdout, _ = cmd.communicate()
         if cmd.returncode == 0:
             py2_version = tuple(int(n) for n in stdout.decode('utf-8').strip().split('.'))
@@ -219,7 +219,6 @@ def gen_thin(cachedir, extra_mods='', overwrite=False, so_mods='',
         raise salt.exceptions.SaltSystemExit(
             'The minimum required python version to run salt-ssh is "2.6".'
         )
-
     tops_py_version_mapping = {}
     tops = get_tops(extra_mods=extra_mods, so_mods=so_mods)
     if _six.PY2:
@@ -231,12 +230,12 @@ def gen_thin(cachedir, extra_mods='', overwrite=False, so_mods='',
     #       This would reduce the thin size.
     if _six.PY2 and sys.version_info[0] == 2:
         # Get python 3 tops
-        py_shell_cmd = (
-            python3_bin + ' -c \'import sys; import json; import salt.utils.thin; '
-            'print(json.dumps(salt.utils.thin.get_tops(**(json.loads(sys.argv[1]))))); exit(0);\' '
-            '\'{0}\''.format(json.dumps({'extra_mods': extra_mods, 'so_mods': so_mods}))
-        )
-        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        py_shell_cmd = [
+            python3_bin, "-c", "import sys; import json; import salt.utils.thin; "
+            "print(json.dumps(salt.utils.thin.get_tops(**(json.loads(sys.argv[1]))))); exit(0);",
+            json.dumps({'extra_mods': extra_mods, 'so_mods': so_mods})
+        ]
+        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = cmd.communicate()
         if cmd.returncode == 0:
             try:
@@ -246,13 +245,13 @@ def gen_thin(cachedir, extra_mods='', overwrite=False, so_mods='',
                 pass
     if _six.PY3 and sys.version_info[0] == 3:
         # Get python 2 tops
-        py_shell_cmd = (
-            python2_bin + ' -c \'from __future__ import print_function; '
-            'import sys; import json; import salt.utils.thin; '
-            'print(json.dumps(salt.utils.thin.get_tops(**(json.loads(sys.argv[1]))))); exit(0);\' '
-            '\'{0}\''.format(json.dumps({'extra_mods': extra_mods, 'so_mods': so_mods}))
-        )
-        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        py_shell_cmd = [
+            python2_bin, "-c", "from __future__ import print_function; "
+            "import sys; import json; import salt.utils.thin; "
+            "print(json.dumps(salt.utils.thin.get_tops(**(json.loads(sys.argv[1]))))); exit(0);",
+            json.dumps({'extra_mods': extra_mods, 'so_mods': so_mods})
+        ]
+        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = cmd.communicate()
         if cmd.returncode == 0:
             try:
@@ -361,11 +360,12 @@ def gen_min(cachedir, extra_mods='', overwrite=False, so_mods='',
             return mintar
     if _six.PY3:
         # Let's check for the minimum python 2 version requirement, 2.6
-        py_shell_cmd = (
-            python2_bin + ' -c \'from __future__ import print_function; import sys; '
-            'print("{0}.{1}".format(*(sys.version_info[:2])));\''
-        )
-        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, shell=True)
+        py_shell_cmd = [
+            python2_bin, '-c',
+            'from __future__ import print_function; import sys;print("{0}.{1}".format(*(sys.version_info[:2])));'
+        ]
+
+        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE)
         stdout, _ = cmd.communicate()
         if cmd.returncode == 0:
             py2_version = tuple(int(n) for n in stdout.decode('utf-8').strip().split('.'))
@@ -394,12 +394,12 @@ def gen_min(cachedir, extra_mods='', overwrite=False, so_mods='',
     #       This would reduce the min size.
     if _six.PY2 and sys.version_info[0] == 2:
         # Get python 3 tops
-        py_shell_cmd = (
-            python3_bin + ' -c \'import sys; import json; import salt.utils.thin; '
-            'print(json.dumps(salt.utils.thin.get_tops(**(json.loads(sys.argv[1]))))); exit(0);\' '
-            '\'{0}\''.format(json.dumps({'extra_mods': extra_mods, 'so_mods': so_mods}))
-        )
-        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        py_shell_cmd = [
+            python3_bin, "-c", "import sys; import json; import salt.utils.thin; "
+            "print(json.dumps(salt.utils.thin.get_tops(**(json.loads(sys.argv[1]))))); exit(0);",
+            json.dumps({'extra_mods': extra_mods, 'so_mods': so_mods})
+        ]
+        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = cmd.communicate()
         if cmd.returncode == 0:
             try:
@@ -409,13 +409,13 @@ def gen_min(cachedir, extra_mods='', overwrite=False, so_mods='',
                 pass
     if _six.PY3 and sys.version_info[0] == 3:
         # Get python 2 tops
-        py_shell_cmd = (
-            python2_bin + ' -c \'from __future__ import print_function; '
-            'import sys; import json; import salt.utils.thin; '
-            'print(json.dumps(salt.utils.thin.get_tops(**(json.loads(sys.argv[1]))))); exit(0);\' '
-            '\'{0}\''.format(json.dumps({'extra_mods': extra_mods, 'so_mods': so_mods}))
-        )
-        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        py_shell_cmd = [
+            python2_bin, "-c", "from __future__ import print_function; "
+            "import sys; import json; import salt.utils.thin; "
+            "print(json.dumps(salt.utils.thin.get_tops(**(json.loads(sys.argv[1]))))); exit(0);",
+            json.dumps({'extra_mods': extra_mods, 'so_mods': so_mods})
+        ]
+        cmd = subprocess.Popen(py_shell_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = cmd.communicate()
         if cmd.returncode == 0:
             try:

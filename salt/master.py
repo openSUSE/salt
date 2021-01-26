@@ -1852,7 +1852,8 @@ class ClearFuncs(object):
             runner_client = salt.runner.RunnerClient(self.opts)
             return runner_client.async(fun,
                                        clear_load.get('kwarg', {}),
-                                       username)
+                                       username,
+                                       local=True)
         except Exception as exc:
             log.error('Exception occurred while '
                       'introspecting {0}: {1}'.format(fun, exc))
@@ -1864,6 +1865,7 @@ class ClearFuncs(object):
         '''
         Send a master control function back to the wheel system
         '''
+        jid = clear_load.get('__jid__', salt.utils.jid.gen_jid(self.opts))
         # All wheel ops pass through eauth
         username = None
         if 'token' in clear_load:
@@ -1918,7 +1920,6 @@ class ClearFuncs(object):
 
         # Authorized. Do the job!
         try:
-            jid = salt.utils.jid.gen_jid()
             fun = clear_load.pop('fun')
             tag = tagify(jid, prefix='wheel')
             data = {'fun': "wheel.{0}".format(fun),

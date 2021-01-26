@@ -173,8 +173,17 @@ def esxcli(host, user, pwd, cmd, protocol=None, port=None, esxi_host=None, creds
     return ret
 
 
-def _get_service_instance(host, username, password, protocol,
-                          port, mechanism, principal, domain):
+def _get_service_instance(
+    host,
+    username,
+    password,
+    protocol,
+    port,
+    mechanism,
+    principal,
+    domain,
+    verify_ssl=True,
+):
     '''
     Internal method to authenticate with a vCenter server or ESX/ESXi host
     and return the service instance object.
@@ -202,35 +211,59 @@ def _get_service_instance(host, username, password, protocol,
             raise salt.exceptions.CommandExecutionError(err_msg)
     else:
         raise salt.exceptions.CommandExecutionError(
-            'Unsupported mechanism: \'{0}\''.format(mechanism))
+            "Unsupported mechanism: '{0}'".format(mechanism)
+        )
+
+    log.trace(
+        "Connecting using the '%s' mechanism, with username '%s'", mechanism, username,
+    )
+    default_msg = (
+        "Could not connect to host '{0}'. "
+        "Please check the debug log for more information.".format(host)
+    )
+
     try:
         log.trace('Connecting using the \'{0}\' mechanism, with username '
                   '\'{1}\''.format(mechanism, username))
-        service_instance = SmartConnect(
-            host=host,
-            user=username,
-            pwd=password,
-            protocol=protocol,
-            port=port,
-            b64token=token,
-            mechanism=mechanism)
+        if verify_ssl:
+            service_instance = SmartConnect(
+                host=host,
+                user=username,
+                pwd=password,
+                protocol=protocol,
+                port=port,
+                b64token=token,
+                mechanism=mechanism,
+            )
     except TypeError as exc:
         if 'unexpected keyword argument' in exc.message:
             log.error('Initial connect to the VMware endpoint failed with {0}'.format(exc.message))
             log.error('This may mean that a version of PyVmomi EARLIER than 6.0.0.2016.6 is installed.')
             log.error('We recommend updating to that version or later.')
             raise
-    except Exception as exc:
+    except Exception as exc:  # pylint: disable=broad-except
+        # pyVmomi's SmartConnect() actually raises Exception in some cases.
+        if (
+            isinstance(exc, vim.fault.HostConnectFault)
+            and "[SSL: CERTIFICATE_VERIFY_FAILED]" in exc.msg
+        ) or "[SSL: CERTIFICATE_VERIFY_FAILED]" in str(exc):
+            err_msg = (
+                "Could not verify the SSL certificate. You can use "
+                "verify_ssl: False if you do not want to verify the "
+                "SSL certificate. This is not recommended as it is "
+                "considered insecure."
+            )
+        else:
+            log.exception(exc)
+            err_msg = exc.msg if hasattr(exc, "msg") else default_msg
+        raise salt.exceptions.VMwareConnectionError(err_msg)
 
-        default_msg = 'Could not connect to host \'{0}\'. ' \
-                      'Please check the debug log for more information.'.format(host)
-
+    if not verify_ssl:
         try:
             if (isinstance(exc, vim.fault.HostConnectFault) and
                 '[SSL: CERTIFICATE_VERIFY_FAILED]' in exc.msg) or \
                '[SSL: CERTIFICATE_VERIFY_FAILED]' in str(exc):
 
-                import ssl
                 service_instance = SmartConnect(
                     host=host,
                     user=username,
@@ -270,6 +303,7 @@ def _get_service_instance(host, username, password, protocol,
                 err_msg = exc.msg if hasattr(exc, 'msg') else default_msg
                 log.trace(exc)
                 raise salt.exceptions.VMwareConnectionError(err_msg)
+
     atexit.register(Disconnect, service_instance)
     return service_instance
 
@@ -308,9 +342,17 @@ def get_datastore_ref(si, datastore_name):
     return None
 
 
-def get_service_instance(host, username=None, password=None, protocol=None,
-                         port=None, mechanism='userpass', principal=None,
-                         domain=None):
+def get_service_instance(
+    host,
+    username=None,
+    password=None,
+    protocol=None,
+    port=None,
+    mechanism="userpass",
+    principal=None,
+    domain=None,
+    verify_ssl=True,
+):
     '''
     Authenticate with a vCenter server or ESX/ESXi host and return the service instance object.
 
@@ -342,8 +384,10 @@ def get_service_instance(host, username=None, password=None, protocol=None,
 
     domain
         Kerberos user domain. Required if mechanism is ``sspi``
-    '''
 
+    verify_ssl
+        Verify the SSL certificate. Default: True
+    '''
     if protocol is None:
         protocol = 'https'
     if port is None:
@@ -363,14 +407,17 @@ def get_service_instance(host, username=None, password=None, protocol=None,
             return service_instance
 
     if not service_instance:
-        service_instance = _get_service_instance(host,
-                                                 username,
-                                                 password,
-                                                 protocol,
-                                                 port,
-                                                 mechanism,
-                                                 principal,
-                                                 domain)
+        service_instance = _get_service_instance(
+            host,
+            username,
+            password,
+            protocol,
+            port,
+            mechanism,
+            principal,
+            domain,
+            verify_ssl=verify_ssl,
+        )
 
     # Test if data can actually be retrieved or connection has gone stale
     log.trace('Checking connection is still authenticated')
@@ -379,14 +426,17 @@ def get_service_instance(host, username=None, password=None, protocol=None,
     except vim.fault.NotAuthenticated:
         log.trace('Session no longer authenticating. Reconnecting')
         Disconnect(service_instance)
-        service_instance = _get_service_instance(host,
-                                                 username,
-                                                 password,
-                                                 protocol,
-                                                 port,
-                                                 mechanism,
-                                                 principal,
-                                                 domain)
+        service_instance = _get_service_instance(
+            host,
+            username,
+            password,
+            protocol,
+            port,
+            mechanism,
+            principal,
+            domain,
+            verify_ssl=verify_ssl,
+        )
     except vim.fault.VimFault as exc:
         raise salt.exceptions.VMwareApiError(exc.msg)
     except vmodl.RuntimeFault as exc:

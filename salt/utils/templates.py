@@ -17,6 +17,8 @@ import sys
 # Import third party libs
 import jinja2
 import jinja2.ext
+import jinja2.sandbox
+
 
 # Import salt libs
 import salt.utils
@@ -338,9 +340,9 @@ def render_jinja_tmpl(tmplstr, context, tmplpath=None):
         env_args['lstrip_blocks'] = True
 
     if opts.get('allow_undefined', False):
-        jinja_env = jinja2.Environment(**env_args)
+        jinja_env = jinja2.sandbox.SandboxedEnvironment(**env_args)
     else:
-        jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined,
+        jinja_env = jinja2.sandbox.SandboxedEnvironment(undefined=jinja2.StrictUndefined,
                                        **env_args)
 
     jinja_env.filters['strftime'] = salt.utils.date_format
@@ -366,7 +368,8 @@ def render_jinja_tmpl(tmplstr, context, tmplpath=None):
         template = jinja_env.from_string(tmplstr)
         template.globals.update(decoded_context)
         output = template.render(**decoded_context)
-    except jinja2.exceptions.TemplateSyntaxError as exc:
+    except (jinja2.exceptions.TemplateSyntaxError,
+           jinja2.exceptions.SecurityError) as exc:
         trace = traceback.extract_tb(sys.exc_info()[2])
         line, out = _get_jinja_error(trace, context=decoded_context)
         if not line:
