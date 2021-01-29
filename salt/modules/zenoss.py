@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module for working with the Zenoss API
 
@@ -16,18 +15,19 @@ Module for working with the Zenoss API
           hostname: https://zenoss.example.com
           username: admin
           password: admin123
+          verify_ssl: True
+          ca_bundle: /etc/ssl/certs/ca-certificates.crt
 """
 
-
-from __future__ import absolute_import, print_function, unicode_literals
 
 import logging
 import re
 
+import salt.utils.http
 import salt.utils.json
 
 try:
-    import requests
+    import requests  # pylint: disable=unused-import
 
     HAS_LIBS = True
 except ImportError:
@@ -53,7 +53,7 @@ def __virtual__():
     else:
         return (
             False,
-            "The '{0}' module could not be loaded: "
+            "The '{}' module could not be loaded: "
             "'requests' is not installed.".format(__virtualname__),
         )
 
@@ -79,11 +79,13 @@ def _session():
     """
 
     config = __salt__["config.option"]("zenoss")
-    session = requests.session()
-    session.auth = (config.get("username"), config.get("password"))
-    session.verify = False
-    session.headers.update({"Content-type": "application/json; charset=utf-8"})
-    return session
+    return salt.utils.http.session(
+        user=config.get("username"),
+        password=config.get("password"),
+        verify_ssl=config.get("verify_ssl", True),
+        ca_bundle=config.get("ca_bundle"),
+        headers={"Content-type": "application/json; charset=utf-8"},
+    )
 
 
 def _router_request(router, method, data=None):
@@ -99,7 +101,7 @@ def _router_request(router, method, data=None):
 
     config = __salt__["config.option"]("zenoss")
     log.debug("Making request to router %s with method %s", router, method)
-    url = "{0}/zport/dmd/{1}_router".format(config.get("hostname"), ROUTERS[router])
+    url = "{}/zport/dmd/{}_router".format(config.get("hostname"), ROUTERS[router])
     response = _session().post(url, data=req_data)
 
     # The API returns a 200 response code even whe auth is bad.
@@ -212,7 +214,7 @@ def set_prod_state(prod_state, device=None):
     device_object = find_device(device)
 
     if not device_object:
-        return "Unable to find a device in Zenoss for {0}".format(device)
+        return "Unable to find a device in Zenoss for {}".format(device)
 
     log.info("Setting prodState to %d on %s device", prod_state, device)
     data = dict(

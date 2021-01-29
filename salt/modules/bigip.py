@@ -1,21 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 An execution module which can manipulate an f5 bigip via iControl REST
     :maturity:      develop
     :platform:      f5_bigip_11.6
 """
 
-# Import python libs
-from __future__ import absolute_import, print_function, unicode_literals
 
-# Import salt libs
 import salt.exceptions
 import salt.utils.json
-
-# Import 3rd-party libs
 from salt.ext import six
 
-# Import third party libs
 try:
     import requests
     import requests.exceptions
@@ -52,7 +45,7 @@ def _build_session(username, password, trans_label=None):
 
     bigip = requests.session()
     bigip.auth = (username, password)
-    bigip.verify = False
+    bigip.verify = True
     bigip.headers.update({"Content-Type": "application/json"})
 
     if trans_label:
@@ -109,7 +102,7 @@ def _loop_payload(params):
     payload = {}
 
     # set the payload
-    for param, value in six.iteritems(params):
+    for param, value in params.items():
         if value is not None:
             payload[param] = value
 
@@ -153,7 +146,7 @@ def _determine_toggles(payload, toggles):
     Figure out what it likes to hear without confusing the user.
     """
 
-    for toggle, definition in six.iteritems(toggles):
+    for toggle, definition in toggles.items():
         # did the user specify anything?
         if definition["value"] is not None:
             # test for yes_no toggle
@@ -1046,7 +1039,7 @@ def replace_pool_members(hostname, username, password, name, members):
     # specify members if provided
     if members is not None:
 
-        if isinstance(members, six.string_types):
+        if isinstance(members, str):
             members = members.split(",")
 
         pool_members = []
@@ -1583,7 +1576,7 @@ def create_virtual(
             payload["vlans"] = "none"
         elif vlans == "default":
             payload["vlans"] = "default"
-        elif isinstance(vlans, six.string_types) and (
+        elif isinstance(vlans, str) and (
             vlans.startswith("enabled") or vlans.startswith("disabled")
         ):
             try:
@@ -2016,7 +2009,7 @@ def create_monitor(hostname, username, password, monitor_type, name, **kwargs):
 
     # there's a ton of different monitors and a ton of options for each type of monitor.
     # this logic relies that the end user knows which options are meant for which monitor types
-    for key, value in six.iteritems(kwargs):
+    for key, value in kwargs.items():
         if not key.startswith("__"):
             if key not in ["hostname", "username", "password", "type"]:
                 key = key.replace("_", "-")
@@ -2067,7 +2060,7 @@ def modify_monitor(hostname, username, password, monitor_type, name, **kwargs):
 
     # there's a ton of different monitors and a ton of options for each type of monitor.
     # this logic relies that the end user knows which options are meant for which monitor types
-    for key, value in six.iteritems(kwargs):
+    for key, value in kwargs.items():
         if not key.startswith("__"):
             if key not in ["hostname", "username", "password", "type", "name"]:
                 key = key.replace("_", "-")
@@ -2231,7 +2224,7 @@ def create_profile(hostname, username, password, profile_type, name, **kwargs):
 
     # there's a ton of different profiles and a ton of options for each type of profile.
     # this logic relies that the end user knows which options are meant for which profile types
-    for key, value in six.iteritems(kwargs):
+    for key, value in kwargs.items():
         if not key.startswith("__"):
             if key not in ["hostname", "username", "password", "profile_type"]:
                 key = key.replace("_", "-")
@@ -2322,7 +2315,7 @@ def modify_profile(hostname, username, password, profile_type, name, **kwargs):
 
     # there's a ton of different profiles and a ton of options for each type of profile.
     # this logic relies that the end user knows which options are meant for which profile types
-    for key, value in six.iteritems(kwargs):
+    for key, value in kwargs.items():
         if not key.startswith("__"):
             if key not in ["hostname", "username", "password", "profile_type"]:
                 key = key.replace("_", "-")
