@@ -39,5 +39,5 @@ def assertEqualUnit(actual, expected, unit="KiB"):
     """
     Assert that two ElementTree nodes have the same value and unit
     """
-    assert unit == actual.get("unit")
-    assert str(expected) == actual.text
+    assert actual.get("unit") == unit
+    assert actual.text == str(expected)
