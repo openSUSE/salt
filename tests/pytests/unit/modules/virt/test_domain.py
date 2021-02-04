@@ -2049,7 +2049,8 @@ def test_update_failure(make_mock_vm):
         "interface": {"attached": [], "detached": []},
     }
 
-def test_gen_xml_spice_default():
+@pytest.mark.parametrize("hypervisor", ["kvm", "xen"])
+def test_gen_xml_spice_default(hypervisor):
     """
     Test virt._gen_xml() with default spice graphics device
     """
@@ -2060,7 +2061,7 @@ def test_gen_xml_spice_default():
         512,
         {},
         {},
-        "kvm",
+        hypervisor,
         "hvm",
         "x86_64",
         graphics={"type": "spice"},
@@ -2071,6 +2072,13 @@ def test_gen_xml_spice_default():
     assert root.find("devices/graphics").attrib["listen"] == "0.0.0.0"
     assert root.find("devices/graphics/listen").attrib["type"] == "address"
     assert root.find("devices/graphics/listen").attrib["address"] == "0.0.0.0"
+    if hypervisor == "kvm":
+        assert (
+            root.find(".//channel[@type='spicevmc']/target").get("name")
+            == "com.redhat.spice.0"
+        )
+    else:
+        assert root.find(".//channel[@type='spicevmc']") is None
 
 
 def test_gen_xml_spice():
