@@ -305,7 +305,7 @@
                             {% endif %}/>
                 </graphics>
 
-                  {% if graphics.type == "spice" -%}
+                  {% if graphics.type == "spice" and hypervisor in ["qemu", "kvm"] -%}
                   <channel type='spicevmc'>
                     <target type='virtio' name='com.redhat.spice.0'/>
                   </channel>
