@@ -68,10 +68,24 @@ def setup_loader(request):
 
 @pytest.fixture
 def make_mock_vm():
-    def _make_mock_vm(xml_def):
+    def _make_mock_vm(xml_def=None, running=False, inactive_def=None):
         mocked_conn = virt.libvirt.openAuth.return_value
 
-        doc = ET.fromstring(xml_def)
+        desc = xml_def
+        if not desc:
+            desc = """
+                <domain type='kvm' id='7'>
+                  <name>my_vm</name>
+                  <memory unit='KiB'>1048576</memory>
+                  <currentMemory unit='KiB'>1048576</currentMemory>
+                  <vcpu placement='auto'>1</vcpu>
+                  <on_reboot>restart</on_reboot>
+                  <os>
+                    <type arch='x86_64' machine='pc-i440fx-2.6'>hvm</type>
+                  </os>
+                </domain>
+            """
+        doc = ET.fromstring(desc)
         name = doc.find("name").text
         os_type = "hvm"
         os_type_node = doc.find("os/type")
@@ -86,7 +100,12 @@ def make_mock_vm():
             mocked_conn.lookupByName = MappedResultMock()
         mocked_conn.lookupByName.add(name)
         domain_mock = mocked_conn.lookupByName(name)
-        domain_mock.XMLDesc.return_value = xml_def
+
+        domain_mock.XMLDesc = MappedResultMock()
+        domain_mock.XMLDesc.add(0, desc)
+        domain_mock.XMLDesc.add(
+            virt.libvirt.VIR_DOMAIN_XML_INACTIVE, inactive_def or desc
+        )
         domain_mock.OSType.return_value = os_type
 
         # Return state as shutdown
@@ -102,6 +121,8 @@ def make_mock_vm():
 
         domain_mock.attachDevice.return_value = 0
         domain_mock.detachDevice.return_value = 0
+        domain_mock.setMemoryFlags.return_value = 0
+        domain_mock.setVcpusFlags.return_value = 0
 
         return domain_mock
 
@@ -110,7 +131,7 @@ def make_mock_vm():
 
 @pytest.fixture
 def make_mock_storage_pool():
-    def _make_mock_storage_pool(name, type, volumes):
+    def _make_mock_storage_pool(name, type, volumes, source=None):
         mocked_conn = virt.libvirt.openAuth.return_value
 
         # Append the pool name to the list of known mocked pools
@@ -127,8 +148,8 @@ def make_mock_storage_pool():
         # Configure the pool
         mocked_conn.storagePoolLookupByName.add(name)
         mocked_pool = mocked_conn.storagePoolLookupByName(name)
-        source = ""
-        if type == "disk":
+        source_def = source
+        if not source and type == "disk":
             source = "<device path='/dev/{}'/>".format(name)
         pool_path = "/path/to/{}".format(name)
         mocked_pool.XMLDesc.return_value = """
