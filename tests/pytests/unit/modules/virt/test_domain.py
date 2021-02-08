@@ -60,13 +60,14 @@ def test_update_xen_disk_volumes(make_mock_vm, make_mock_storage_pool):
     assert ret["definition"]
     virt.libvirt.openAuth().defineXML = virt.libvirt.openAuth().defineXML
     setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
-    assert "block" == setxml.find(".//disk[3]").get("type")
-    assert "/path/to/vdb/vdb1" == setxml.find(".//disk[3]/source").get("dev")
+    assert setxml.find(".//disk[3]").get("type") == "block"
+    assert setxml.find(".//disk[3]/source").get("dev") == "/path/to/vdb/vdb1"
 
     # Note that my_vm-file-data was not an existing volume before the update
-    assert "file" == setxml.find(".//disk[4]").get("type")
-    assert "/path/to/default/my_vm_file-data" == setxml.find(".//disk[4]/source").get(
-        "file"
+    assert setxml.find(".//disk[4]").get("type") == "file"
+    assert (
+        setxml.find(".//disk[4]/source").get("file")
+        == "/path/to/default/my_vm_file-data"
     )
 
 
@@ -242,7 +243,7 @@ def test_get_disk_convert_volumes(make_mock_vm, make_mock_storage_pool):
     subprocess_mock.Popen = popen_mock
 
     with patch.dict(virt.__dict__, {"subprocess": subprocess_mock}):
-        assert {
+        assert virt.get_disks("srv01") == {
             "vda": {
                 "type": "disk",
                 "file": "default/srv01_system",
@@ -265,7 +266,7 @@ def test_get_disk_convert_volumes(make_mock_vm, make_mock_storage_pool):
                 "disk size": 340525056,
                 "virtual size": 214748364800,
             },
-        } == virt.get_disks("srv01")
+        }
 
 
 def test_update_approx_mem(make_mock_vm):
@@ -308,7 +309,7 @@ def test_gen_hypervisor_features():
         hypervisor_features={"kvm-hint-dedicated": True},
     )
     root = ET.fromstring(xml_data)
-    assert "on" == root.find("features/kvm/hint-dedicated").attrib["state"]
+    assert root.find("features/kvm/hint-dedicated").attrib["state"] == "on"
 
 
 def test_update_hypervisor_features(make_mock_vm):
@@ -343,7 +344,7 @@ def test_update_hypervisor_features(make_mock_vm):
     ret = virt.update("my_vm", hypervisor_features={"kvm-hint-dedicated": False})
     assert ret["definition"]
     setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
-    assert "off" == setxml.find("features/kvm/hint-dedicated").get("state")
+    assert setxml.find("features/kvm/hint-dedicated").get("state") == "off"
 
     # Add the features
     xml_def = """
@@ -362,7 +363,7 @@ def test_update_hypervisor_features(make_mock_vm):
     ret = virt.update("my_vm", hypervisor_features={"kvm-hint-dedicated": True})
     assert ret["definition"]
     setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
-    assert "on" == setxml.find("features/kvm/hint-dedicated").get("state")
+    assert setxml.find("features/kvm/hint-dedicated").get("state") == "on"
 
 
 def test_gen_clock():
@@ -383,8 +384,8 @@ def test_gen_clock():
         clock={"adjustment": 3600, "utc": False},
     )
     root = ET.fromstring(xml_data)
-    assert "localtime" == root.find("clock").get("offset")
-    assert "3600" == root.find("clock").get("adjustment")
+    assert root.find("clock").get("offset") == "localtime"
+    assert root.find("clock").get("adjustment") == "3600"
 
     # Specific timezone
     xml_data = virt._gen_xml(
@@ -400,8 +401,8 @@ def test_gen_clock():
         clock={"timezone": "CEST"},
     )
     root = ET.fromstring(xml_data)
-    assert "timezone" == root.find("clock").get("offset")
-    assert "CEST" == root.find("clock").get("timezone")
+    assert root.find("clock").get("offset") == "timezone"
+    assert root.find("clock").get("timezone") == "CEST"
 
     # UTC
     xml_data = virt._gen_xml(
@@ -417,7 +418,7 @@ def test_gen_clock():
         clock={"utc": True},
     )
     root = ET.fromstring(xml_data)
-    assert "utc" == root.find("clock").get("offset")
+    assert root.find("clock").get("offset") == "utc"
 
     # Timers
     xml_data = virt._gen_xml(
@@ -444,14 +445,16 @@ def test_gen_clock():
         },
     )
     root = ET.fromstring(xml_data)
-    assert "utc" == root.find("clock").get("offset")
-    assert "3504000000" == root.find("clock/timer[@name='tsc']").get("frequency")
-    assert "native" == root.find("clock/timer[@name='tsc']").get("mode")
-    assert "catchup" == root.find("clock/timer[@name='rtc']").get("tickpolicy")
-    assert {"slew": "4636", "threshold": "123", "limit": "2342"} == root.find(
-        "clock/timer[@name='rtc']/catchup"
-    ).attrib
-    assert "no" == root.find("clock/timer[@name='hpet']").get("present")
+    assert root.find("clock").get("offset") == "utc"
+    assert root.find("clock/timer[@name='tsc']").get("frequency") == "3504000000"
+    assert root.find("clock/timer[@name='tsc']").get("mode") == "native"
+    assert root.find("clock/timer[@name='rtc']").get("tickpolicy") == "catchup"
+    assert root.find("clock/timer[@name='rtc']/catchup").attrib == {
+        "slew": "4636",
+        "threshold": "123",
+        "limit": "2342",
+    }
+    assert root.find("clock/timer[@name='hpet']").get("present") == "no"
 
 
 def test_update_clock(make_mock_vm):
@@ -491,6 +494,44 @@ def test_update_clock(make_mock_vm):
     )
     assert not ret["definition"]
 
+    # Update
+    ret = virt.update(
+        "my_vm",
+        clock={
+            "timezone": "CEST",
+            "timers": {
+                "rtc": {
+                    "track": "wall",
+                    "tickpolicy": "catchup",
+                    "slew": 4636,
+                    "threshold": 123,
+                    "limit": 2342,
+                },
+                "hpet": {"present": True},
+            },
+        },
+    )
+    assert ret["definition"]
+    setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
+    assert setxml.find("clock").get("offset") == "timezone"
+    assert setxml.find("clock").get("timezone") == "CEST"
+    assert {t.get("name") for t in setxml.findall("clock/timer")} == {"rtc", "hpet"}
+    assert setxml.find("clock/timer[@name='rtc']").get("tickpolicy") == "catchup"
+    assert setxml.find("clock/timer[@name='rtc']").get("track") == "wall"
+    assert setxml.find("clock/timer[@name='rtc']/catchup").attrib == {
+        "slew": "4636",
+        "threshold": "123",
+        "limit": "2342",
+    }
+    assert setxml.find("clock/timer[@name='hpet']").get("present") == "yes"
+
+    # Revert to UTC
+    ret = virt.update("my_vm", clock={"utc": True, "adjustment": None, "timers": None})
+    assert ret["definition"]
+    setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
+    assert setxml.find("clock").attrib == {"offset": "utc"}
+    assert setxml.find("clock/timer") is None
+
 
 def test_update_stop_on_reboot_reset(make_mock_vm):
     """
@@ -514,7 +555,7 @@ def test_update_stop_on_reboot_reset(make_mock_vm):
     assert ret["definition"]
     virt.libvirt.openAuth().defineXML = virt.libvirt.openAuth().defineXML
     setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
-    assert "restart" == setxml.find("./on_reboot").text
+    assert setxml.find("./on_reboot").text == "restart"
 
 
 def test_update_stop_on_reboot(make_mock_vm):
@@ -538,7 +579,7 @@ def test_update_stop_on_reboot(make_mock_vm):
     assert ret["definition"]
     virt.libvirt.openAuth().defineXML = virt.libvirt.openAuth().defineXML
     setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
-    assert "destroy" == setxml.find("./on_reboot").text
+    assert setxml.find("./on_reboot").text == "destroy"
 
 
 def test_init_no_stop_on_reboot(make_capabilities):
@@ -551,7 +592,7 @@ def test_init_no_stop_on_reboot(make_capabilities):
             virt.init("test_vm", 2, 2048, start=False)
             virt.libvirt.openAuth().defineXML = virt.libvirt.openAuth().defineXML
             setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
-            assert "restart" == setxml.find("./on_reboot").text
+            assert setxml.find("./on_reboot").text == "restart"
 
 
 def test_init_stop_on_reboot(make_capabilities):
@@ -564,8 +605,460 @@ def test_init_stop_on_reboot(make_capabilities):
             virt.init("test_vm", 2, 2048, stop_on_reboot=True, start=False)
             virt.libvirt.openAuth().defineXML = virt.libvirt.openAuth().defineXML
             setxml = ET.fromstring(virt.libvirt.openAuth().defineXML.call_args[0][0])
-            assert "destroy" == setxml.find("./on_reboot").text
-    # Update
+            assert setxml.find("./on_reboot").text == "destroy"
+
+
+def test_init_hostdev_usb(make_capabilities, make_mock_device):
+    """
+    Test virt.init with USB host device passed through
+    """
+    make_capabilities()
+    make_mock_device(
+        """
+        <device>
+          <name>usb_3_1_3</name>
+          <path>/sys/devices/pci0000:00/0000:00:1d.6/0000:06:00.0/0000:07:02.0/0000:3e:00.0/usb3/3-1/3-1.3</path>
+          <devnode type='dev'>/dev/bus/usb/003/004</devnode>
+          <parent>usb_3_1</parent>
+          <driver>
+            <name>usb</name>
+          </driver>
+          <capability type='usb_device'>
+            <bus>3</bus>
+            <device>4</device>
+            <product id='0x6006'>AUKEY PC-LM1E Camera</product>
+            <vendor id='0x0458'>KYE Systems Corp. (Mouse Systems)</vendor>
+          </capability>
+        </device>
+    """
+    )
+    with patch.dict(virt.os.__dict__, {"chmod": MagicMock(), "makedirs": MagicMock()}):
+        with patch.dict(virt.__salt__, {"cmd.run": MagicMock()}):
+            virt.init("test_vm", 2, 2048, host_devices=["usb_3_1_3"], start=False)
+            define_mock = virt.libvirt.openAuth().defineXML
+            setxml = ET.fromstring(define_mock.call_args[0][0])
+            expected_xml = strip_xml(
+                """
+                <hostdev mode='subsystem' type='usb'>
+                  <source>
+                    <vendor id='0x0458'/>
+                    <product id='0x6006'/>
+                  </source>
+                </hostdev>
+                """
+            )
+            assert (
+                strip_xml(ET.tostring(setxml.find("./devices/hostdev"))) == expected_xml
+            )
+
+
+def test_init_hostdev_pci(make_capabilities, make_mock_device):
+    """
+    Test virt.init with PCI host device passed through
+    """
+    make_capabilities()
+    make_mock_device(
+        """
+        <device>
+          <name>pci_1002_71c4</name>
+          <parent>pci_8086_27a1</parent>
+          <capability type='pci'>
+            <class>0xffffff</class>
+            <domain>0</domain>
+            <bus>1</bus>
+            <slot>0</slot>
+            <function>0</function>
+            <product id='0x71c4'>M56GL [Mobility FireGL V5200]</product>
+            <vendor id='0x1002'>ATI Technologies Inc</vendor>
+            <numa node='1'/>
+          </capability>
+        </device>
+    """
+    )
+    with patch.dict(virt.os.__dict__, {"chmod": MagicMock(), "makedirs": MagicMock()}):
+        with patch.dict(virt.__salt__, {"cmd.run": MagicMock()}):
+            virt.init("test_vm", 2, 2048, host_devices=["pci_1002_71c4"], start=False)
+            define_mock = virt.libvirt.openAuth().defineXML
+            setxml = ET.fromstring(define_mock.call_args[0][0])
+            expected_xml = strip_xml(
+                """
+                <hostdev mode='subsystem' type='pci' managed='yes'>
+                  <source>
+                    <address domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
+                  </source>
+                </hostdev>
+                """
+            )
+            assert (
+                strip_xml(ET.tostring(setxml.find("./devices/hostdev"))) == expected_xml
+            )
+
+
+def test_update_hostdev_nochange(make_mock_device, make_mock_vm):
+    """
+    Test the virt.update function with no host device changes
+    """
+    xml_def = """
+        <domain type='kvm'>
+          <name>my_vm</name>
+          <memory unit='KiB'>524288</memory>
+          <currentMemory unit='KiB'>524288</currentMemory>
+          <vcpu placement='static'>1</vcpu>
+          <os>
+            <type arch='x86_64'>hvm</type>
+          </os>
+          <on_reboot>restart</on_reboot>
+          <devices>
+            <hostdev mode='subsystem' type='pci' managed='yes'>
+              <source>
+                <address domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
+              </source>
+              <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+            </hostdev>
+            <hostdev mode='subsystem' type='usb' managed='no'>
+              <source>
+                <vendor id='0x0458'/>
+                <product id='0x6006'/>
+                <address bus='3' device='4'/>
+              </source>
+              <alias name='hostdev0'/>
+              <address type='usb' bus='0' port='1'/>
+            </hostdev>
+          </devices>
+        </domain>"""
+    domain_mock = make_mock_vm(xml_def)
+
+    make_mock_device(
+        """
+        <device>
+          <name>usb_3_1_3</name>
+          <path>/sys/devices/pci0000:00/0000:00:1d.6/0000:06:00.0/0000:07:02.0/0000:3e:00.0/usb3/3-1/3-1.3</path>
+          <devnode type='dev'>/dev/bus/usb/003/004</devnode>
+          <parent>usb_3_1</parent>
+          <driver>
+            <name>usb</name>
+          </driver>
+          <capability type='usb_device'>
+            <bus>3</bus>
+            <device>4</device>
+            <product id='0x6006'>AUKEY PC-LM1E Camera</product>
+            <vendor id='0x0458'>KYE Systems Corp. (Mouse Systems)</vendor>
+          </capability>
+        </device>
+    """
+    )
+    make_mock_device(
+        """
+        <device>
+          <name>pci_1002_71c4</name>
+          <parent>pci_8086_27a1</parent>
+          <capability type='pci'>
+            <class>0xffffff</class>
+            <domain>0</domain>
+            <bus>1</bus>
+            <slot>0</slot>
+            <function>0</function>
+            <product id='0x71c4'>M56GL [Mobility FireGL V5200]</product>
+            <vendor id='0x1002'>ATI Technologies Inc</vendor>
+            <numa node='1'/>
+          </capability>
+        </device>
+    """
+    )
+
+    ret = virt.update("my_vm", host_devices=["pci_1002_71c4", "usb_3_1_3"])
+
+    assert not ret["definition"]
+    define_mock = virt.libvirt.openAuth().defineXML
+    define_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "running,live",
+    [(False, False), (True, False), (True, True)],
+    ids=["stopped, no live", "running, no live", "running, live"],
+)
+def test_update_hostdev_changes(running, live, make_mock_device, make_mock_vm, test):
+    """
+    Test the virt.update function with host device changes
+    """
+    xml_def = """
+        <domain type='kvm'>
+          <name>my_vm</name>
+          <memory unit='KiB'>524288</memory>
+          <currentMemory unit='KiB'>524288</currentMemory>
+          <vcpu placement='static'>1</vcpu>
+          <os>
+            <type arch='x86_64'>hvm</type>
+          </os>
+          <on_reboot>restart</on_reboot>
+          <devices>
+            <hostdev mode='subsystem' type='pci' managed='yes'>
+              <source>
+                <address domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
+              </source>
+              <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+            </hostdev>
+          </devices>
+        </domain>"""
+    domain_mock = make_mock_vm(xml_def, running)
+
+    make_mock_device(
+        """
+        <device>
+          <name>usb_3_1_3</name>
+          <path>/sys/devices/pci0000:00/0000:00:1d.6/0000:06:00.0/0000:07:02.0/0000:3e:00.0/usb3/3-1/3-1.3</path>
+          <devnode type='dev'>/dev/bus/usb/003/004</devnode>
+          <parent>usb_3_1</parent>
+          <driver>
+            <name>usb</name>
+          </driver>
+          <capability type='usb_device'>
+            <bus>3</bus>
+            <device>4</device>
+            <product id='0x6006'>AUKEY PC-LM1E Camera</product>
+            <vendor id='0x0458'>KYE Systems Corp. (Mouse Systems)</vendor>
+          </capability>
+        </device>
+    """
+    )
+
+    make_mock_device(
+        """
+            <device>
+              <name>pci_1002_71c4</name>
+              <parent>pci_8086_27a1</parent>
+              <capability type='pci'>
+                <class>0xffffff</class>
+                <domain>0</domain>
+                <bus>1</bus>
+                <slot>0</slot>
+                <function>0</function>
+                <product id='0x71c4'>M56GL [Mobility FireGL V5200]</product>
+                <vendor id='0x1002'>ATI Technologies Inc</vendor>
+                <numa node='1'/>
+              </capability>
+            </device>
+        """
+    )
+
+    ret = virt.update("my_vm", host_devices=["usb_3_1_3"], test=test, live=live)
+    define_mock = virt.libvirt.openAuth().defineXML
+    assert_called(define_mock, not test)
+
+    # Test that the XML is updated with the proper devices
+    usb_device_xml = strip_xml(
+        """
+        <hostdev mode="subsystem" type="usb">
+          <source>
+           <vendor id="0x0458" />
+           <product id="0x6006" />
+          </source>
+        </hostdev>
+        """
+    )
+    if not test:
+        set_xml = ET.fromstring(define_mock.call_args[0][0])
+        actual_hostdevs = [
+            ET.tostring(xmlutil.strip_spaces(node))
+            for node in set_xml.findall("./devices/hostdev")
+        ]
+        assert actual_hostdevs == [usb_device_xml]
+
+    if not test and live:
+        attach_xml = strip_xml(domain_mock.attachDevice.call_args[0][0])
+        assert attach_xml == usb_device_xml
+
+        pci_device_xml = strip_xml(
+            """
+                <hostdev mode='subsystem' type='pci' managed='yes'>
+                  <source>
+                    <address domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
+                  </source>
+                  <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+                </hostdev>
+            """
+        )
+        detach_xml = strip_xml(domain_mock.detachDevice.call_args[0][0])
+        assert detach_xml == pci_device_xml
+    else:
+        domain_mock.attachDevice.assert_not_called()
+        domain_mock.detachDevice.assert_not_called()
+
+
+def test_diff_nics():
+    """
+    Test virt._diff_nics()
+    """
+    old_nics = ET.fromstring(
+        """
+        <devices>
+           <interface type='network'>
+             <mac address='52:54:00:39:02:b1'/>
+             <source network='default'/>
+             <model type='virtio'/>
+             <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+           </interface>
+           <interface type='network'>
+             <mac address='52:54:00:39:02:b2'/>
+             <source network='admin'/>
+             <model type='virtio'/>
+             <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+           </interface>
+           <interface type='network'>
+             <mac address='52:54:00:39:02:b3'/>
+             <source network='admin'/>
+             <model type='virtio'/>
+             <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+           </interface>
+        </devices>
+    """
+    ).findall("interface")
+
+    new_nics = ET.fromstring(
+        """
+        <devices>
+           <interface type='network'>
+             <mac address='52:54:00:39:02:b1'/>
+             <source network='default'/>
+             <model type='virtio'/>
+           </interface>
+           <interface type='network'>
+             <mac address='52:54:00:39:02:b2'/>
+             <source network='default'/>
+             <model type='virtio'/>
+           </interface>
+           <interface type='network'>
+             <mac address='52:54:00:39:02:b4'/>
+             <source network='admin'/>
+             <model type='virtio'/>
+           </interface>
+        </devices>
+    """
+    ).findall("interface")
+    ret = virt._diff_interface_lists(old_nics, new_nics)
+    assert [nic.find("mac").get("address") for nic in ret["unchanged"]] == [
+        "52:54:00:39:02:b1"
+    ]
+    assert [nic.find("mac").get("address") for nic in ret["new"]] == [
+        "52:54:00:39:02:b2",
+        "52:54:00:39:02:b4",
+    ]
+    assert [nic.find("mac").get("address") for nic in ret["deleted"]] == [
+        "52:54:00:39:02:b2",
+        "52:54:00:39:02:b3",
+    ]
+
+
+def test_diff_nics_live_nochange():
+    """
+    Libvirt alters the NICs of network type when running the guest, test the virt._diff_nics()
+    function with no change in such a case.
+    """
+    old_nics = ET.fromstring(
+        """
+        <devices>
+          <interface type='direct'>
+            <mac address='52:54:00:03:02:15'/>
+            <source network='test-vepa' portid='8377df4f-7c72-45f3-9ba4-a76306333396' dev='eth1' mode='vepa'/>
+            <target dev='macvtap0'/>
+            <model type='virtio'/>
+            <alias name='net0'/>
+            <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
+          </interface>
+          <interface type='bridge'>
+            <mac address='52:54:00:ea:2e:89'/>
+            <source network='default' portid='b97ec5b7-25fd-4697-ae45-06af8cc1a964' bridge='br0'/>
+            <target dev='vnet0'/>
+            <model type='virtio'/>
+            <alias name='net0'/>
+            <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+          </interface>
+        </devices>
+        """
+    ).findall("interface")
+
+    new_nics = ET.fromstring(
+        """
+        <devices>
+           <interface type='network'>
+             <source network='test-vepa'/>
+             <model type='virtio'/>
+           </interface>
+           <interface type='network'>
+             <source network='default'/>
+             <model type='virtio'/>
+           </interface>
+        </devices>
+        """
+    )
+    ret = virt._diff_interface_lists(old_nics, new_nics)
+    assert [nic.find("mac").get("address") for nic in ret["unchanged"]] == [
+        "52:54:00:03:02:15",
+        "52:54:00:ea:2e:89",
+    ]
+
+
+def test_update_nic_hostdev_nochange(make_mock_network, make_mock_vm, test):
+    """
+    Test the virt.update function with a running host with hostdev nic
+    """
+    xml_def_template = """
+        <domain type='kvm'>
+          <name>my_vm</name>
+          <memory unit='KiB'>524288</memory>
+          <currentMemory unit='KiB'>524288</currentMemory>
+          <vcpu placement='static'>1</vcpu>
+          <os>
+            <type arch='x86_64'>hvm</type>
+          </os>
+          <on_reboot>restart</on_reboot>
+          <devices>
+            {}
+          </devices>
+        </domain>
+    """
+    inactive_nic = """
+        <interface type='hostdev' managed='yes'>
+          <mac address='52:54:00:67:b2:08'/>
+          <driver name='vfio'/>
+          <source network="test-hostdev"/>
+          <model type='virtio'/>
+          <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+        </interface>
+    """
+    running_nic = """
+        <interface type='hostdev' managed='yes'>
+          <mac address='52:54:00:67:b2:08'/>
+          <driver name='vfio'/>
+          <source>
+            <address type='pci' domain='0x0000' bus='0x3d' slot='0x02' function='0x0'/>
+          </source>
+          <model type='virtio'/>
+          <alias name='hostdev0'/>
+          <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+        </interface>
+    """
+    domain_mock = make_mock_vm(
+        xml_def_template.format(running_nic),
+        running="running",
+        inactive_def=xml_def_template.format(inactive_nic),
+    )
+
+    make_mock_network(
+        """
+        <network connections='1'>
+          <name>test-hostdev</name>
+          <uuid>51d0aaa5-7530-4c60-8498-5bc3ab8c655b</uuid>
+          <forward mode='hostdev' managed='yes'>
+            <pf dev='eth0'/>
+            <address type='pci' domain='0x0000' bus='0x3d' slot='0x02' function='0x0'/>
+            <address type='pci' domain='0x0000' bus='0x3d' slot='0x02' function='0x1'/>
+          </forward>
+        </network>
+        """
+    )
+
     ret = virt.update(
         "my_vm",
         clock={
@@ -795,7 +1288,7 @@ def test_update_bootdev_unchanged(make_mock_vm, boot_dev):
         """
     )
     ret = virt.update("my_vm", boot_dev=boot_dev)
-    assert (boot_dev != "hd") == ret["definition"]
+    assert ret["definition"] == (boot_dev != "hd")
     if boot_dev == "hd":
         virt.libvirt.openAuth().defineXML.assert_not_called()
     else:
@@ -1573,3 +2066,66 @@ def test_update_failure(make_mock_vm):
         "disk": {"attached": [], "detached": [], "updated": []},
         "interface": {"attached": [], "detached": []},
     }
+
+
+@pytest.mark.parametrize("hypervisor", ["kvm", "xen"])
+def test_gen_xml_spice_default(hypervisor):
+    """
+    Test virt._gen_xml() with default spice graphics device
+    """
+    xml_data = virt._gen_xml(
+        virt.libvirt.openAuth.return_value,
+        "hello",
+        1,
+        512,
+        {},
+        {},
+        hypervisor,
+        "hvm",
+        "x86_64",
+        graphics={"type": "spice"},
+    )
+    root = ET.fromstring(xml_data)
+    assert root.find("devices/graphics").attrib["type"] == "spice"
+    assert root.find("devices/graphics").attrib["autoport"] == "yes"
+    assert root.find("devices/graphics").attrib["listen"] == "0.0.0.0"
+    assert root.find("devices/graphics/listen").attrib["type"] == "address"
+    assert root.find("devices/graphics/listen").attrib["address"] == "0.0.0.0"
+    if hypervisor == "kvm":
+        assert (
+            root.find(".//channel[@type='spicevmc']/target").get("name")
+            == "com.redhat.spice.0"
+        )
+    else:
+        assert root.find(".//channel[@type='spicevmc']") is None
+
+
+def test_gen_xml_spice():
+    """
+    Test virt._gen_xml() with spice graphics device
+    """
+    xml_data = virt._gen_xml(
+        virt.libvirt.openAuth.return_value,
+        "hello",
+        1,
+        512,
+        {},
+        {},
+        "kvm",
+        "hvm",
+        "x86_64",
+        graphics={
+            "type": "spice",
+            "port": 1234,
+            "tls_port": 5678,
+            "listen": {"type": "none"},
+        },
+    )
+    root = ET.fromstring(xml_data)
+    assert root.find("devices/graphics").attrib["type"] == "spice"
+    assert root.find("devices/graphics").attrib["autoport"] == "no"
+    assert root.find("devices/graphics").attrib["port"] == "1234"
+    assert root.find("devices/graphics").attrib["tlsPort"] == "5678"
+    assert "listen" not in root.find("devices/graphics").attrib
+    assert root.find("devices/graphics/listen").attrib["type"] == "none"
+    assert "address" not in root.find("devices/graphics/listen").attrib

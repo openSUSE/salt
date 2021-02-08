@@ -242,13 +242,65 @@
         <clock offset="{{ clock.offset }}"{{ opt_attribute(clock, "adjustment") }}{{ opt_attribute(clock, "timezone") }}>
     {%- for timer_name in clock.timers %}
     {%- set timer = clock.timers[timer_name] %}
-            <timer name='{{ timer_name }}'{{ opt_attribute(timer, "track") }}{{ opt_attribute(timer, "tickpolicy") }}{{ opt_attribute(timer, "frequency") }}{{ opt_attribute(timer, "mode") }}{{ opt_attribute(timer, "present", yesno) }}>
-        {%- if "threshold" in timer or "slew" in timer or "limit" in timer %}
-                <catchup{{ opt_attribute(timer, "slew") }}{{ opt_attribute(timer, "threshold") }}{{ opt_attribute(timer, "limit") }}/>
-        {%- endif %}
-            </timer>
-    {%- endfor %}
-        </clock>
+    <timer name='{{ timer_name }}'{{ opt_attribute(timer, "track") }}{{ opt_attribute(timer, "tickpolicy") }}{{ opt_attribute(timer, "frequency") }}{{ opt_attribute(timer, "mode") }}{{ opt_attribute(timer, "present", yesno) }}>
+    {%- if "threshold" in timer or "slew" in timer or "limit" in timer %}
+      <catchup{{ opt_attribute(timer, "slew") }}{{ opt_attribute(timer, "threshold") }}{{ opt_attribute(timer, "limit") }}/>
+    {%- endif %}
+    </timer>
+  {%- endfor %}
+  </clock>
+{%- endif %}
+  <on_reboot>{{ on_reboot }}</on_reboot>
+  <devices>
+{%- for disk in disks %}
+    <disk type='{{ disk.type }}' device='{{ disk.device }}'>
+  {%- if disk.type == 'file' and 'source_file' in disk -%}
+      <source file='{{ disk.source_file }}' />
+  {%- endif %}
+  {%- if disk.type == 'block' -%}
+      <source dev='{{ disk.source_file }}' />
+  {%- endif %}
+  {%- if disk.type == 'volume' and 'pool' in disk -%}
+      <source pool='{{ disk.pool }}' volume='{{ disk.volume }}' />
+  {%- endif %}
+  {%- if disk.type == 'network' %}{{ libvirt_disks.network_source(disk) }}{%- endif %}
+      <target dev='{{ disk.target_dev }}' bus='{{ disk.disk_bus }}' />
+    {%- if disk.address -%}
+      <address type='drive' controller='0' bus='0' target='0' unit='{{ disk.index }}' />
+    {%- endif %}
+    {%- if disk.driver -%}
+      <driver name='qemu' type='{{ disk.format}}' cache='none' io='{{ disk.io }}'{{ opt_attribute(disk, "iothread") }}/>
+  {%- endif %}
+    </disk>
+{%- endfor %}
+{%- if controller_model %}
+    <controller type='scsi' index='0' model='{{ controller_model }}' />
+{%- endif %}
+{%- for nic in nics %}
+    <interface type='{{ nic.type }}'>
+      <source {{ nic.type }}='{{ nic.source }}'/>
+  {%- if nic.get('mac') -%}
+      <mac address='{{ nic.mac }}'/>
+  {%- endif %}
+  {%- if nic.model %}<model type='{{ nic.model }}'/>{% endif %}
+    </interface>
+{%- endfor %}
+{%- if graphics %}
+    <graphics type='{{ graphics.type }}'{{ opt_attribute(graphics, "port") }}
+  {%- if graphics.listen.address %}
+      listen='{{ graphics.listen.address }}'
+  {%- endif %}
+  {%- if graphics.type == 'spice' and graphics.tls_port %}
+      tlsPort='{{ graphics.tls_port }}'
+  {%- endif %}
+      autoport='{{ yesno(not graphics.port and not graphics.tls_port) }}'>
+      <listen type='{{ graphics.listen.type }}'{{ opt_attribute(graphics.listen, "address") }}/>
+    </graphics>
+  {%- if graphics.type == "spice" and hypervisor in ["qemu", "kvm"] %}
+    <channel type='spicevmc'>
+      <target type='virtio' name='com.redhat.spice.0'/>
+    </channel>
+  {%- endif %}
 {%- endif %}
         <on_reboot>{{ on_reboot }}</on_reboot>
         <devices>
