@@ -34,3 +34,10 @@ def assert_called(mock, condition):
     I know it's a simple XOR, but makes the tests easier to read
     """
     assert not condition and not mock.called or condition and mock.called
+
+def assertEqualUnit(actual, expected, unit="KiB"):
+    """
+    Assert that two ElementTree nodes have the same value and unit
+    """
+    assert actual.get("unit") == unit
+    assert actual.text == str(expected)
