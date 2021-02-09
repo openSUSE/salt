@@ -6478,47 +6478,7 @@ def network_define(name, bridge, forward, ipv4_config=None, ipv6_config=None, **
         CIDR notation for the network. For example '192.168.124.0/24'
 
     dhcp_ranges
-        A list of dictionaries with ``'start'`` and ``'end'`` properties.
-
-    hosts
-        A list of dictionaries with ``ip`` property and optional ``name``, ``mac`` and ``id`` properties.
-
-        .. versionadded:: Aluminium
-
-    bootp
-        A dictionary with a ``file`` property and an optional ``server`` one.
-
-        .. versionadded:: Aluminium
-
-    tftp
-        The path to the TFTP root directory to serve.
-
-        .. versionadded:: Aluminium
-
-    .. _net-define-dns:
-
-    .. rubric:: DNS configuration definition
-
-    The DNS configuration dictionary contains the following optional properties:
-
-    forwarders
-        List of alternate DNS forwarders to use.
-        Each item is a dictionary with the optional ``domain`` and ``addr`` keys.
-        If both are provided, the requests to the domain are forwarded to the server at the ``addr``.
-        If only ``domain`` is provided the requests matching this domain will be resolved locally.
-        If only ``addr`` is provided all requests will be forwarded to this DNS server.
-
-    txt:
-        Dictionary of TXT fields to set.
-
-    hosts:
-        Dictionary of host DNS entries.
-        The key is the IP of the host, and the value is a list of hostnames for it.
-
-    srvs:
-        List of SRV DNS entries.
-        Each entry is a dictionary with the mandatory ``name`` and ``protocol`` keys.
-        Entries can also have ``target``, ``port``, ``priority``, ``domain`` and ``weight`` optional properties.
+        A list of dictionary with ``'start'`` and ``'end'`` properties.
 
     CLI Example:
 
