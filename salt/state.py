@@ -979,7 +979,7 @@ class State(object):
                 except CommandExecutionError:
                     # Command failed, so notify unless to skip the item
                     cmd = 0
-                if not _check_cmd(cmd):
+                if _check_cmd(cmd):
                     return ret
             elif isinstance(entry, dict):
                 if 'fun' not in entry:
@@ -988,8 +988,8 @@ class State(object):
                     return ret
 
                 result = self._run_check_function(entry)
-                if self.state_con.get('retcode', 0):
-                    if not _check_cmd(self.state_con['retcode']):
+                if self.state_con.get("retcode", 0):
+                    if _check_cmd(self.state_con["retcode"]):
                         return ret
                 elif result:
                     ret.update({'comment': 'unless condition is true',
