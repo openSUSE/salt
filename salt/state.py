@@ -892,25 +892,32 @@ class State(object):
         return self.functions[fun](*cdata['args'], **cdata['kwargs'])
 
     def _run_check_onlyif(self, low_data, cmd_opts):
-        '''
-        Check that unless doesn't return 0, and that onlyif returns a 0.
-        '''
-        ret = {'result': False}
+        """
+        Make sure that all commands return True for the state to run. If any
+        command returns False (non 0), the state will not run
+        """
+        ret = {"result": False}
 
         if not isinstance(low_data['onlyif'], list):
             low_data_onlyif = [low_data['onlyif']]
         else:
             low_data_onlyif = low_data['onlyif']
 
+        # If any are False the state will NOT run
         def _check_cmd(cmd):
-            if cmd != 0 and ret['result'] is False:
-                ret.update({'comment': 'onlyif condition is false',
-                            'skip_watch': True,
-                            'result': True})
+            # Don't run condition (False)
+            if cmd != 0 and ret["result"] is False:
+                ret.update(
+                    {
+                        "comment": "onlyif condition is false",
+                        "skip_watch": True,
+                        "result": True,
+                    }
+                )
                 return False
-            elif cmd == 0:
-                ret.update({'comment': 'onlyif condition is true', 'result': False})
-            return True
+            else:
+                ret.update({"comment": "onlyif condition is true", "result": False})
+                return True
 
         for entry in low_data_onlyif:
             if isinstance(entry, six.string_types):
@@ -949,25 +956,33 @@ class State(object):
         return ret
 
     def _run_check_unless(self, low_data, cmd_opts):
-        '''
-        Check that unless doesn't return 0, and that onlyif returns a 0.
-        '''
-        ret = {'result': False}
+        """
+        Check if any of the commands return False (non 0). If any are False the
+        state will run.
+        """
+        ret = {"result": False}
 
         if not isinstance(low_data['unless'], list):
             low_data_unless = [low_data['unless']]
         else:
             low_data_unless = low_data['unless']
 
+        # If any are False the state will run
         def _check_cmd(cmd):
-            if cmd == 0 and ret['result'] is False:
-                ret.update({'comment': 'unless condition is true',
-                            'skip_watch': True,
-                            'result': True})
+            # Don't run condition
+            if cmd == 0:
+                ret.update(
+                    {
+                        "comment": "unless condition is true",
+                        "skip_watch": True,
+                        "result": True,
+                    }
+                )
                 return False
-            elif cmd != 0:
-                ret.update({'comment': 'unless condition is false', 'result': False})
-            return True
+            else:
+                ret.pop("skip_watch", None)
+                ret.update({"comment": "unless condition is false", "result": False})
+                return True
 
         for entry in low_data_unless:
             if isinstance(entry, six.string_types):
@@ -992,16 +1007,25 @@ class State(object):
                     if _check_cmd(self.state_con["retcode"]):
                         return ret
                 elif result:
-                    ret.update({'comment': 'unless condition is true',
-                                'skip_watch': True,
-                                'result': True})
-                    return ret
+                    ret.update(
+                        {
+                            "comment": "unless condition is true",
+                            "skip_watch": True,
+                            "result": True,
+                        }
+                    )
                 else:
-                    ret.update({'comment': 'unless condition is false',
-                                'result': False})
+                    ret.update(
+                        {"comment": "unless condition is false", "result": False}
+                    )
+                    return ret
             else:
-                ret.update({'comment': 'unless condition is false, bad type passed', 'result': False})
-                return ret
+                ret.update(
+                    {
+                        "comment": "unless condition is false, bad type passed",
+                        "result": False,
+                    }
+                )
 
         # No reason to stop, return ret
         return ret
