@@ -93,7 +93,7 @@ certifi==2019.3.9         # via msrest, requests
 cffi==1.12.2              # via azure-datalake-store, cryptography
 chardet==3.0.4            # via requests
 click==7.0                # via flask
-cryptography==2.6.1       # via adal, azure-cosmosdb-table, azure-keyvault, azure-storage-common, pyopenssl, requests-ntlm, smbprotocol
+cryptography==3.3.2       # via adal, azure-cosmosdb-table, azure-keyvault, azure-storage-common, pyopenssl, requests-ntlm, smbprotocol
 dnspython==1.16.0         # via ldapdomaindump
 enum34==1.1.6             # via cryptography, msrest
 flask==1.0.2              # via impacket
