@@ -1106,6 +1106,7 @@ class SaltDistribution(distutils.dist.Distribution):
         package_data = {
             "salt.templates": [
                 "rh_ip/*.jinja",
+                "suse_ip/*.jinja",
                 "debian_ip/*.jinja",
                 "virt/*.jinja",
                 "git/*",

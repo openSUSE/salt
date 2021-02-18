@@ -21,6 +21,8 @@ def __virtual__():
     """
     if salt.utils.platform.is_windows():
         return (False, "Module linux_ip: Windows systems are not supported.")
+    if __grains__['os_family'] == "Suse":
+        return (False, "Module linux_ip: SUSE systems are not supported.")
     if __grains__["os_family"] == "RedHat":
         return (False, "Module linux_ip: RedHat systems are not supported.")
     if __grains__["os_family"] == "Debian":
