@@ -1133,6 +1133,9 @@ class MinionManager(MinionBase):
         last = 0  # never have we signed in
         auth_wait = minion.opts["acceptance_wait_time"]
         failed = False
+        retry_wait = 1
+        retry_wait_inc = 1
+        max_retry_wait = 20
         while True:
             try:
                 if minion.opts.get("beacons_before_connect", False):
@@ -1176,7 +1179,9 @@ class MinionManager(MinionBase):
                     minion.opts["master"],
                     exc_info=True,
                 )
-                break
+                await asyncio.sleep(retry_wait)
+                if retry_wait < max_retry_wait:
+                    retry_wait += retry_wait_inc
 
     # Multi Master Tune In
     def tune_in(self):
