@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-The networking module for RHEL/Fedora based distros
+The networking module for SUSE based distros
 """
 from __future__ import absolute_import, print_function, unicode_literals
 
@@ -14,7 +14,6 @@ import jinja2.exceptions
 
 # Import salt libs
 import salt.utils.files
-import salt.utils.json
 import salt.utils.stringutils
 import salt.utils.templates
 import salt.utils.validate.net
@@ -27,7 +26,7 @@ log = logging.getLogger(__name__)
 # Set up template environment
 JINJA = jinja2.Environment(
     loader=jinja2.FileSystemLoader(
-        os.path.join(salt.utils.templates.TEMPLATE_DIRNAME, "rh_ip")
+        os.path.join(salt.utils.templates.TEMPLATE_DIRNAME, "suse_ip")
     )
 )
 
@@ -55,21 +54,20 @@ _BOND_DEFAULTS = {
     # Default. Don't change unless you know what you are doing.
     "xmit_hash_policy": "layer2",
 }
-_RH_NETWORK_SCRIPT_DIR = "/etc/sysconfig/network-scripts"
-_RH_NETWORK_FILE = "/etc/sysconfig/network"
+_SUSE_NETWORK_SCRIPT_DIR = "/etc/sysconfig/network"
+_SUSE_NETWORK_FILE = "/etc/sysconfig/network/config"
+_SUSE_NETWORK_ROUTES_FILE = "/etc/sysconfig/network/routes"
 _CONFIG_TRUE = ("yes", "on", "true", "1", True)
 _CONFIG_FALSE = ("no", "off", "false", "0", False)
 _IFACE_TYPES = (
     "eth",
     "bond",
-    "team",
     "alias",
     "clone",
     "ipsec",
     "dialup",
     "bridge",
     "slave",
-    "teamport",
     "vlan",
     "ipip",
     "ib",
@@ -78,17 +76,13 @@ _IFACE_TYPES = (
 
 def __virtual__():
     """
-    Confine this module to RHEL/Fedora based distros
+    Confine this module to SUSE based distros
     """
-    if __grains__["os_family"] == "RedHat":
-        if __grains__["os"] == "Amazon":
-            if __grains__["osmajorrelease"] >= 2:
-                return __virtualname__
-        else:
-            return __virtualname__
+    if __grains__["os_family"] == "Suse":
+        return __virtualname__
     return (
         False,
-        "The rh_ip execution module cannot be loaded: this module is only available on RHEL/Fedora based distributions.",
+        "The suse_ip execution module cannot be loaded: this module is only available on SUSE based distributions.",
     )
 
 
@@ -133,11 +127,11 @@ def _log_default_network(opt, value):
     log.info("Using existing setting -- Setting: %s Value: %s", opt, value)
 
 
-def _parse_rh_config(path):
-    rh_config = _read_file(path)
-    cv_rh_config = {}
-    if rh_config:
-        for line in rh_config:
+def _parse_suse_config(path):
+    suse_config = _read_file(path)
+    cv_suse_config = {}
+    if suse_config:
+        for line in suse_config:
             line = line.strip()
             if len(line) == 0 or line.startswith("!") or line.startswith("#"):
                 continue
@@ -145,9 +139,9 @@ def _parse_rh_config(path):
             if len(pair) != 2:
                 continue
             name, value = pair
-            cv_rh_config[name.upper()] = value
+            cv_suse_config[name.upper()] = salt.utils.stringutils.dequote(value)
 
-    return cv_rh_config
+    return cv_suse_config
 
 
 def _parse_ethtool_opts(opts, iface):
@@ -282,9 +276,6 @@ def _parse_settings_miimon(opts, iface):
                 ret.update({binding: opts[binding]})
             except Exception:  # pylint: disable=broad-except
                 _raise_error_iface(iface, binding, "integer")
-
-    if "miimon" in opts and "downdelay" not in opts:
-        ret["downdelay"] = ret["miimon"] * 2
 
     if "miimon" in opts:
         if not opts["miimon"]:
@@ -543,15 +534,11 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
     """
     result = {"name": iface}
     if "proto" in opts:
-        valid = ["none", "static", "bootp", "dhcp"]
+        valid = ["static", "dhcp", "dhcp4", "dhcp6", "autoip", "dhcp+autoip", "auto6", "6to4", "none"]
         if opts["proto"] in valid:
             result["proto"] = opts["proto"]
         else:
             _raise_error_iface(iface, opts["proto"], valid)
-
-    if "dns" in opts:
-        result["dns"] = opts["dns"]
-        result["peerdns"] = "yes"
 
     if "mtu" in opts:
         try:
@@ -574,16 +561,6 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
     if iface_type == "slave":
         result["proto"] = "none"
 
-    if iface_type == "team":
-        result["devicetype"] = "Team"
-        if "team_config" in opts:
-            result["team_config"] = salt.utils.json.dumps(opts["team_config"])
-
-    if iface_type == "teamport":
-        result["devicetype"] = "TeamPort"
-        result["team_master"] = opts["team_master"]
-        if "team_port_config" in opts:
-            result["team_port_config"] = salt.utils.json.dumps(opts["team_port_config"])
 
     if iface_type == "bond":
         if "mode" not in opts:
@@ -596,6 +573,11 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
                 ["{0}={1}".format(x, y) for x, y in bonding.items()]
             )
             result["devtype"] = "Bond"
+            if "slaves" in opts:
+                if isinstance(opts["slaves"], list):
+                    result["slaves"] = opts["slaves"]
+                else:
+                    result["slaves"] = opts["slaves"].split()
 
     if iface_type == "vlan":
         vlan = _parse_settings_vlan(opts, iface)
@@ -603,27 +585,6 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
             result["devtype"] = "Vlan"
             for opt in vlan:
                 result[opt] = opts[opt]
-
-    if iface_type not in ("bond", "team", "vlan", "bridge", "ipip"):
-        auto_addr = False
-        if "hwaddr" in opts:
-            if salt.utils.validate.net.mac(opts["hwaddr"]):
-                result["hwaddr"] = opts["hwaddr"]
-            elif opts["hwaddr"] == "auto":
-                auto_addr = True
-            elif opts["hwaddr"] != "none":
-                _raise_error_iface(
-                    iface, opts["hwaddr"], ("AA:BB:CC:DD:EE:FF", "auto", "none")
-                )
-        else:
-            auto_addr = True
-
-        if auto_addr:
-            # If interface type is slave for bond, not setting hwaddr
-            if iface_type != "slave":
-                ifaces = __salt__["network.interfaces"]()
-                if iface in ifaces and "hwaddr" in ifaces[iface]:
-                    result["hwaddr"] = ifaces[iface]["hwaddr"]
 
     if iface_type == "eth":
         result["devtype"] = "Ethernet"
@@ -695,28 +656,29 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
         if opt in opts:
             result[opt] = opts[opt]
 
-    for opt in ("ipv6addr", "ipv6gateway"):
-        if opt in opts:
-            result[opt] = opts[opt]
-
-    if "ipaddrs" in opts:
+    if "ipaddrs" in opts or "ipv6addr" in opts or "ipv6addrs" in opts:
         result["ipaddrs"] = []
+        addrs = list
         for opt in opts["ipaddrs"]:
-            if salt.utils.validate.net.ipv4_addr(opt):
-                ip, prefix = [i.strip() for i in opt.split("/")]
-                result["ipaddrs"].append({"ipaddr": ip, "prefix": prefix})
+            if salt.utils.validate.net.ipv4_addr(opt) or salt.utils.validate.net.ipv6_addr(opt):
+                result['ipaddrs'].append(opt)
             else:
-                msg = "ipv4 CIDR is invalid"
+                msg = "{0} is invalid ipv4 or ipv6 CIDR"
                 log.error(msg)
                 raise AttributeError(msg)
-
-    if "ipv6addrs" in opts:
+        if salt.utils.validate.net.ipv6_addr(opts["ipv6addr"]):
+            result['ipaddrs'].append(opts["ipv6addr"])
+        else:
+            msg = "{0} is invalid ipv6 CIDR"
+            log.error(msg)
+            raise AttributeError(msg)
         for opt in opts["ipv6addrs"]:
-            if not salt.utils.validate.net.ipv6_addr(opt):
-                msg = "ipv6 CIDR is invalid"
+            if salt.utils.validate.net.ipv6_addr(opt):
+                result['ipaddrs'].append(opt)
+            else:
+                msg = "{0} is invalid ipv6 CIDR"
                 log.error(msg)
                 raise AttributeError(msg)
-            result["ipv6addrs"] = opts["ipv6addrs"]
 
     if "enable_ipv6" in opts:
         result["enable_ipv6"] = opts["enable_ipv6"]
@@ -753,23 +715,17 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
             enabled,
         )
 
-    if enabled:
-        result["onboot"] = "yes"
-    else:
-        result["onboot"] = "no"
-
-    # If the interface is defined then we want to always take
-    # control away from non-root users; unless the administrator
-    # wants to allow non-root users to control the device.
-    if "userctl" in opts:
-        if opts["userctl"] in _CONFIG_TRUE:
-            result["userctl"] = "yes"
-        elif opts["userctl"] in _CONFIG_FALSE:
-            result["userctl"] = "no"
+    if "startmode" in opts:
+        valid = ("manual", "auto", "nfsroot", "hotplug", "off")
+        if opts["startmode"] in valid:
+            result["startmode"] = opts["startmode"]
         else:
-            _raise_error_iface(iface, opts["userctl"], valid)
+            _raise_error_iface(iface, opts["startmode"], valid)
     else:
-        result["userctl"] = "no"
+        if enabled:
+            result["startmode"] = "auto"
+        else:
+            result["startmode"] = "off"
 
     # This vlan is in opts, and should be only used in range interface
     # will affect jinja template for interface generating
@@ -843,64 +799,28 @@ def _parse_network_settings(opts, current):
 
     # Check for supported parameters
     retain_settings = opts.get("retain_settings", False)
-    result = current if retain_settings else {}
-
-    # Default quote type is an empty string, which will not quote values
-    quote_type = ""
-
-    valid = _CONFIG_TRUE + _CONFIG_FALSE
-    if "enabled" not in opts:
-        try:
-            opts["networking"] = current["networking"]
-            # If networking option is quoted, use its quote type
-            quote_type = salt.utils.stringutils.is_quoted(opts["networking"])
-            _log_default_network("networking", current["networking"])
-        except ValueError:
-            _raise_error_network("networking", valid)
-    else:
-        opts["networking"] = opts["enabled"]
-
-    true_val = "{0}yes{0}".format(quote_type)
-    false_val = "{0}no{0}".format(quote_type)
-
-    networking = salt.utils.stringutils.dequote(opts["networking"])
-    if networking in valid:
-        if networking in _CONFIG_TRUE:
-            result["networking"] = true_val
-        elif networking in _CONFIG_FALSE:
-            result["networking"] = false_val
-    else:
-        _raise_error_network("networking", valid)
-
-    if "hostname" not in opts:
-        try:
-            opts["hostname"] = current["hostname"]
-            _log_default_network("hostname", current["hostname"])
-        except Exception:  # pylint: disable=broad-except
-            _raise_error_network("hostname", ["server1.example.com"])
-
-    if opts["hostname"]:
-        result["hostname"] = "{1}{0}{1}".format(
-            salt.utils.stringutils.dequote(opts["hostname"]), quote_type
-        )
-    else:
-        _raise_error_network("hostname", ["server1.example.com"])
-
-    if "nozeroconf" in opts:
-        nozeroconf = salt.utils.stringutils.dequote(opts["nozeroconf"])
-        if nozeroconf in valid:
-            if nozeroconf in _CONFIG_TRUE:
-                result["nozeroconf"] = true_val
-            elif nozeroconf in _CONFIG_FALSE:
-                result["nozeroconf"] = false_val
-        else:
-            _raise_error_network("nozeroconf", valid)
+    result = {}
+    if retain_settings:
+        for opt in current:
+            nopt = opt
+            if opt == "netconfig_dns_static_servers":
+                nopt = "dns"
+                result[nopt] = current[opt].split()
+            elif opt == "netconfig_dns_static_searchlist":
+                nopt = "dns_search"
+                result[nopt] = current[opt].split()
+            elif opt.startswith("netconfig_") and opt not in ("netconfig_modules_order", "netconfig_verbose", "netconfig_force_replace"):
+                nopt = opt[10:]
+                result[nopt] = current[opt]
+            else:
+                result[nopt] = current[opt]
+            _log_default_network(nopt, current[opt])
 
     for opt in opts:
-        if opt not in ("networking", "hostname", "nozeroconf"):
-            result[opt] = "{1}{0}{1}".format(
-                salt.utils.stringutils.dequote(opts[opt]), quote_type
-            )
+        if opt in ("dns", "dns_search") and not isinstance(opts[opt], list):
+            result[opt] = opts[opt].split()
+        else:
+            result[opt] = opts[opt]
     return result
 
 
@@ -948,16 +868,16 @@ def _read_file(path):
 
 
 def _write_file_iface(iface, data, folder, pattern):
-    """
+    '''
     Writes a file to disk
-    """
+    '''
     filename = os.path.join(folder, pattern.format(iface))
     if not os.path.exists(folder):
-        msg = "{0} cannot be written. {1} does not exist"
+        msg = '{0} cannot be written. {1} does not exist'
         msg = msg.format(filename, folder)
         log.error(msg)
         raise AttributeError(msg)
-    with salt.utils.files.fopen(filename, "w") as fp_:
+    with salt.utils.files.fopen(filename, 'w') as fp_:
         fp_.write(salt.utils.stringutils.to_str(data))
 
 
@@ -988,16 +908,6 @@ def build_interface(iface, iface_type, enabled, **settings):
 
         salt '*' ip.build_interface eth0 eth <settings>
     """
-    if __grains__["os"] == "Fedora":
-        if __grains__["osmajorrelease"] >= 28:
-            rh_major = "8"
-        else:
-            rh_major = "7"
-    elif __grains__["os"] == "Amazon":
-        rh_major = "7"
-    else:
-        rh_major = __grains__["osrelease"][:1]
-
     iface_type = iface_type.lower()
 
     if iface_type not in _IFACE_TYPES:
@@ -1017,39 +927,15 @@ def build_interface(iface, iface_type, enabled, **settings):
             raise AttributeError(msg)
         settings["mode"] = str(settings["mode"])
 
-    if iface_type == "teamport":
-        # Validate that either a master or team_master is defined
-        if "master" not in settings and "team_master" not in settings:
-            msg = "master or team_master is a required setting for teamport interfaces"
-            log.error(msg)
-            raise AttributeError(msg)
-        elif "master" in settings and "team_master" in settings:
-            log.warning(
-                "Both team_master (%s) and master (%s) were configured "
-                "for teamport interface %s. Ignoring master in favor of "
-                "team_master.",
-                settings["team_master"],
-                settings["master"],
-                iface,
-            )
-            del settings["master"]
-        elif "master" in settings:
-            settings["team_master"] = settings.pop("master")
-
     if iface_type == "vlan":
         settings["vlan"] = "yes"
 
     if iface_type == "bridge" and not __salt__["pkg.version"]("bridge-utils"):
         __salt__["pkg.install"]("bridge-utils")
 
-    if iface_type == "team" and not __salt__["pkg.version"]("teamd"):
-        __salt__["pkg.install"]("teamd")
-
     if iface_type in (
         "eth",
         "bond",
-        "team",
-        "teamport",
         "bridge",
         "slave",
         "vlan",
@@ -1059,17 +945,18 @@ def build_interface(iface, iface_type, enabled, **settings):
     ):
         opts = _parse_settings_eth(settings, iface_type, enabled, iface)
         try:
-            template = JINJA.get_template("rh{0}_eth.jinja".format(rh_major))
+            template = JINJA.get_template("ifcfg.jinja")
         except jinja2.exceptions.TemplateNotFound:
-            log.error("Could not load template rh%s_eth.jinja", rh_major)
+            log.error("Could not load template ifcfg.jinja")
             return ""
+        log.debug("Interface opts: \n %s", opts)
         ifcfg = template.render(opts)
 
     if settings.get("test"):
         return _read_temp(ifcfg)
 
-    _write_file_iface(iface, ifcfg, _RH_NETWORK_SCRIPT_DIR, "ifcfg-{0}")
-    path = os.path.join(_RH_NETWORK_SCRIPT_DIR, "ifcfg-{0}".format(iface))
+    _write_file_iface(iface, ifcfg, _SUSE_NETWORK_SCRIPT_DIR, "ifcfg-{0}")
+    path = os.path.join(_SUSE_NETWORK_SCRIPT_DIR, "ifcfg-{0}".format(iface))
 
     return _read_file(path)
 
@@ -1085,12 +972,7 @@ def build_routes(iface, **settings):
         salt '*' ip.build_routes eth0 <settings>
     """
 
-    template = "rh6_route_eth.jinja"
-    try:
-        if int(__grains__["osrelease"][0]) < 6:
-            template = "route_eth.jinja"
-    except ValueError:
-        pass
+    template = "ifroute.jinja"
     log.debug("Template name: %s", template)
 
     opts = _parse_routes(iface, settings)
@@ -1100,37 +982,27 @@ def build_routes(iface, **settings):
     except jinja2.exceptions.TemplateNotFound:
         log.error("Could not load template %s", template)
         return ""
-    opts6 = []
-    opts4 = []
-    for route in opts["routes"]:
-        ipaddr = route["ipaddr"]
-        if salt.utils.validate.net.ipv6_addr(ipaddr):
-            opts6.append(route)
-        else:
-            opts4.append(route)
-    log.debug("IPv4 routes:\n%s", opts4)
-    log.debug("IPv6 routes:\n%s", opts6)
+    log.debug("IP routes:\n%s", opts["routes"])
 
-    routecfg = template.render(routes=opts4, iface=iface)
-    routecfg6 = template.render(routes=opts6, iface=iface)
+    if iface == "routes":
+        routecfg = template.render(routes=opts["routes"])
+    else:
+        routecfg = template.render(routes=opts["routes"], iface=iface)
 
     if settings["test"]:
-        routes = _read_temp(routecfg)
-        routes.extend(_read_temp(routecfg6))
-        return routes
+        return _read_temp(routecfg)
 
-    _write_file_iface(iface, routecfg, _RH_NETWORK_SCRIPT_DIR, "route-{0}")
-    _write_file_iface(iface, routecfg6, _RH_NETWORK_SCRIPT_DIR, "route6-{0}")
+    if iface == "routes":
+        path = _SUSE_NETWORK_ROUTES_FILE
+    else:
+        path = os.path.join(_SUSE_NETWORK_SCRIPT_DIR, "ifroute-{0}".format(iface))
 
-    path = os.path.join(_RH_NETWORK_SCRIPT_DIR, "route-{0}".format(iface))
-    path6 = os.path.join(_RH_NETWORK_SCRIPT_DIR, "route6-{0}".format(iface))
+    _write_file_network(routecfg, path)
 
-    routes = _read_file(path)
-    routes.extend(_read_file(path6))
-    return routes
+    return _read_file(path)
 
 
-def down(iface, iface_type):
+def down(iface, iface_type=None):
     """
     Shutdown a network interface
 
@@ -1141,7 +1013,7 @@ def down(iface, iface_type):
         salt '*' ip.down eth0
     """
     # Slave devices are controlled by the master.
-    if iface_type.lower() not in ("slave", "teamport"):
+    if not iface_type or iface_type.lower() != "slave":
         return __salt__["cmd.run"]("ifdown {0}".format(iface))
     return None
 
@@ -1156,11 +1028,11 @@ def get_interface(iface):
 
         salt '*' ip.get_interface eth0
     """
-    path = os.path.join(_RH_NETWORK_SCRIPT_DIR, "ifcfg-{0}".format(iface))
+    path = os.path.join(_SUSE_NETWORK_SCRIPT_DIR, "ifcfg-{0}".format(iface))
     return _read_file(path)
 
 
-def up(iface, iface_type):  # pylint: disable=C0103
+def up(iface, iface_type=None):
     """
     Start up a network interface
 
@@ -1171,7 +1043,7 @@ def up(iface, iface_type):  # pylint: disable=C0103
         salt '*' ip.up eth0
     """
     # Slave devices are controlled by the master.
-    if iface_type.lower() not in ("slave", "teamport"):
+    if not iface_type or iface_type.lower() != "slave":
         return __salt__["cmd.run"]("ifup {0}".format(iface))
     return None
 
@@ -1186,11 +1058,11 @@ def get_routes(iface):
 
         salt '*' ip.get_routes eth0
     """
-    path = os.path.join(_RH_NETWORK_SCRIPT_DIR, "route-{0}".format(iface))
-    path6 = os.path.join(_RH_NETWORK_SCRIPT_DIR, "route6-{0}".format(iface))
-    routes = _read_file(path)
-    routes.extend(_read_file(path6))
-    return routes
+    if iface == "routes":
+        path = _SUSE_NETWORK_ROUTES_FILE
+    else:
+        path = os.path.join(_SUSE_NETWORK_SCRIPT_DIR, "ifroute-{0}".format(iface))
+    return _read_file(path)
 
 
 def get_network_settings():
@@ -1203,7 +1075,7 @@ def get_network_settings():
 
         salt '*' ip.get_network_settings
     """
-    return _read_file(_RH_NETWORK_FILE)
+    return _read_file(_SUSE_NETWORK_FILE)
 
 
 def apply_network_settings(**settings):
@@ -1241,7 +1113,7 @@ def apply_network_settings(**settings):
         )
         res = True
     else:
-        res = __salt__["service.restart"]("network")
+        res = __salt__["service.reload"]("network")
 
     return hostname_res and res
 
@@ -1257,7 +1129,7 @@ def build_network_settings(**settings):
         salt '*' ip.build_network_settings <settings>
     """
     # Read current configuration and store default values
-    current_network_settings = _parse_rh_config(_RH_NETWORK_FILE)
+    current_network_settings = _parse_suse_config(_SUSE_NETWORK_FILE)
 
     # Build settings
     opts = _parse_network_settings(settings, current_network_settings)
@@ -1272,6 +1144,8 @@ def build_network_settings(**settings):
         return _read_temp(network)
 
     # Write settings
-    _write_file_network(network, _RH_NETWORK_FILE)
+    _write_file_network(network, _SUSE_NETWORK_FILE)
 
-    return _read_file(_RH_NETWORK_FILE)
+    __salt__["cmd.run"]("netconfig update -f")
+
+    return _read_file(_SUSE_NETWORK_FILE)
