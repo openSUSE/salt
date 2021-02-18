@@ -17,7 +17,6 @@ import salt.syspaths
 import salt.utils.yaml
 from salt._compat import ElementTree as ET
 from salt.exceptions import CommandExecutionError, SaltInvocationError
-
 # pylint: disable=import-error
 from salt.ext.six.moves import range  # pylint: disable=redefined-builtin
 from tests.support.mixins import LoaderModuleMockMixin
@@ -2370,8 +2369,8 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
         )
 
         self.assertTrue(ret["definition"])
-        self.assertFalse(ret["disk"]["attached"])
-        self.assertFalse(ret["disk"]["detached"])
+        self.assertFalse(ret["disk"].get("attached"))
+        self.assertFalse(ret["disk"].get("detached"))
         self.assertEqual(
             [
                 {
