@@ -197,7 +197,7 @@ class Serial(object):
             def verylong_encoder(obj, context):
                 # Make sure we catch recursion here.
                 objid = id(obj)
-                if objid in context:
+                if objid in context and isinstance(obj, (dict, list, tuple)):
                     return '<Recursion on {} with id={}>'.format(type(obj).__name__, id(obj))
                 context.add(objid)
 
