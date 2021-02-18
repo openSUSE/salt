@@ -146,7 +146,8 @@ import salt.utils.yaml
 from salt._compat import ElementTree, ipaddress, saxutils
 from salt.exceptions import CommandExecutionError, SaltInvocationError
 from salt.ext import six
-from salt.ext.six.moves import range  # pylint: disable=import-error,redefined-builtin
+from salt.ext.six.moves import \
+    range  # pylint: disable=import-error,redefined-builtin
 from salt.ext.six.moves.urllib.parse import urlparse, urlunparse
 
 try:
@@ -3025,6 +3026,177 @@ def _diff_console_lists(old, new):
     return _diff_lists(old, new, _serial_or_concole_equal)
 
 
+def _almost_equal(current, new):
+    """
+    return True if the parameters are numbers that are almost
+    """
+    if current is None or new is None:
+        return False
+    return abs(current - new) / float(current) < 1e-03
+
+
+def _compute_device_changes(old_xml, new_xml, to_skip):
+    """
+    Compute the device changes between two domain XML definitions.
+    """
+    devices_node = old_xml.find("devices")
+    changes = {}
+    for dev_type in to_skip:
+        changes[dev_type] = {}
+        if not to_skip[dev_type]:
+            old = devices_node.findall(dev_type)
+            new = new_xml.findall("devices/{}".format(dev_type))
+            changes[dev_type] = globals()["_diff_{}_lists".format(dev_type)](old, new)
+    return changes
+
+
+def _update_live(domain, new_desc, mem, cpu, old_mem, old_cpu, to_skip, test):
+    """
+    Perform the live update of a domain.
+    """
+    status = {}
+    errors = []
+
+    if not domain.isActive():
+        return status, errors
+
+    # Do the live changes now that we know the definition has been properly set
+    # From that point on, failures are not blocking to try to live update as much
+    # as possible.
+    commands = []
+    if cpu and (isinstance(cpu, int) or isinstance(cpu, dict) and cpu.get("maximum")):
+        new_cpu = cpu.get("maximum") if isinstance(cpu, dict) else cpu
+        if old_cpu != new_cpu and new_cpu is not None:
+            commands.append(
+                {
+                    "device": "cpu",
+                    "cmd": "setVcpusFlags",
+                    "args": [new_cpu, libvirt.VIR_DOMAIN_AFFECT_LIVE],
+                }
+            )
+    if mem:
+        if isinstance(mem, dict):
+            # setMemoryFlags takes memory amount in KiB
+            new_mem = (
+                int(_handle_unit(mem.get("current")) / 1024)
+                if "current" in mem
+                else None
+            )
+        elif isinstance(mem, int):
+            new_mem = int(mem * 1024)
+
+        if not _almost_equal(old_mem, new_mem) and new_mem is not None:
+            commands.append(
+                {
+                    "device": "mem",
+                    "cmd": "setMemoryFlags",
+                    "args": [new_mem, libvirt.VIR_DOMAIN_AFFECT_LIVE],
+                }
+            )
+
+    # Compute the changes with the live definition
+    changes = _compute_device_changes(
+        ElementTree.fromstring(domain.XMLDesc(0)), new_desc, to_skip
+    )
+
+    # Look for removable device source changes
+    removable_changes = []
+    new_disks = []
+    for new_disk in changes["disk"].get("new", []):
+        device = new_disk.get("device", "disk")
+        if device not in ["cdrom", "floppy"]:
+            new_disks.append(new_disk)
+            continue
+
+        target_dev = new_disk.find("target").get("dev")
+        matching = [
+            old_disk
+            for old_disk in changes["disk"].get("deleted", [])
+            if old_disk.get("device", "disk") == device
+            and old_disk.find("target").get("dev") == target_dev
+        ]
+        if not matching:
+            new_disks.append(new_disk)
+        else:
+            # libvirt needs to keep the XML exactly as it was before
+            updated_disk = matching[0]
+            changes["disk"]["deleted"].remove(updated_disk)
+            removable_changes.append(updated_disk)
+            source_node = updated_disk.find("source")
+            new_source_node = new_disk.find("source")
+            source_file = (
+                new_source_node.get("file") if new_source_node is not None else None
+            )
+
+            updated_disk.set("type", "file")
+            # Detaching device
+            if source_node is not None:
+                updated_disk.remove(source_node)
+
+            # Attaching device
+            if source_file:
+                ElementTree.SubElement(
+                    updated_disk, "source", attrib={"file": source_file}
+                )
+
+    changes["disk"]["new"] = new_disks
+
+    for dev_type in ["disk", "interface", "hostdev"]:
+        for added in changes[dev_type].get("new", []):
+            commands.append(
+                {
+                    "device": dev_type,
+                    "cmd": "attachDevice",
+                    "args": [
+                        salt.utils.stringutils.to_str(ElementTree.tostring(added))
+                    ],
+                }
+            )
+
+        for removed in changes[dev_type].get("deleted", []):
+            commands.append(
+                {
+                    "device": dev_type,
+                    "cmd": "detachDevice",
+                    "args": [
+                        salt.utils.stringutils.to_str(ElementTree.tostring(removed))
+                    ],
+                }
+            )
+
+    for updated_disk in removable_changes:
+        commands.append(
+            {
+                "device": "disk",
+                "cmd": "updateDeviceFlags",
+                "args": [
+                    salt.utils.stringutils.to_str(ElementTree.tostring(updated_disk))
+                ],
+            }
+        )
+
+    for cmd in commands:
+        try:
+            ret = 0 if test else getattr(domain, cmd["cmd"])(*cmd["args"])
+            device_type = cmd["device"]
+            if device_type in ["cpu", "mem"]:
+                status[device_type] = not ret
+            else:
+                actions = {
+                    "attachDevice": "attached",
+                    "detachDevice": "detached",
+                    "updateDeviceFlags": "updated",
+                }
+                device_status = status.setdefault(device_type, {})
+                cmd_status = device_status.setdefault(actions[cmd["cmd"]], [])
+                cmd_status.append(cmd["args"][0])
+
+        except libvirt.libvirtError as err:
+            errors.append(six.text_type(err))
+
+    return status, errors
+
+
 def update(
     name,
     cpu=0,
@@ -3336,11 +3508,6 @@ def update(
 
     old_mem = int(_get_with_unit(desc.find("memory")) / 1024)
     old_cpu = int(desc.find("./vcpu").text)
-
-    def _almost_equal(current, new):
-        if current is None or new is None:
-            return False
-        return abs(current - new) / float(current) < 1e-03
 
     def _yesno_attribute(path, xpath, attr_name, ignored=None):
         return xmlutil.attribute(
@@ -3693,19 +3860,11 @@ def update(
         "console": _skip_update(["consoles"]),
         "hostdev": _skip_update(["host_devices"]),
     }
-    changes = {}
-    for dev_type in parameters:
-        changes[dev_type] = {}
-        func_locals = locals()
-        if [
-            param
-            for param in parameters[dev_type]
-            if func_locals.get(param, None) is not None
-        ]:
+    changes = _compute_device_changes(desc, new_desc, to_skip)
+    for dev_type in changes:
+        if not to_skip[dev_type]:
             old = devices_node.findall(dev_type)
-            new = new_desc.findall("devices/{}".format(dev_type))
-            changes[dev_type] = globals()["_diff_{}_lists".format(dev_type)](old, new)
-            if changes[dev_type]["deleted"] or changes[dev_type]["new"]:
+            if changes[dev_type].get("deleted") or changes[dev_type].get("new"):
                 for item in old:
                     devices_node.remove(item)
                 devices_node.extend(changes[dev_type]["sorted"])
@@ -3738,143 +3897,15 @@ def update(
             conn.close()
             raise err
 
-        # Do the live changes now that we know the definition has been properly set
-        # From that point on, failures are not blocking to try to live update as much
-        # as possible.
-        commands = []
-        removable_changes = []
-        if domain.isActive() and live:
-            if cpu and (
-                isinstance(cpu, int) or isinstance(cpu, dict) and cpu.get("maximum")
-            ):
-                new_cpu = cpu.get("maximum") if isinstance(cpu, dict) else cpu
-                if old_cpu != new_cpu and new_cpu is not None:
-                    commands.append(
-                        {
-                            "device": "cpu",
-                            "cmd": "setVcpusFlags",
-                            "args": [new_cpu, libvirt.VIR_DOMAIN_AFFECT_LIVE],
-                        }
-                    )
-            if mem:
-                if isinstance(mem, dict):
-                    # setMemoryFlags takes memory amount in KiB
-                    new_mem = (
-                        int(_handle_unit(mem.get("current")) / 1024)
-                        if "current" in mem
-                        else None
-                    )
-                elif isinstance(mem, int):
-                    new_mem = int(mem * 1024)
-
-                if not _almost_equal(old_mem, new_mem) and new_mem is not None:
-                    commands.append(
-                        {
-                            "device": "mem",
-                            "cmd": "setMemoryFlags",
-                            "args": [new_mem, libvirt.VIR_DOMAIN_AFFECT_LIVE],
-                        }
-                    )
-
-            # Look for removable device source changes
-            new_disks = []
-            for new_disk in changes["disk"].get("new", []):
-                device = new_disk.get("device", "disk")
-                if device not in ["cdrom", "floppy"]:
-                    new_disks.append(new_disk)
-                    continue
-
-                target_dev = new_disk.find("target").get("dev")
-                matching = [
-                    old_disk
-                    for old_disk in changes["disk"].get("deleted", [])
-                    if old_disk.get("device", "disk") == device
-                    and old_disk.find("target").get("dev") == target_dev
-                ]
-                if not matching:
-                    new_disks.append(new_disk)
-                else:
-                    # libvirt needs to keep the XML exactly as it was before
-                    updated_disk = matching[0]
-                    changes["disk"]["deleted"].remove(updated_disk)
-                    removable_changes.append(updated_disk)
-                    source_node = updated_disk.find("source")
-                    new_source_node = new_disk.find("source")
-                    source_file = (
-                        new_source_node.get("file")
-                        if new_source_node is not None
-                        else None
-                    )
-
-                    updated_disk.set("type", "file")
-                    # Detaching device
-                    if source_node is not None:
-                        updated_disk.remove(source_node)
-
-                    # Attaching device
-                    if source_file:
-                        ElementTree.SubElement(updated_disk, "source", file=source_file)
-
-            changes["disk"]["new"] = new_disks
-
-            for dev_type in ["disk", "interface"]:
-                for added in changes[dev_type].get("new", []):
-                    commands.append(
-                        {
-                            "device": dev_type,
-                            "cmd": "attachDevice",
-                            "args": [
-                                salt.utils.stringutils.to_str(
-                                    ElementTree.tostring(added)
-                                )
-                            ],
-                        }
-                    )
-
-                for removed in changes[dev_type].get("deleted", []):
-                    commands.append(
-                        {
-                            "device": dev_type,
-                            "cmd": "detachDevice",
-                            "args": [
-                                salt.utils.stringutils.to_str(
-                                    ElementTree.tostring(removed)
-                                )
-                            ],
-                        }
-                    )
-
-        for updated_disk in removable_changes:
-            commands.append(
-                {
-                    "device": "disk",
-                    "cmd": "updateDeviceFlags",
-                    "args": [
-                        salt.utils.stringutils.to_str(
-                            ElementTree.tostring(updated_disk)
-                        )
-                    ],
-                }
+        if live:
+            live_status, errors = _update_live(
+                domain, new_desc, mem, cpu, old_mem, old_cpu, to_skip, test
             )
-
-        for cmd in commands:
-            try:
-                ret = getattr(domain, cmd["cmd"])(*cmd["args"]) if not test else 0
-                device_type = cmd["device"]
-                if device_type in ["cpu", "mem"]:
-                    status[device_type] = not bool(ret)
-                else:
-                    actions = {
-                        "attachDevice": "attached",
-                        "detachDevice": "detached",
-                        "updateDeviceFlags": "updated",
-                    }
-                    status[device_type][actions[cmd["cmd"]]].append(cmd["args"][0])
-
-            except libvirt.libvirtError as err:
+            status.update(live_status)
+            if errors:
                 if "errors" not in status:
                     status["errors"] = []
-                status["errors"].append(six.text_type(err))
+                status["errors"] += errors
 
     conn.close()
     return status
