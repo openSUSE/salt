@@ -1594,7 +1594,7 @@ def _disk_profile(conn, profile, hypervisor, disks, vm_name):
                 disk["format"] = (
                     "qcow2" if disk.get("device", "disk") != "cdrom" else "raw"
                 )
-        elif disk.get("device", "disk") == "disk":
+        elif vm_name and disk.get("device", "disk") == "disk":
             _fill_disk_filename(conn, vm_name, disk, hypervisor, pool_caps)
 
     return disklist
