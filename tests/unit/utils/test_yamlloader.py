@@ -13,7 +13,7 @@ import salt.utils.files
 
 # Import 3rd-party libs
 from salt.ext import six
-from salt.utils.yamlloader import SaltYamlSafeLoader
+from salt.utils.yamlloader import SaltYamlSafeLoader, yaml
 from tests.support.mock import mock_open, patch
 
 # Import Salt Testing Libs
@@ -177,3 +177,7 @@ class YamlLoaderTestCase(TestCase):
             ),
             {"foo": {"b": {"foo": "bar", "one": 1, "list": [1, "two", 3]}}},
         )
+
+    def test_not_yaml_monkey_patching(self):
+        if hasattr(yaml, "CSafeLoader"):
+            assert yaml.SafeLoader != yaml.CSafeLoader
