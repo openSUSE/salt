@@ -10,13 +10,9 @@ import warnings
 import yaml  # pylint: disable=blacklisted-import
 from yaml.nodes import MappingNode, SequenceNode
 from yaml.constructor import ConstructorError
-try:
-    yaml.Loader = yaml.CLoader
-    yaml.Dumper = yaml.CDumper
-    yaml.SafeLoader = yaml.CSafeLoader
-    yaml.SafeDumper = yaml.CSafeDumper
-except Exception:  # pylint: disable=broad-except
-    pass
+
+# prefer C bindings over python when available
+BaseLoader = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 
 import salt.utils.stringutils
 
@@ -34,7 +30,7 @@ warnings.simplefilter('always', category=DuplicateKeyWarning)
 
 
 # with code integrated from https://gist.github.com/844388
-class SaltYamlSafeLoader(yaml.SafeLoader):
+class SaltYamlSafeLoader(BaseLoader):
     '''
     Create a custom YAML loader that uses the custom constructor. This allows
     for the YAML loading defaults to be manipulated based on needs within salt
