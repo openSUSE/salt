@@ -397,22 +397,33 @@ class SSH(object):
         :return:
         '''
 
-        hostname = self.opts.get('tgt', '')
-        if '@' in hostname:
-            user, hostname = hostname.split('@', 1)
-        else:
-            user = self.opts.get('ssh_user')
-        if hostname == '*':
-            hostname = ''
-
-        if salt.utils.network.is_reachable_host(hostname):
-            hostname = salt.utils.network.ip_to_host(hostname)
-            self.opts['tgt'] = hostname
-            self.targets[hostname] = {
-                'passwd': self.opts.get('ssh_passwd', ''),
-                'host': hostname,
-                'user': user,
-            }
+        hosts = self.opts.get('tgt', '')
+        if not isinstance(hosts, (list, tuple)):
+            hosts = list([hosts])
+        updated = False
+        _hosts = list()
+        for hostname in hosts:
+            if '@' in hostname:
+                user, hostname = hostname.split('@', 1)
+            else:
+                user = self.opts.get('ssh_user')
+            if hostname == '*':
+                hostname = ''
+            if salt.utils.network.is_reachable_host(hostname):
+                _hostname = hostname
+                hostname = salt.utils.network.ip_to_host(hostname)
+                if not hostname:
+                    log.warning("Unable to resolve hostname {}".format(_hostname))
+                    continue
+                _hosts.append(hostname)
+                self.targets[hostname] = {
+                    'passwd': self.opts.get('ssh_passwd', ''),
+                    'host': hostname,
+                    'user': user,
+                }
+                updated = True
+        if updated:
+            self.opts['tgt'] = _hosts
             if self.opts.get('ssh_update_roster'):
                 self._update_roster()
 
