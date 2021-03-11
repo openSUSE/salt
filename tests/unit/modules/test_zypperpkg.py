@@ -483,7 +483,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     zypper_mock.assert_any_call(
                         "dist-upgrade",
                         "--auto-agree-with-licenses",
-                        "--no-allow-vendor-change",
                     )
 
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
@@ -502,13 +501,11 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         "dist-upgrade",
                         "--auto-agree-with-licenses",
                         "--dry-run",
-                        "--no-allow-vendor-change",
                     )
                     zypper_mock.assert_any_call(
                         "dist-upgrade",
                         "--auto-agree-with-licenses",
                         "--dry-run",
-                        "--no-allow-vendor-change",
                     )
 
                 with patch(
@@ -562,7 +559,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         "Dummy",
                         "--from",
                         "Dummy2",
-                        "--no-allow-vendor-change",
                     )
                     zypper_mock.assert_any_call(
                         "dist-upgrade",
@@ -572,7 +568,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         "Dummy",
                         "--from",
                         "Dummy2",
-                        "--no-allow-vendor-change",
                         "--debug-solver",
                     )
 
@@ -603,7 +598,7 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     )
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
                     zypper_mock.assert_any_call('dist-upgrade', '--auto-agree-with-licenses', '--from', "Dummy",
-                                                '--from', 'Dummy2', '--no-allow-vendor-change')
+                                                '--from', 'Dummy2')
 
                 with patch(
                     "salt.modules.zypperpkg.list_pkgs",
@@ -682,7 +677,6 @@ Repository 'DUMMY' not found by its alias, number, or URI.
                     "--auto-agree-with-licenses",
                     "--from",
                     "DUMMY",
-                    "--no-allow-vendor-change",
                 )
 
     def test_upgrade_available(self):
