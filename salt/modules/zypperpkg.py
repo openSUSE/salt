@@ -222,21 +222,20 @@ class _Zypper(object):
     def pid(self):
         return self.__call_result.get('pid', '')
 
-    def calc_zypper(self):
+    def refresh_zypper_flags(self):
         try:
-            zypp_tmp = version('zypper')
+            zypp_version = version('zypper')
             # zypper version 1.11.34 in SLE12 update supports vendor change for only dist upgrade
-            if version_cmp(zypp_tmp, '1.11.34') >= 0 and version_cmp(zypp_tmp, '1.14.8') == -1:
+            if version_cmp(zypp_version, '1.11.34') >= 0:
                 # zypper version supports vendor change for dist upgrade
                 self.dup_avc = True
             # zypper version 1.14.8 in SLE15 update supports vendor change in install/patch/upgrading
-            if version_cmp(zypp_tmp, '1.14.8') >= 0:
+            if version_cmp(zypp_version, '1.14.8') >= 0:
                 self.inst_avc = True
             else:
                 log.error("Failed to compare Zypper version")
         except Exception as ex:
-            log.error("Unable to get Zypper version")
-            log.error(ex)
+            log.error("Unable to get Zypper version: {}".format(ex))
 
     def _is_error(self):
         '''
@@ -1435,7 +1434,6 @@ def install(name=None,
     skip_verify
         Skip the GPG verification check (e.g., ``--no-gpg-checks``)
 
-
     novendorchange
         Disallow vendor change
 
@@ -1590,7 +1588,7 @@ def install(name=None,
     cmd_install.append(kwargs.get('resolve_capabilities') and '--capability' or '--name')
     # Install / patching / upgrade with vendor change support is only in SLE 15+  opensuse Leap 15+
     if not novendorchange:
-        __zypper__(root=root).calc_zypper()
+        __zypper__(root=root).refresh_zypper_flags()
         if __zypper__(root=root).inst_avc:
             cmd_install.append("--allow-vendor-change")
             log.info("Enabling vendor changes")
@@ -1608,6 +1606,7 @@ def install(name=None,
         cmd_install.extend(fromrepoopt)
     if no_recommends:
         cmd_install.append('--no-recommends')
+
     errors = []
 
     # Split the targets into batches of 500 packages each, so that
@@ -1733,11 +1732,10 @@ def upgrade(refresh=True,
             cmd_update.extend(['--from' if dist_upgrade else '--repo', repo])
         log.info('Targeting repos: %s', fromrepo)
 
-    # TODO: Grains validation should be moved to Zypper class
     if not novendorchange:
-        __zypper__(root=root).calc_zypper()
+        __zypper__(root=root).refresh_zypper_flags()
         if dist_upgrade:
-            if __zypper__(root=root).inst_avc or __zypper__(root=root).dup_avc:
+            if __zypper__(root=root).dup_avc:
                 cmd_update.append("--allow-vendor-change")
                 log.info("Enabling vendor changes")
             else:
