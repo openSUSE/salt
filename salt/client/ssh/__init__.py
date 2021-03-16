@@ -325,7 +325,7 @@ class SSH:
         if not self.opts.get("ssh_cli_tgt"):
             self.opts["ssh_cli_tgt"] = self.opts.get("tgt", "")
         hostname = self.opts.get("ssh_cli_tgt", "")
-        if "@" in hostname:
+        if isinstance(hostname, str) and "@" in hostname:
             user, hostname = hostname.split("@", 1)
         else:
             user = self.opts.get("ssh_user")
@@ -409,20 +409,28 @@ class SSH:
         Uptade targets in case hostname was directly passed without the roster.
         :return:
         """
-        hostname = self.parse_tgt["hostname"]
+        hosts = self.parse_tgt["hostname"]
         user = self.parse_tgt["user"]
-        if hostname == "*":
-            hostname = ""
 
-        if salt.utils.network.is_reachable_host(hostname):
-            self.opts["tgt"] = hostname
-            self.targets[hostname] = {
-                "passwd": self.opts.get("ssh_passwd", ""),
-                "host": hostname,
-                "user": user,
-            }
-            if self.opts.get("ssh_update_roster"):
-                self._update_roster()
+        if not isinstance(hosts, (list, tuple)):
+            hosts = list([hosts])
+        updated = False
+        _hosts = list()
+        for hostname in hosts:
+            if hostname == "*":
+                hostname = ""
+
+            if salt.utils.network.is_reachable_host(hostname):
+                _hosts.append(hostname)
+                self.targets[hostname] = {
+                    "passwd": self.opts.get("ssh_passwd", ""),
+                    "host": hostname,
+                    "user": user,
+                }
+                updated = True
+        if updated and self.opts.get("ssh_update_roster"):
+            self.opts["tgt"] = _hosts
+            self._update_roster()
 
     def get_pubkey(self):
         """
