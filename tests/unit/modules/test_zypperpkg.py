@@ -644,7 +644,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     zypper_mock.assert_any_call(
                         "dist-upgrade",
                         "--auto-agree-with-licenses",
-                        "--no-allow-vendor-change",
                     )
 
                 with patch(
@@ -691,46 +690,80 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         "dist-upgrade",
                         "--auto-agree-with-licenses",
                         "--dry-run",
-                        "--no-allow-vendor-change",
                     )
                     zypper_mock.assert_any_call(
                         "dist-upgrade",
                         "--auto-agree-with-licenses",
                         "--dry-run",
-                        "--no-allow-vendor-change",
                     )
 
                 with patch(
                     "salt.modules.zypperpkg.list_pkgs",
-                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}]),
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
                 ):
-                    ret = zypper.upgrade(
-                        dist_upgrade=True,
-                        dryrun=True,
-                        fromrepo=["Dummy", "Dummy2"],
-                        novendorchange=False,
-                    )
-                    zypper_mock.assert_any_call(
-                        "dist-upgrade",
-                        "--auto-agree-with-licenses",
-                        "--dry-run",
-                        "--from",
-                        "Dummy",
-                        "--from",
-                        "Dummy2",
-                        "--allow-vendor-change",
-                    )
-                    zypper_mock.assert_any_call(
-                        "dist-upgrade",
-                        "--auto-agree-with-licenses",
-                        "--dry-run",
-                        "--from",
-                        "Dummy",
-                        "--from",
-                        "Dummy2",
-                        "--allow-vendor-change",
-                        "--debug-solver",
-                    )
+                    with patch.dict(zypper.__salt__,
+                                    {'pkg_resource.version': MagicMock(return_value='1.15'),
+                                     'lowpkg.version_cmp': MagicMock(return_value=1)}):
+                        ret = zypper.upgrade(
+                            dist_upgrade=True,
+                            dryrun=True,
+                            fromrepo=["Dummy", "Dummy2"],
+                            novendorchange=False,
+                        )
+                        zypper_mock.assert_any_call(
+                            "dist-upgrade",
+                            "--auto-agree-with-licenses",
+                            "--dry-run",
+                            "--from",
+                            "Dummy",
+                            "--from",
+                            "Dummy2",
+                            "--allow-vendor-change",
+                        )
+                        zypper_mock.assert_any_call(
+                            "dist-upgrade",
+                            "--auto-agree-with-licenses",
+                            "--dry-run",
+                            "--from",
+                            "Dummy",
+                            "--from",
+                            "Dummy2",
+                            "--allow-vendor-change",
+                            "--debug-solver",
+                        )
+
+                with patch(
+                    "salt.modules.zypperpkg.list_pkgs",
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
+                ):
+                    with patch.dict(zypper.__salt__,
+                                    {'pkg_resource.version': MagicMock(return_value='1.11'),
+                                     'lowpkg.version_cmp': MagicMock(return_value=1)}):
+                        ret = zypper.upgrade(
+                            dist_upgrade=True,
+                            dryrun=True,
+                            fromrepo=["Dummy", "Dummy2"],
+                            novendorchange=False,
+                        )
+                        zypper_mock.assert_any_call(
+                            "dist-upgrade",
+                            "--auto-agree-with-licenses",
+                            "--dry-run",
+                            "--from",
+                            "Dummy",
+                            "--from",
+                            "Dummy2",
+                        )
+                        zypper_mock.assert_any_call(
+                            "dist-upgrade",
+                            "--auto-agree-with-licenses",
+                            "--dry-run",
+                            "--from",
+                            "Dummy",
+                            "--from",
+                            "Dummy2",
+                            "--debug-solver",
+                        )
 
                 with patch(
                     "salt.modules.zypperpkg.list_pkgs",
@@ -750,7 +783,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         "Dummy",
                         "--from",
                         "Dummy2",
-                        "--no-allow-vendor-change",
                     )
                     zypper_mock.assert_any_call(
                         "dist-upgrade",
@@ -760,7 +792,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         "Dummy",
                         "--from",
                         "Dummy2",
-                        "--no-allow-vendor-change",
                         "--debug-solver",
                     )
 
@@ -797,7 +828,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         "Dummy",
                         "--from",
                         "Dummy2",
-                        "--no-allow-vendor-change",
                     )
 
                 with patch(
@@ -911,7 +941,6 @@ Repository 'DUMMY' not found by its alias, number, or URI.
                     "--auto-agree-with-licenses",
                     "--from",
                     "DUMMY",
-                    "--no-allow-vendor-change",
                 )
 
     def test_upgrade_available(self):

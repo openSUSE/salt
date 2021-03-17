@@ -105,6 +105,10 @@ class _Zypper:
     ZYPPER_LOCK = "/var/run/zypp.pid"
     TAG_RELEASED = "zypper/released"
     TAG_BLOCKED = "zypper/blocked"
+    # Dist upgrade vendor change support (SLE12+)
+    dup_avc = False
+    # Install/Patch/Upgrade vendor change support (SLE15+)
+    inst_avc = False
 
     def __init__(self):
         """
@@ -217,6 +221,21 @@ class _Zypper:
     @property
     def pid(self):
         return self.__call_result.get("pid", "")
+
+    def refresh_zypper_flags(self):
+        try:
+            zypp_version = version('zypper')
+            # zypper version 1.11.34 in SLE12 update supports vendor change for only dist upgrade
+            if version_cmp(zypp_version, '1.11.34') >= 0:
+                # zypper version supports vendor change for dist upgrade
+                self.dup_avc = True
+            # zypper version 1.14.8 in SLE15 update supports vendor change in install/patch/upgrading
+            if version_cmp(zypp_version, '1.14.8') >= 0:
+                self.inst_avc = True
+            else:
+                log.error("Failed to compare Zypper version")
+        except Exception as ex:
+            log.error("Unable to get Zypper version: {}".format(ex))
 
     def _is_error(self):
         """
@@ -1431,6 +1450,7 @@ def install(
     no_recommends=False,
     root=None,
     inclusion_detection=False,
+    novendorchange=True,
     **kwargs
 ):
     """
@@ -1477,6 +1497,9 @@ def install(
 
     skip_verify
         Skip the GPG verification check (e.g., ``--no-gpg-checks``)
+
+    novendorchange
+        Disallow vendor change
 
     version
         Can be either a version number, or the combination of a comparison
@@ -1638,6 +1661,15 @@ def install(
     cmd_install.append(
         kwargs.get("resolve_capabilities") and "--capability" or "--name"
     )
+    # Install / patching / upgrade with vendor change support is only in SLE 15+  opensuse Leap 15+
+    if not novendorchange:
+        __zypper__(root=root).refresh_zypper_flags()
+        if __zypper__(root=root).inst_avc:
+            cmd_install.append("--allow-vendor-change")
+            log.info("Enabling vendor changes")
+        else:
+            log.warning("Enabling/Disabling vendor changes is not supported on this Zypper version")
+
 
     if not refresh:
         cmd_install.insert(0, "--no-refresh")
@@ -1793,19 +1825,25 @@ def upgrade(
             cmd_update.extend(["--from" if dist_upgrade else "--repo", repo])
         log.info("Targeting repos: %s", fromrepo)
 
-    if dist_upgrade:
-        # TODO: Grains validation should be moved to Zypper class
-        if __grains__["osrelease_info"][0] > 11:
-            if novendorchange:
-                cmd_update.append("--no-allow-vendor-change")
-                log.info("Disabling vendor changes")
-            else:
+    if not novendorchange:
+        __zypper__(root=root).refresh_zypper_flags()
+        if dist_upgrade:
+            if __zypper__(root=root).dup_avc:
                 cmd_update.append("--allow-vendor-change")
                 log.info("Enabling vendor changes")
+            else:
+                log.warning(
+                    "Enabling/Disabling vendor changes is not supported on this Zypper version"
+                )
         else:
-            log.warning(
-                "Enabling/Disabling vendor changes is not supported on this Zypper version"
-            )
+            # Install / patching / upgrade with vendor change support is only in SLE 15+  opensuse Leap 15+
+            if __zypper__(root=root).inst_avc:
+                cmd_update.append("--allow-vendor-change")
+                log.info("Enabling vendor changes")
+            else:
+                log.warning(
+                    "Enabling/Disabling vendor changes is not supported on this Zypper version"
+                 )
 
         if no_recommends:
             cmd_update.append("--no-recommends")
