@@ -376,7 +376,7 @@ class SSH:
                             self.__parsed_rosters[self.ROSTER_UPDATE_FLAG] = False
                             return
 
-    def _update_roster(self):
+    def _update_roster(self, hostname=None, user=None):
         """
         Update default flat roster with the passed in information.
         :return:
@@ -391,8 +391,8 @@ class SSH:
                         "\n    passwd: {passwd}\n".format(
                             s_user=getpass.getuser(),
                             s_time=datetime.datetime.utcnow().isoformat(),
-                            hostname=self.opts.get("tgt", ""),
-                            user=self.opts.get("ssh_user", ""),
+                            hostname=hostname if hostname else self.opts.get("tgt", ""),
+                            user=user if user else self.opts.get("ssh_user", ""),
                             passwd=self.opts.get("ssh_passwd", ""),
                         )
                     )
@@ -414,23 +414,29 @@ class SSH:
 
         if not isinstance(hosts, (list, tuple)):
             hosts = list([hosts])
-        updated = False
         _hosts = list()
         for hostname in hosts:
+            _user = user
+            if "@" in hostname:
+                _user, hostname = hostname.split("@", 1)
             if hostname == "*":
-                hostname = ""
-
+                continue
             if salt.utils.network.is_reachable_host(hostname):
                 _hosts.append(hostname)
                 self.targets[hostname] = {
                     "passwd": self.opts.get("ssh_passwd", ""),
                     "host": hostname,
-                    "user": user,
+                    "user": _user,
                 }
-                updated = True
-        if updated and self.opts.get("ssh_update_roster"):
+                if self.opts.get("ssh_update_roster"):
+                    self._update_roster(hostname=hostname, user=_user)
+
+        if self.tgt_type == "list":
             self.opts["tgt"] = _hosts
-            self._update_roster()
+        elif _hosts:
+            self.opts["tgt"] = _hosts[0]
+        else:
+            self.opts["tgt"] = ""
 
     def get_pubkey(self):
         """
