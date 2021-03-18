@@ -30,7 +30,6 @@ def get_roster_file(options):
     # from Salt API. In that case no way to define own 'roster_file', instead
     # this file needs to be chosen from already validated rosters
     # (see /etc/salt/master config).
-    skip_roster_file = False
     if options.get('__disable_custom_roster') and options.get('roster_file'):
         roster = options.get('roster_file').strip('/')
         for roster_location in options.get('rosters'):
@@ -38,10 +37,9 @@ def get_roster_file(options):
             if os.path.isfile(r_file):
                 template = r_file
                 break
-        skip_roster_file = True
 
     if not template:
-        if options.get('roster_file') and not skip_roster_file:
+        if options.get('roster_file'):
             template = options.get('roster_file')
         elif 'config_dir' in options.get('__master_opts__', {}):
             template = os.path.join(options['__master_opts__']['config_dir'],
