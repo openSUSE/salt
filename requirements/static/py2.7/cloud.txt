@@ -104,7 +104,7 @@ impacket==0.9.19 ; python_version < "3.0"
 ipaddress==1.0.22         # via cryptography
 isodate==0.6.0            # via msrest
 itsdangerous==1.1.0       # via flask
-jinja2==2.10.1            # via flask
+jinja2==2.11.3            # via flask
 ldap3==2.5.1              # via impacket, ldapdomaindump
 ldapdomaindump==0.9.1     # via impacket
 markupsafe==1.1.1         # via jinja2
