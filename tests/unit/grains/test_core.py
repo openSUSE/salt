@@ -628,6 +628,26 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
         }
         self._run_os_grains_tests("astralinuxce-2.12.22", _os_release_map, expectation)
 
+    @skipIf(not salt.utils.platform.is_linux(), 'System is not Linux')
+    def test_aliyunlinux2_os_grains(self):
+        '''
+        Test if OS grains are parsed correctly in Alibaba Cloud Linux (Aliyun Linux) 2.1903 LTS
+        '''
+        _os_release_map = {
+            'linux_distribution': ('Alibaba Cloud Linux (Aliyun Linux)', '2.1903', 'Alibaba Cloud Linux (Aliyun Linux) 2.1903 LTS (Hunting Beagle)'),
+        }
+        expectation = {
+            'os': 'Alibaba Cloud (Aliyun)',
+            'os_family': 'RedHat',
+            'oscodename': 'Alibaba Cloud Linux (Aliyun Linux) 2.1903 LTS (Hunting Beagle)',
+            'osfullname': 'Alibaba Cloud Linux (Aliyun Linux)',
+            'osrelease': '2.1903',
+            'osrelease_info': (2, 1903),
+            'osmajorrelease': 2,
+            'osfinger': 'Alibaba Cloud Linux (Aliyun Linux)-2',
+        }
+        self._run_os_grains_tests(None, _os_release_map, expectation)
+
     @skipIf(not salt.utils.platform.is_windows(), 'System is not Windows')
     def test_windows_platform_data(self):
         '''

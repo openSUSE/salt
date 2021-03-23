@@ -1467,6 +1467,7 @@ _OS_NAME_MAP = {
     'slesexpand': 'RES',
     'linuxmint': 'Mint',
     'neon': 'KDE neon',
+    'alibaba': 'Alibaba Cloud (Aliyun)',
 }
 
 # Map the 'os' grain to the 'os_family' grain
@@ -1540,6 +1541,7 @@ _OS_FAMILY_MAP = {
     'AIX': 'AIX',
     'TurnKey': 'Debian',
     'AstraLinuxCE': 'Debian',
+    'Alibaba Cloud (Aliyun)': 'RedHat',
 }
 
 # Matches any possible format:
