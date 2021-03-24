@@ -569,6 +569,27 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
         self._run_os_grains_tests("debian-9", _os_release_map, expectation)
 
     @skipIf(not salt.utils.platform.is_linux(), 'System is not Linux')
+    def test_almalinux_8_os_grains(self):
+        '''
+        Test if OS grains are parsed correctly in AlmaLinux 8
+        '''
+        _os_release_map = {
+            'linux_distribution': ('AlmaLinux', '8.3', 'Purple Manul'),
+        }
+
+        expectation = {
+            'os': 'AlmaLinux',
+            'os_family': 'RedHat',
+            'oscodename': 'Purple Manul',
+            'osfullname': 'AlmaLinux',
+            'osrelease': '8.3',
+            'osrelease_info': (8, 3,),
+            'osmajorrelease': 8,
+            'osfinger': 'AlmaLinux-8',
+        }
+        self._run_os_grains_tests(None, _os_release_map, expectation)
+
+    @skipIf(not salt.utils.platform.is_linux(), 'System is not Linux')
     def test_ubuntu_xenial_os_grains(self):
         '''
         Test if OS grains are parsed correctly in Ubuntu 16.04 "Xenial Xerus"
