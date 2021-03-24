@@ -762,7 +762,7 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
         Test if OS grains are parsed correctly in Astra Linux CE 2.12.22 "orel"
         """
         _os_release_map = {
-            "linux_distribution": ("AstraLinuxCE", "2.12.22", "orel"),
+            "_linux_distribution": ("AstraLinuxCE", "2.12.22", "orel"),
         }
         expectation = {
             "os": "AstraLinuxCE",
@@ -782,7 +782,7 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
         Test if OS grains are parsed correctly in Alibaba Cloud Linux (Aliyun Linux) 2.1903 LTS
         '''
         _os_release_map = {
-            'linux_distribution': ('Alibaba Cloud Linux (Aliyun Linux)', '2.1903', 'Alibaba Cloud Linux (Aliyun Linux) 2.1903 LTS (Hunting Beagle)'),
+            '_linux_distribution': ('Alibaba Cloud Linux (Aliyun Linux)', '2.1903', 'Alibaba Cloud Linux (Aliyun Linux) 2.1903 LTS (Hunting Beagle)'),
         }
         expectation = {
             'os': 'Alibaba Cloud (Aliyun)',
