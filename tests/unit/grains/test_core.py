@@ -574,13 +574,13 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
         Test if OS grains are parsed correctly in AlmaLinux 8
         '''
         _os_release_map = {
-            'linux_distribution': ('almaLinux', '8.3', ''),
+            'linux_distribution': ('AlmaLinux', '8.3', 'Purple Manul'),
         }
 
         expectation = {
             'os': 'AlmaLinux',
             'os_family': 'RedHat',
-            'oscodename': 'AlmaLinux 8',
+            'oscodename': 'Purple Manul',
             'osfullname': 'AlmaLinux',
             'osrelease': '8.3',
             'osrelease_info': (8, 3,),
