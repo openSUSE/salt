@@ -213,6 +213,20 @@ class AsyncZeroMQReqChannel(salt.transport.client.ReqChannel):
                                                         kwargs={'io_loop': self._io_loop})
         self._closing = False
 
+    @classmethod
+    def force_close_all_instances(cls):
+        """
+        Will force close all instances
+
+        ZMQ can hang on quit if left to deconstruct on its own.
+        This because is deconstructs out of order.
+
+        :return: None
+        """
+        for weak_dict in list(cls.instance_map.values()):
+            for instance in list(weak_dict.values()):
+                instance.close()
+
     def close(self):
         '''
         Since the message_client creates sockets and assigns them to the IOLoop we have to
