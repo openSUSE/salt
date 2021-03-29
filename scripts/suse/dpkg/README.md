@@ -1,6 +1,6 @@
 ## What it is
 
-Debian base package to notify instalation of new packages outside the control of uyuni/suse manager
+Debian base package to notify installation of new packages outside the control of salt.
 
 ## Installation
 This script depends on python package, so python3 should be installed on the machine
