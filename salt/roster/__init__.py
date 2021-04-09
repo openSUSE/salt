@@ -37,7 +37,6 @@ def get_roster_file(options):
             if os.path.isfile(r_file):
                 template = r_file
                 break
-        del options['roster_file']
 
     if not template:
         if options.get('roster_file'):
