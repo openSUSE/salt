@@ -426,8 +426,6 @@ class SSH(object):
             self.opts["tgt"] = _hosts
         elif _hosts:
             self.opts["tgt"] = _hosts[0]
-        else:
-            self.opts["tgt"] = ""
 
     def get_pubkey(self):
         '''
