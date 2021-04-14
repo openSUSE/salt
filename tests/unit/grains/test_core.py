@@ -663,7 +663,7 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
                 "ID": "alinux",
                 "ANSI_COLOR": "0;31",
             },
-            "_linux_distribution": ("alinux", "2.1903", "LTS"),
+            "linux_distribution": ("alinux", "2.1903", "LTS"),
         }
 
         expectation = {
