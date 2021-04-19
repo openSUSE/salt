@@ -355,9 +355,11 @@ class _Zypper(object):
             if self.__systemd_scope:
                 cmd.extend(['systemd-run', '--scope'])
             cmd.extend(self.__cmd)
+            log.error("j**************************8")
+            log.error(cmd)
             if self.avc:
                 for i in ["install", "upgrade", "dist-upgrade"]:
-                    if cmd.index(i):
+                    if i in cmd:
                         cmd.insert(cmd(index) + 1, "--allow-vendor-change")
             log.debug("Calling Zypper: %s", ' '.join(cmd))
             self.__call_result = __salt__['cmd.run_all'](cmd, **kwargs)
