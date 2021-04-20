@@ -66,16 +66,12 @@ class AnsibleRosterTestCase(TestCase, mixins.LoaderModuleMockMixin):
         delattr(cls, 'opts')
 
     def setup_loader_modules(self):
-        opts = salt.config.master_config(os.path.join(RUNTIME_VARS.TMP_CONF_DIR, 'master'))
-        utils = salt.loader.utils(opts, whitelist=['json', 'stringutils'])
-        runner = salt.loader.runner(opts, utils=utils, whitelist=['salt'])
-        return {
-            ansible: {
-                '__utils__': utils,
-                '__opts__': {},
-                '__runner__': runner
-            }
-        }
+        opts = salt.config.master_config(
+            os.path.join(RUNTIME_VARS.TMP_CONF_DIR, "master")
+        )
+        utils = salt.loader.utils(opts, whitelist=["json", "stringutils", "ansible"])
+        runner = salt.loader.runner(opts, utils=utils, whitelist=["salt"])
+        return {ansible: {"__utils__": utils, "__opts__": {}, "__runner__": runner}}
 
     def test_ini(self):
         self.opts['roster_file'] = os.path.join(self.roster_dir, 'roster.ini')
