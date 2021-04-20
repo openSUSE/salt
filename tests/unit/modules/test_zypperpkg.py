@@ -569,7 +569,7 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                             "Dummy",
                             "--from",
                             "Dummy2",
-                        
+                        )
 
     def test_upgrade_success(self):
         '''
