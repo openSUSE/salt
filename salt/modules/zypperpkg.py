@@ -355,8 +355,6 @@ class _Zypper(object):
             if self.__systemd_scope:
                 cmd.extend(['systemd-run', '--scope'])
             cmd.extend(self.__cmd)
-            log.error("j**************************8")
-            log.error(cmd)
             if self.avc:
                 for i in ["install", "upgrade", "dist-upgrade"]:
                     if i in cmd:
