@@ -180,9 +180,21 @@ def playbooks(name, rundir=None, git_repo=None, git_kwargs=None, ansible_kwargs=
         log.debug('Setting ansible_kwargs to empty dict: %s', ansible_kwargs)
         ansible_kwargs = {}
     if __opts__["test"]:
-        checks = __salt__["ansible.playbooks"](name, rundir=rundir, check=True, diff=True, **ansible_kwargs)
-        if all(not check["changed"] and not check["failures"] and not check["unreachable"] and not check["skipped"] for check in six.itervalues(checks["stats"])):
-            ret["comment"] = "No changes to be made from playbook {0}".format(name)
+        checks = __salt__["ansible.playbooks"](
+            name, rundir=rundir, check=True, diff=True, **ansible_kwargs
+        )
+        if "stats" not in checks:
+            ret["comment"] = checks.get("stderr", checks)
+            ret["result"] = False
+            ret["changes"] = {}
+        elif all(
+            not check["changed"]
+            and not check["failures"]
+            and not check["unreachable"]
+            and not check["skipped"]
+            for check in checks["stats"].values()
+        ):
+            ret["comment"] = "No changes to be made from playbook {}".format(name)
             ret["result"] = True
         elif any(check["changed"] and not check["failures"] and not check["unreachable"] and not check["skipped"] for check in six.itervalues(checks["stats"])):
             ret["comment"] = "Changes will be made from playbook {0}".format(name)
@@ -193,9 +205,21 @@ def playbooks(name, rundir=None, git_repo=None, git_kwargs=None, ansible_kwargs=
             ret["result"] = False
             ret["changes"] = _changes(checks)
     else:
-        results = __salt__["ansible.playbooks"](name, rundir=rundir, diff=True, **ansible_kwargs)
-        if all(not check["changed"] and not check["failures"] and not check["unreachable"] and not check["skipped"] for check in six.itervalues(results["stats"])):
-            ret["comment"] = "No changes to be made from playbook {0}".format(name)
+        results = __salt__["ansible.playbooks"](
+            name, rundir=rundir, diff=True, **ansible_kwargs
+        )
+        if "stats" not in results:
+            ret["comment"] = results.get("stderr", results)
+            ret["result"] = False
+            ret["changes"] = {}
+        elif all(
+            not check["changed"]
+            and not check["failures"]
+            and not check["unreachable"]
+            and not check["skipped"]
+            for check in results["stats"].values()
+        ):
+            ret["comment"] = "No changes to be made from playbook {}".format(name)
             ret["result"] = True
             ret["changes"] = _changes(results)
         else:
