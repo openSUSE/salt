@@ -19,6 +19,7 @@ import logging
 import os
 import time
 import difflib
+import subprocess
 try:
     from pwd import getpwuid
     HAS_PWD = True
@@ -520,7 +521,12 @@ def _is_text_file(filename):
     '''
     Checks if a file is a text file
     '''
-    type_of_file = os.popen('file -bi {0}'.format(filename), 'r').read()
+    type_of_file = subprocess.run(
+        ["file", "-bi", filename],
+        check=False,
+        stdout=subprocess.PIPE,
+        universal_newlines=True,
+    ).stdout
     return type_of_file.startswith('text')
 
 
