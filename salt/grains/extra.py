@@ -89,10 +89,10 @@ def suse_backported_capabilities():
     }
 
 
-def __secure_boot():
+def __secure_boot(efivars_dir):
     """Detect if secure-boot is enabled."""
     enabled = False
-    sboot = glob.glob("/sys/firmware/efi/vars/SecureBoot-*/data")
+    sboot = glob.glob(os.path.join(efivars_dir, "SecureBoot-*/data"))
     if len(sboot) == 1:
         # The minion is usually running as a privileged user, but is
         # not the case for the master.  Seems that the master can also
@@ -107,9 +107,17 @@ def __secure_boot():
 
 def uefi():
     """Populate UEFI grains."""
+    efivars_dir = next(
+        iter(
+            filter(
+                os.path.exists, ["/sys/firmware/efi/efivars", "/sys/firmware/efi/vars"]
+            )
+        ),
+        None,
+    )
     grains = {
-        "efi": os.path.exists("/sys/firmware/efi/systab"),
-        "efi-secure-boot": __secure_boot(),
+        "efi": bool(efivars_dir),
+        "efi-secure-boot": __secure_boot(efivars_dir) if efivars_dir else False,
     }
 
     return grains
