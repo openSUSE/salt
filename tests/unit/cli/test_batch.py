@@ -13,6 +13,8 @@ from salt.cli.batch import Batch
 from tests.support.unit import TestCase
 from tests.support.mock import MagicMock, patch
 
+from salt.cli.batch import batch_get_opts
+
 
 class BatchTestCase(TestCase):
     '''
@@ -134,3 +136,50 @@ class BatchTestCase(TestCase):
             verbose=False,
             gather_job_timeout=5,
         )
+
+    def test_batch_presence_ping(self):
+        '''
+        Tests passing batch_presence_ping_timeout and batch_presence_ping_gather_job_timeout
+        '''
+        ret = batch_get_opts('', 'test.ping', '2', {},
+                             timeout=20, gather_job_timeout=120)
+        self.assertEqual(ret['batch_presence_ping_timeout'], 20)
+        self.assertEqual(ret['batch_presence_ping_gather_job_timeout'], 120)
+        ret = batch_get_opts('', 'test.ping', '2', {},
+                             timeout=20, gather_job_timeout=120,
+                             batch_presence_ping_timeout=4,
+                             batch_presence_ping_gather_job_timeout=360)
+        self.assertEqual(ret['batch_presence_ping_timeout'], 4)
+        self.assertEqual(ret['batch_presence_ping_gather_job_timeout'], 360)
+
+    def test_gather_minions_with_batch_presence_ping(self):
+        '''
+        Tests __gather_minions with batch_presence_ping options
+        '''
+        opts_no_pp   = {'batch': '2',
+                        'conf_file': {},
+                        'tgt': '',
+                        'transport': '',
+                        'timeout': 5,
+                        'gather_job_timeout': 20}
+        opts_with_pp = {'batch': '2',
+                        'conf_file': {},
+                        'tgt': '',
+                        'transport': '',
+                        'timeout': 5,
+                        'gather_job_timeout': 20,
+                        'batch_presence_ping_timeout': 3,
+                        'batch_presence_ping_gather_job_timeout': 4}
+        mock_client = MagicMock()
+        with patch('salt.client.get_local_client', MagicMock(return_value=mock_client)):
+            with patch('salt.client.LocalClient.cmd_iter', MagicMock(return_value=[])):
+                Batch(opts_no_pp)
+                Batch(opts_with_pp)
+        self.assertEqual(mock_client.mock_calls[0][1][3],
+                         opts_no_pp['timeout'])
+        self.assertEqual(mock_client.mock_calls[0][2]['gather_job_timeout'],
+                         opts_no_pp['gather_job_timeout'])
+        self.assertEqual(mock_client.mock_calls[2][1][3],
+                         opts_with_pp['batch_presence_ping_timeout'])
+        self.assertEqual(mock_client.mock_calls[2][2]['gather_job_timeout'],
+                         opts_with_pp['batch_presence_ping_gather_job_timeout'])
