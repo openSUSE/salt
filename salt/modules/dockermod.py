@@ -217,7 +217,6 @@ import pipes
 import re
 import shutil
 import string
-import sys
 import time
 import uuid
 import subprocess
@@ -6740,28 +6739,67 @@ def call(name, function, *args, **kwargs):
     )
     ret = copy_to(name, thin_path, os.path.join(thin_dest_path, os.path.basename(thin_path)))
 
+    # figure out available python interpreter inside the container
+    pycmds = (
+        "python3",
+        "/usr/libexec/platform-python",
+        "python27",
+        "python2.7",
+        "python26",
+        "python2.6",
+        "python2",
+        "python",
+    )
+    container_python_bin = None
+    for py_cmd in pycmds:
+        cmd = [py_cmd] + ["--version"]
+        ret = run_all(name, subprocess.list2cmdline(cmd))
+        if ret["retcode"] == 0:
+            container_python_bin = py_cmd
+            break
+    if not container_python_bin:
+        raise CommandExecutionError(
+            "Python interpreter cannot be found inside the container. Make sure Python is installed in the container"
+        )
+
     # untar archive
-    untar_cmd = ["python", "-c", (
-                     "import tarfile; "
-                     "tarfile.open(\"{0}/{1}\").extractall(path=\"{0}\")"
-                 ).format(thin_dest_path, os.path.basename(thin_path))]
+    untar_cmd = [
+        container_python_bin,
+        "-c",
+        "import tarfile; "
+        'tarfile.open("{0}/{1}").extractall(path="{0}")'.format(
+            thin_dest_path, os.path.basename(thin_path)
+        ),
+    ]
     ret = run_all(name, subprocess.list2cmdline(untar_cmd))
     if ret['retcode'] != 0:
         return {'result': False, 'comment': ret['stderr']}
 
     try:
-        salt_argv = [
-            'python{0}'.format(sys.version_info[0]),
-            os.path.join(thin_dest_path, 'salt-call'),
-            '--metadata',
-            '--local',
-            '--log-file', os.path.join(thin_dest_path, 'log'),
-            '--cachedir', os.path.join(thin_dest_path, 'cache'),
-            '--out', 'json',
-            '-l', 'quiet',
-            '--',
-            function
-        ] + list(args) + ['{0}={1}'.format(key, value) for (key, value) in kwargs.items() if not key.startswith('__')]
+        salt_argv = (
+            [
+                container_python_bin,
+                os.path.join(thin_dest_path, "salt-call"),
+                "--metadata",
+                "--local",
+                "--log-file",
+                os.path.join(thin_dest_path, "log"),
+                "--cachedir",
+                os.path.join(thin_dest_path, "cache"),
+                "--out",
+                "json",
+                "-l",
+                "quiet",
+                "--",
+                function,
+            ]
+            + list(args)
+            + [
+                "{}={}".format(key, value)
+                for (key, value) in kwargs.items()
+                if not key.startswith("__")
+            ]
+        )
 
         ret = run_all(name, subprocess.list2cmdline(map(str, salt_argv)))
         # python not found
