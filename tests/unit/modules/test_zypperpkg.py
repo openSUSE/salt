@@ -470,16 +470,21 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     )
 
 
+    #def test_refresh_zypper.....
+      #mocking version_cmp() 
+
+
     def test_upgrade_with_novendorchange(self):
         '''
         Dist-upgrade without vendor change option.
         '''
-        with patch.dict(zypper.__grains__, {'osrelease_info': [12, 1]}), \
-                patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()) as refresh_flags_mock, \
                 patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
             with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
                     ret = zypper.upgrade(dist_upgrade=True, novendorchange=True)
+                    refresh_flags_mock.assert_not_called()
                     zypper_mock.assert_any_call(
                         "dist-upgrade",
                         "--auto-agree-with-licenses",
@@ -489,15 +494,16 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
         '''
         Perform dist-upgrade with novendorchange set to False.
         '''
-        with patch.dict(zypper.__grains__, {'osrelease_info': [12, 1]}), \
-                patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
                 patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
             with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
-                with patch('salt.modules.zypperpkg.__zypper__.allow_vendor_change', MagicMock()) as vendor_change_mock:
                     with patch(
                         "salt.modules.zypperpkg.list_pkgs",
                         MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
                     ):
+                        zypper.__zypper__.inst_avc = True
+                        zypper.__zypper__.dup_avc = True
                         with patch.dict(zypper.__salt__,
                                         {'pkg_resource.version': MagicMock(return_value='1.15'),
                                         'lowpkg.version_cmp': MagicMock(return_value=1)}):
@@ -511,19 +517,16 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                             # assert on the vendor_change_mock, because the logic of the vendor-change
                             # flag insertion is in thes __call method.
                             assert zypper.__zypper__.avc == True
-                            vendor_change_mock.assert_any_call(False, False, True)
 
 
     def test_upgrade_with_allowvendorchange(self):
         '''
         Perform dist-upgrade with allowvendorchange set to True.
         '''
-        with patch.dict(zypper.__grains__, {'osrelease_info': [12, 1]}), \
-                patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
                 patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
             with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
-                with patch('salt.modules.zypperpkg.__zypper__.allow_vendor_change', MagicMock()) as vendor_change_mock:
-
                     with patch(
                         "salt.modules.zypperpkg.list_pkgs",
                         MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
@@ -531,6 +534,9 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         with patch.dict(zypper.__salt__,
                                         {'pkg_resource.version': MagicMock(return_value='1.15'),
                                         'lowpkg.version_cmp': MagicMock(return_value=1)}):
+
+                            zypper.__zypper__.inst_avc = True
+                            zypper.__zypper__.dup_avc = True
                             ret = zypper.upgrade(
                                 dist_upgrade=True,
                                 dryrun=True,
@@ -541,11 +547,10 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                             # assert on the vendor_change_mock, because the logic of the vendor-change
                             # flag insertion is in thes __call method.
                             assert zypper.__zypper__.avc == True
-                            vendor_change_mock.assert_any_call(True, True, True)
 
     def test_upgrade_old_zypper(self):
-        with patch.dict(zypper.__grains__, {'osrelease_info': [12, 1]}), \
-                patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+         with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()) as refresh_flags_mock, \
                 patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
             with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
                 with patch(
@@ -555,13 +560,14 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     with patch.dict(zypper.__salt__,
                                     {'pkg_resource.version': MagicMock(return_value='1.11'),
                                     'lowpkg.version_cmp': MagicMock(return_value=-1)}):
+                        refresh_flags_mock.assert_not_called()
                         ret = zypper.upgrade(
                             dist_upgrade=True,
                             dryrun=True,
                             fromrepo=["Dummy", "Dummy2"],
                             novendorchange=False,
                         )
-                        assert zypper.__zypper__.avc == False
+
 
     def test_upgrade_success(self):
         '''

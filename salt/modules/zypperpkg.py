@@ -227,7 +227,7 @@ class _Zypper(object):
     def pid(self):
         return self.__call_result.get('pid', '')
 
-    def __allow_vendor_change(self, allowvendorchange, novendorchange, dist_upgrade=False):
+    def __allow_vendor_change(self, allowvendorchange, novendorchange):
         if allowvendorchange or not novendorchange:
             self.refresh_zypper_flags()
             if self.dup_avc or self.inst_avc:
@@ -1759,10 +1759,10 @@ def upgrade(refresh=True,
     if dryrun:
         # Creates a solver test case for debugging.
         log.info('Executing debugsolver and performing a dry-run dist-upgrade')
-        __zypper__(systemd_scope=_systemd_scope(), root=root).allow_vendor_change(allowvendorchange, novendorchange, dist_upgrade).noraise.call(*cmd_update + ['--debug-solver'])
+        __zypper__(systemd_scope=_systemd_scope(), root=root).allow_vendor_change(allowvendorchange, novendorchange).noraise.call(*cmd_update + ['--debug-solver'])
 
     old = list_pkgs(root=root)
-    __zypper__(systemd_scope=_systemd_scope(), root=root).allow_vendor_change(allowvendorchange, novendorchange, dist_upgrade).noraise.call(*cmd_update)
+    __zypper__(systemd_scope=_systemd_scope(), root=root).allow_vendor_change(allowvendorchange, novendorchange).noraise.call(*cmd_update)
     _clean_cache()
     new = list_pkgs(root=root)
     ret = salt.utils.data.compare_dicts(old, new)
