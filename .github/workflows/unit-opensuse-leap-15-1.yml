@@ -14,4 +14,4 @@ jobs:
           repository: openSUSE/salt-toaster
           path: salt-toaster
       - name: Unit tests
-        run: cd $GITHUB_WORKSPACE/salt-toaster && make saltstack.unit VERSION=opensuse151 FLAVOR=devel SALT_REPO=$GITHUB_WORKSPACE/salt
+        run: cd $GITHUB_WORKSPACE/salt-toaster && make saltstack.unit VERSION=opensuse151 FLAVOR=devel SALT_REPO=$GITHUB_WORKSPACE/salt NOX=False
