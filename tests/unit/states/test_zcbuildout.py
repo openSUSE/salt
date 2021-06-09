@@ -56,9 +56,7 @@ class BuildoutTestCase(Base):
     def test_error(self):
         b_dir = os.path.join(self.tdir, "e")
         ret = buildout.installed(b_dir, python=self.py_st)
-        self.assertTrue(
-            "We did not get any expectable answer from buildout" in ret["comment"]
-        )
+        self.assertTrue("Unexpected response from buildout" in ret["comment"])
         self.assertFalse(ret["result"])
 
     @slowTest
