@@ -225,7 +225,7 @@ class OptionParser(optparse.OptionParser, object):
                 logger.exception(err)
                 self.error(
                     'Error while processing {0}: {1}'.format(
-                        process_option_func, traceback.format_exc(err)
+                        process_option_func, traceback.format_exc()
                     )
                 )
 
@@ -237,7 +237,7 @@ class OptionParser(optparse.OptionParser, object):
                 logger.exception(err)
                 self.error(
                     'Error while processing {0}: {1}'.format(
-                        mixin_after_parsed_func, traceback.format_exc(err)
+                        mixin_after_parsed_func, traceback.format_exc()
                     )
                 )
 
@@ -278,7 +278,7 @@ class OptionParser(optparse.OptionParser, object):
                 logger.exception(err)
                 logger.error('Error while processing %s: %s',
                              six.text_type(mixin_before_exit_func),
-                             traceback.format_exc(err))
+                             traceback.format_exc())
         if self._setup_mp_logging_listener_ is True:
             # Stop logging through the queue
             log.shutdown_multiprocessing_logging()
