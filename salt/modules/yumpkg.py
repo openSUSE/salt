@@ -2051,6 +2051,8 @@ def remove(name=None, pkgs=None, **kwargs):  # pylint: disable=W0613
     old = list_pkgs()
     targets = []
     for target in pkg_params:
+        if target not in old:
+            continue
         version_to_remove = pkg_params[target]
         installed_versions = old[target].split(",")
 
