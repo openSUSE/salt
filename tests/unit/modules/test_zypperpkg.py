@@ -621,7 +621,8 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
             patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
                 patch('salt.modules.zypperpkg.__zypper__._reset', MagicMock()):
                     zypper.__zypper__.inst_avc = False
-                    zypper.__zypper__.avc = False
+                    zypper.__zypper__.dup_avc = True
+                    zypper.__zypper__.avc = True
                     zypper.__zypper__.call("install")
                     cmd_run_mock.assert_any_call(
                         [
@@ -675,9 +676,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                                 fromrepo=["Dummy", "Dummy2"],
                                 novendorchange=False,
                             )
-                            # Since the "call" method is completely mocked away, we need to
-                            # assert on the vendor_change_mock, because the logic of the vendor-change
-                            # flag insertion is in thes __call method.
                             assert zypper.__zypper__.avc == True
 
 
@@ -706,9 +704,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                                 fromrepo=["Dummy", "Dummy2"],
                                 allowvendorchange=True,
                             )
-                            # Since the "call" method is completely mocked away, we need to
-                            # assert on the vendor_change_mock, because the logic of the vendor-change
-                            # flag insertion is in thes __call method.
                             assert zypper.__zypper__.avc == True
 
     def test_upgrade_with_allowvendorchange_false(self):
@@ -736,9 +731,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                                 fromrepo=["Dummy", "Dummy2"],
                                 allowvendorchange=False,
                             )
-                            # Since the "call" method is completely mocked away, we need to
-                            # assert on the vendor_change_mock, because the logic of the vendor-change
-                            # flag insertion is in thes __call method.
                             assert zypper.__zypper__.avc == False
 
     def test_upgrade_old_zypper(self):
