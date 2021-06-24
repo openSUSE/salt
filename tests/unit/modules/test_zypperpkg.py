@@ -16,6 +16,7 @@ from tests.support.mock import (
     MagicMock,
     call,
     patch,
+    mock_open,
 )
 
 # Import Salt libs
@@ -137,6 +138,7 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
 
         stdout_xml_snippet = '<?xml version="1.0"?><test foo="bar"/>'
         sniffer = RunSniffer(stdout=stdout_xml_snippet)
+        zypper.__zypper__._reset()
         with patch.dict('salt.modules.zypperpkg.__salt__', {'cmd.run_all': sniffer}):
             self.assertEqual(zypper.__zypper__.call('foo'), stdout_xml_snippet)
             self.assertEqual(len(sniffer.calls), 1)
@@ -450,14 +452,317 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
             self.assertEqual(zypper.latest_version('vim'), '7.4.326-2.62')
             self.assertDictEqual(zypper.latest_version('vim', 'fakepkg'), {'vim': '7.4.326-2.62', 'fakepkg': ''})
 
+
+    def test_upgrade_without_vendor_change(self):
+        '''
+        Dist-upgrade without vendor change option.
+        '''
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
+            with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
+                with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
+                    ret = zypper.upgrade(dist_upgrade=True)
+                    self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                    )
+
+    def test_refresh_zypper_flags(self):
+        zypper.__zypper__._reset()
+        with patch('salt.modules.zypperpkg.version', MagicMock(return_value="0.5")), \
+            patch.dict(zypper.__salt__, {'lowpkg.version_cmp': MagicMock(side_effect=[-1, -1])}):
+            zypper.__zypper__.refresh_zypper_flags()
+            assert zypper.__zypper__.inst_avc == False
+            assert zypper.__zypper__.dup_avc == False
+        with patch('salt.modules.zypperpkg.version', MagicMock(return_value="1.11.34")), \
+            patch.dict(zypper.__salt__, {'lowpkg.version_cmp': MagicMock(side_effect=[0, -1])}):
+            zypper.__zypper__.refresh_zypper_flags()
+            assert zypper.__zypper__.inst_avc == False
+            assert zypper.__zypper__.dup_avc == True
+        with patch('salt.modules.zypperpkg.version', MagicMock(return_value="1.14.8")), \
+            patch.dict(zypper.__salt__, {'lowpkg.version_cmp': MagicMock(side_effect=[0, 0])}):
+            zypper.__zypper__.refresh_zypper_flags()
+            assert zypper.__zypper__.inst_avc == True
+            assert zypper.__zypper__.dup_avc == True
+
+    @patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock())
+    def test_allow_vendor_change_function(self):
+        zypper.__zypper__._reset()
+        zypper.__zypper__.inst_avc = True
+        zypper.__zypper__.dup_avc = True
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(False, False)
+        assert zypper.__zypper__.avc == True
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(True, False)
+        assert zypper.__zypper__.avc == True
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(False, True)
+        assert zypper.__zypper__.avc == False
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(True, True)
+        assert zypper.__zypper__.avc == True
+
+        zypper.__zypper__._reset()
+        zypper.__zypper__.inst_avc = False
+        zypper.__zypper__.dup_avc = True
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(False, False)
+        assert zypper.__zypper__.avc == True
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(True, False)
+        assert zypper.__zypper__.avc == True
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(False, True)
+        assert zypper.__zypper__.avc == False
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(True, True)
+        assert zypper.__zypper__.avc == True
+
+        zypper.__zypper__._reset()
+        zypper.__zypper__.inst_avc = False
+        zypper.__zypper__.dup_avc = False
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(False, False)
+        assert zypper.__zypper__.avc == False
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(True, False)
+        assert zypper.__zypper__.avc == False
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(False, True)
+        assert zypper.__zypper__.avc == False
+        zypper.__zypper__.avc = False
+        zypper.__zypper__.allow_vendor_change(True, True)
+        assert zypper.__zypper__.avc == False
+
+    @patch('salt.utils.environment.get_module_environment', MagicMock(return_value={'SALT_RUNNING': "1"}))
+    def test_zypper_call_dist_upgrade_with_avc_true(self):
+        cmd_run_mock = MagicMock(return_value={
+            'retcode': 0,
+            'stdout': None
+        })
+        zypper.__zypper__._reset()
+        with patch.dict(zypper.__salt__, {'cmd.run_all': cmd_run_mock}), \
+            patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
+                patch('salt.modules.zypperpkg.__zypper__._reset', MagicMock()):
+                    zypper.__zypper__.dup_avc = True
+                    zypper.__zypper__.avc = True
+                    zypper.__zypper__.call("dist-upgrade")
+                    cmd_run_mock.assert_any_call(
+                        [
+                            "zypper",
+                            "--non-interactive",
+                            "--no-refresh",
+                            "dist-upgrade",
+                            "--allow-vendor-change",
+                        ],
+                        output_loglevel="trace",
+                        python_shell=False,
+                        env={"SALT_RUNNING": "1"})
+
+    @patch('salt.utils.environment.get_module_environment', MagicMock(return_value={'SALT_RUNNING': "1"}))
+    def test_zypper_call_dist_upgrade_with_avc_false(self):
+        cmd_run_mock = MagicMock(return_value={
+            'retcode': 0,
+            'stdout': None
+        })
+        zypper.__zypper__._reset()
+        with patch.dict(zypper.__salt__, {'cmd.run_all': cmd_run_mock}), \
+            patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
+                patch('salt.modules.zypperpkg.__zypper__._reset', MagicMock()):
+                    zypper.__zypper__.dup_avc = False
+                    zypper.__zypper__.avc = False
+                    zypper.__zypper__.call("dist-upgrade")
+                    cmd_run_mock.assert_any_call(
+                        [
+                            "zypper",
+                            "--non-interactive",
+                            "--no-refresh",
+                            "dist-upgrade",
+                        ],
+                        output_loglevel="trace",
+                        python_shell=False,
+                        env={"SALT_RUNNING": "1"})
+
+    @patch('salt.utils.environment.get_module_environment', MagicMock(return_value={'SALT_RUNNING': "1"}))
+    def test_zypper_call_install_with_avc_true(self):
+        cmd_run_mock = MagicMock(return_value={
+            'retcode': 0,
+            'stdout': None
+        })
+        zypper.__zypper__._reset()
+        with patch.dict(zypper.__salt__, {'cmd.run_all': cmd_run_mock}), \
+            patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
+                patch('salt.modules.zypperpkg.__zypper__._reset', MagicMock()):
+                    zypper.__zypper__.inst_avc = True
+                    zypper.__zypper__.avc = True
+                    zypper.__zypper__.call("install")
+                    cmd_run_mock.assert_any_call(
+                        [
+                            "zypper",
+                            "--non-interactive",
+                            "--no-refresh",
+                            "install",
+                            "--allow-vendor-change",
+                        ],
+                        output_loglevel="trace",
+                        python_shell=False,
+                        env={"SALT_RUNNING": "1"})
+
+    @patch('salt.utils.environment.get_module_environment', MagicMock(return_value={'SALT_RUNNING': "1"}))
+    def test_zypper_call_install_with_avc_false(self):
+        cmd_run_mock = MagicMock(return_value={
+            'retcode': 0,
+            'stdout': None
+        })
+        zypper.__zypper__._reset()
+        with patch.dict(zypper.__salt__, {'cmd.run_all': cmd_run_mock}), \
+            patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
+                patch('salt.modules.zypperpkg.__zypper__._reset', MagicMock()):
+                    zypper.__zypper__.inst_avc = False
+                    zypper.__zypper__.dup_avc = True
+                    zypper.__zypper__.avc = True
+                    zypper.__zypper__.call("install")
+                    cmd_run_mock.assert_any_call(
+                        [
+                            "zypper",
+                            "--non-interactive",
+                            "--no-refresh",
+                            "install",
+                        ],
+                        output_loglevel="trace",
+                        python_shell=False,
+                        env={"SALT_RUNNING": "1"})
+
+    def test_upgrade_with_novendorchange_true(self):
+        '''
+        Dist-upgrade without vendor change option.
+        '''
+        zypper.__zypper__._reset()
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()) as refresh_flags_mock, \
+                patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
+            with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
+                with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
+                    ret = zypper.upgrade(dist_upgrade=True, novendorchange=True)
+                    refresh_flags_mock.assert_not_called()
+                    zypper_mock.assert_any_call(
+                        "dist-upgrade",
+                        "--auto-agree-with-licenses",
+                    )
+
+    def test_upgrade_with_novendorchange_false(self):
+        '''
+        Perform dist-upgrade with novendorchange set to False.
+        '''
+        zypper.__zypper__._reset()
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
+                patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
+            with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
+                    with patch(
+                        "salt.modules.zypperpkg.list_pkgs",
+                        MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
+                    ):
+                        zypper.__zypper__.inst_avc = True
+                        zypper.__zypper__.dup_avc = True
+                        with patch.dict(zypper.__salt__,
+                                        {'pkg_resource.version': MagicMock(return_value='1.15'),
+                                        'lowpkg.version_cmp': MagicMock(return_value=1)}):
+                            ret = zypper.upgrade(
+                                dist_upgrade=True,
+                                dryrun=True,
+                                fromrepo=["Dummy", "Dummy2"],
+                                novendorchange=False,
+                            )
+                            assert zypper.__zypper__.avc == True
+
+
+    def test_upgrade_with_allowvendorchange_true(self):
+        '''
+        Perform dist-upgrade with allowvendorchange set to True.
+        '''
+        zypper.__zypper__._reset()
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
+                patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
+            with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
+                    with patch(
+                        "salt.modules.zypperpkg.list_pkgs",
+                        MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
+                    ):
+                        with patch.dict(zypper.__salt__,
+                                        {'pkg_resource.version': MagicMock(return_value='1.15'),
+                                        'lowpkg.version_cmp': MagicMock(return_value=1)}):
+
+                            zypper.__zypper__.inst_avc = True
+                            zypper.__zypper__.dup_avc = True
+                            ret = zypper.upgrade(
+                                dist_upgrade=True,
+                                dryrun=True,
+                                fromrepo=["Dummy", "Dummy2"],
+                                allowvendorchange=True,
+                            )
+                            assert zypper.__zypper__.avc == True
+
+    def test_upgrade_with_allowvendorchange_false(self):
+        '''
+        Perform dist-upgrade with allowvendorchange set to False.
+        '''
+        zypper.__zypper__._reset()
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()), \
+                patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
+            with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
+                    with patch(
+                        "salt.modules.zypperpkg.list_pkgs",
+                        MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
+                    ):
+                        with patch.dict(zypper.__salt__,
+                                        {'pkg_resource.version': MagicMock(return_value='1.15'),
+                                        'lowpkg.version_cmp': MagicMock(return_value=1)}):
+
+                            zypper.__zypper__.inst_avc = True
+                            zypper.__zypper__.dup_avc = True
+                            ret = zypper.upgrade(
+                                dist_upgrade=True,
+                                dryrun=True,
+                                fromrepo=["Dummy", "Dummy2"],
+                                allowvendorchange=False,
+                            )
+                            assert zypper.__zypper__.avc == False
+
+    def test_upgrade_old_zypper(self):
+        zypper.__zypper__._reset()
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+                patch('salt.modules.zypperpkg.__zypper__.refresh_zypper_flags', MagicMock()) as refresh_flags_mock, \
+                patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
+            with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
+                with patch(
+                    "salt.modules.zypperpkg.list_pkgs",
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
+                ):
+                    with patch.dict(zypper.__salt__,
+                                    {'pkg_resource.version': MagicMock(return_value='1.11'),
+                                    'lowpkg.version_cmp': MagicMock(return_value=-1)}):
+                        zypper.__zypper__.inst_avc = False
+                        zypper.__zypper__.dup_avc = False
+                        ret = zypper.upgrade(
+                            dist_upgrade=True,
+                            dryrun=True,
+                            fromrepo=["Dummy", "Dummy2"],
+                            novendorchange=False,
+                        )
+                        zypper.__zypper__.avc = False
+
     def test_upgrade_success(self):
         '''
         Test system upgrade and dist-upgrade success.
 
         :return:
         '''
-        with patch.dict(zypper.__grains__, {'osrelease_info': [12, 1]}), \
-                patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
                 patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
             with patch('salt.modules.zypperpkg.__zypper__.noraise.call', MagicMock()) as zypper_mock:
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
@@ -477,13 +782,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.1,1.2"}})
                     zypper_mock.assert_any_call('update', '--auto-agree-with-licenses')
 
-                with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
-                    ret = zypper.upgrade(dist_upgrade=True)
-                    self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
-                    zypper_mock.assert_any_call(
-                        "dist-upgrade",
-                        "--auto-agree-with-licenses",
-                    )
 
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
                     ret = zypper.upgrade(dist_upgrade=True, dryrun=True)
@@ -494,87 +792,6 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                 with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])):
                     ret = zypper.upgrade(dist_upgrade=False, fromrepo=["Dummy", "Dummy2"], dryrun=False)
                     zypper_mock.assert_any_call('update', '--auto-agree-with-licenses', '--repo', "Dummy", '--repo', 'Dummy2')
-
-                with patch('salt.modules.zypperpkg.list_pkgs', MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}])):
-                    ret = zypper.upgrade(dist_upgrade=True, fromrepo=["Dummy", "Dummy2"], novendorchange=True)
-                    zypper_mock.assert_any_call(
-                        "dist-upgrade",
-                        "--auto-agree-with-licenses",
-                        "--dry-run",
-                    )
-                    zypper_mock.assert_any_call(
-                        "dist-upgrade",
-                        "--auto-agree-with-licenses",
-                        "--dry-run",
-                    )
-
-                with patch(
-                    "salt.modules.zypperpkg.list_pkgs",
-                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
-                ):
-                    with patch.dict(zypper.__salt__,
-                                    {'pkg_resource.version': MagicMock(return_value='1.15'),
-                                     'lowpkg.version_cmp': MagicMock(return_value=1)}):
-                        ret = zypper.upgrade(
-                            dist_upgrade=True,
-                            dryrun=True,
-                            fromrepo=["Dummy", "Dummy2"],
-                            novendorchange=False,
-                        )
-                        zypper_mock.assert_any_call(
-                            "dist-upgrade",
-                            "--auto-agree-with-licenses",
-                            "--dry-run",
-                            "--from",
-                            "Dummy",
-                            "--from",
-                            "Dummy2",
-                            "--allow-vendor-change",
-                        )
-                        zypper_mock.assert_any_call(
-                            "dist-upgrade",
-                            "--auto-agree-with-licenses",
-                            "--dry-run",
-                            "--from",
-                            "Dummy",
-                            "--from",
-                            "Dummy2",
-                            "--allow-vendor-change",
-                            "--debug-solver",
-                        )
-
-                with patch(
-                    "salt.modules.zypperpkg.list_pkgs",
-                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.1"}])
-                ):
-                    with patch.dict(zypper.__salt__,
-                                    {'pkg_resource.version': MagicMock(return_value='1.11'),
-                                     'lowpkg.version_cmp': MagicMock(return_value=1)}):
-                        ret = zypper.upgrade(
-                            dist_upgrade=True,
-                            dryrun=True,
-                            fromrepo=["Dummy", "Dummy2"],
-                            novendorchange=False,
-                        )
-                        zypper_mock.assert_any_call(
-                            "dist-upgrade",
-                            "--auto-agree-with-licenses",
-                            "--dry-run",
-                            "--from",
-                            "Dummy",
-                            "--from",
-                            "Dummy2",
-                        )
-                        zypper_mock.assert_any_call(
-                            "dist-upgrade",
-                            "--auto-agree-with-licenses",
-                            "--dry-run",
-                            "--from",
-                            "Dummy",
-                            "--from",
-                            "Dummy2",
-                            "--debug-solver",
-                        )
 
                 with patch(
                     "salt.modules.zypperpkg.list_pkgs",
@@ -622,46 +839,13 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                         "Dummy2",
                     )
 
-                with patch(
-                    "salt.modules.zypperpkg.list_pkgs",
-                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}]),
-                ):
-                    ret = zypper.upgrade(
-                        dist_upgrade=True,
-                        fromrepo=["Dummy", "Dummy2"],
-                        novendorchange=True,
-                    )
-                    self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
-                    zypper_mock.assert_any_call('dist-upgrade', '--auto-agree-with-licenses', '--from', "Dummy",
-                                                '--from', 'Dummy2')
-
-                with patch(
-                    "salt.modules.zypperpkg.list_pkgs",
-                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}]),
-                ):
-                    ret = zypper.upgrade(
-                        dist_upgrade=True,
-                        fromrepo=["Dummy", "Dummy2"],
-                        novendorchange=False,
-                    )
-                    self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
-                    zypper_mock.assert_any_call(
-                        "dist-upgrade",
-                        "--auto-agree-with-licenses",
-                        "--from",
-                        "Dummy",
-                        "--from",
-                        "Dummy2",
-                        "--allow-vendor-change",
-                    )
     def test_upgrade_kernel(self):
         '''
         Test kernel package upgrade success.
 
         :return:
         '''
-        with patch.dict(zypper.__grains__, {'osrelease_info': [12, 1]}), \
-             patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
+        with patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
              patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
             with patch.dict(zypper.__salt__, {'pkg_resource.parse_targets': MagicMock(return_value=(['kernel-default'],
                                                                                                     None))}):
@@ -692,13 +876,14 @@ Repository 'DUMMY' not found by its alias, number, or URI.
                 self.pid = 1234
                 self.exit_code = 555
                 self.noraise = MagicMock()
+                self.allow_vendor_change = self
                 self.SUCCESS_EXIT_CODES = [0]
 
             def __call__(self, *args, **kwargs):
                 return self
 
-        with patch.dict(zypper.__grains__, {'osrelease_info': [12, 1]}), \
-                patch('salt.modules.zypperpkg.__zypper__', FailingZypperDummy()) as zypper_mock, \
+
+        with patch('salt.modules.zypperpkg.__zypper__', FailingZypperDummy()) as zypper_mock, \
                 patch('salt.modules.zypperpkg.refresh_db', MagicMock(return_value=True)), \
                 patch('salt.modules.zypperpkg._systemd_scope', MagicMock(return_value=False)):
             zypper_mock.noraise.call = MagicMock()
