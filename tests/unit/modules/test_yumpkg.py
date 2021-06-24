@@ -746,6 +746,31 @@ class YumTestCase(TestCase, LoaderModuleMockMixin):
                 call = cmd_mock.mock_calls[0][1][0]
                 assert call == expected, call
 
+    def test_remove_not_existing(self):
+        """
+        Test if no exception on removing not installed package
+        """
+        name = "foo"
+        def list_pkgs_mock():
+            return {}
+        cmd_mock = MagicMock(
+            return_value={"pid": 12345, "retcode": 0, "stdout": "", "stderr": ""}
+        )
+        salt_mock = {
+            "cmd.run_all": cmd_mock,
+            "lowpkg.version_cmp": rpm.version_cmp,
+            "pkg_resource.parse_targets": MagicMock(
+                return_value=({name: None}, "repository")
+            ),
+        }
+        with patch.object(yumpkg, "list_pkgs", list_pkgs_mock), patch(
+            "salt.utils.systemd.has_scope", MagicMock(return_value=False)
+        ), patch.dict(yumpkg.__salt__, salt_mock):
+
+            with patch.dict(yumpkg.__grains__, {"os": "CentOS", "osrelease": 7}):
+                yumpkg.remove(name)
+                cmd_mock.assert_not_called()
+
     def test_install_with_epoch(self):
         '''
         Tests that we properly identify a version containing an epoch as an
