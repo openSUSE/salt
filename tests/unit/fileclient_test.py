@@ -6,6 +6,7 @@
 # Import Python libs
 from __future__ import absolute_import
 import errno
+import os
 from mock import Mock
 
 # Import Salt Testing libs
@@ -52,3 +53,21 @@ class FileclientTestCase(TestCase):
                 with self.assertRaises(OSError):
                     with Client(self.opts)._cache_loc('testfile') as c_ref_itr:
                         assert c_ref_itr == '/__test__/files/base/testfile'
+
+    def test_cache_extrn_path_valid(self):
+        """
+        Tests for extrn_filepath for a given url
+        """
+        file_name = "http://localhost:8000/test/location/src/dev/usr/file"
+
+        ret = Client(self.opts)._extrn_path(file_name, "base")
+        assert ret == os.path.join("__test__", "extrn_files", "base", ret)
+
+    def test_cache_extrn_path_invalid(self):
+        """
+        Tests for extrn_filepath for a given url
+        """
+        file_name = "http://localhost:8000/../../../../../usr/bin/bad"
+
+        ret = Client(self.opts)._extrn_path(file_name, "base")
+        assert ret == "Invalid path"

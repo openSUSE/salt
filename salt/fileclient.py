@@ -33,6 +33,7 @@ import salt.utils.http
 import salt.ext.six as six
 from salt.utils.locales import sdecode
 from salt.utils.openstack.swift import SaltSwift
+import salt.utils.verify
 
 # pylint: disable=no-name-in-module,import-error
 import salt.ext.six.moves.BaseHTTPServer as BaseHTTPServer
@@ -733,6 +734,12 @@ class Client(object):
             file_name = '-'.join([url_data.path, url_data.query])
         else:
             file_name = url_data.path
+
+        # clean_path returns an empty string if the check fails
+        root_path = salt.utils.path_join(cachedir, "extrn_files", saltenv, netloc)
+        new_path = os.path.sep.join([root_path, file_name])
+        if not salt.utils.verify.clean_path(root_path, new_path, subdir=True):
+            return "Invalid path"
 
         return salt.utils.path_join(
             cachedir,
