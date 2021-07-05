@@ -1942,7 +1942,6 @@ pattern() = package-c"""
                 python_shell=False,
                 env={"ZYPP_READONLY_HACK": "1"},
             )
-            self.assertEqual(zypper.__context__, {"pkg.other_data": None})
 
     def test_get_repo_keys(self):
         salt_mock = {"lowpkg.list_gpg_keys": MagicMock(return_value=True)}
@@ -1994,3 +1993,135 @@ pattern() = package-c"""
         with patch("salt.modules.zypperpkg.__zypper__", zypper_mock):
             assert zypper.services_need_restart() == expected
             zypper_mock(root=None).nolock.call.assert_called_with("ps", "-sss")
+
+    def test_pkg_hold(self):
+        """
+        Tests holding packages with Zypper
+        """
+
+        # Test openSUSE 15.3
+        list_locks_mock = {
+            "bar": {"type": "package", "match_type": "glob", "case_sensitive": "on"},
+            "minimal_base": {
+                "type": "pattern",
+                "match_type": "glob",
+                "case_sensitive": "on",
+            },
+            "baz": {"type": "package", "match_type": "glob", "case_sensitive": "on"},
+        }
+
+        cmd = MagicMock(
+            return_value={
+                "pid": 1234,
+                "retcode": 0,
+                "stdout": "Specified lock has been successfully added.",
+                "stderr": "",
+            }
+        )
+        with patch.object(
+            zypper, "list_locks", MagicMock(return_value=list_locks_mock)
+        ), patch.dict(zypper.__salt__, {"cmd.run_all": cmd}):
+            ret = zypper.hold("foo")
+            assert ret["foo"]["changes"]["old"] == ""
+            assert ret["foo"]["changes"]["new"] == "hold"
+            assert ret["foo"]["comment"] == "Package foo is now being held."
+            cmd.assert_called_once_with(
+                ["zypper", "--non-interactive", "--no-refresh", "al", "foo"],
+                env={},
+                output_loglevel="trace",
+                python_shell=False,
+            )
+            cmd.reset_mock()
+            ret = zypper.hold(pkgs=["foo", "bar"])
+            assert ret["foo"]["changes"]["old"] == ""
+            assert ret["foo"]["changes"]["new"] == "hold"
+            assert ret["foo"]["comment"] == "Package foo is now being held."
+            assert ret["bar"]["changes"] == {}
+            assert ret["bar"]["comment"] == "Package bar is already set to be held."
+            cmd.assert_called_once_with(
+                ["zypper", "--non-interactive", "--no-refresh", "al", "foo"],
+                env={},
+                output_loglevel="trace",
+                python_shell=False,
+            )
+
+
+    def test_pkg_unhold(self):
+        """
+        Tests unholding packages with Zypper
+        """
+
+        # Test openSUSE 15.3
+        list_locks_mock = {
+            "bar": {"type": "package", "match_type": "glob", "case_sensitive": "on"},
+            "minimal_base": {
+                "type": "pattern",
+                "match_type": "glob",
+                "case_sensitive": "on",
+            },
+            "baz": {"type": "package", "match_type": "glob", "case_sensitive": "on"},
+        }
+
+        cmd = MagicMock(
+            return_value={
+                "pid": 1234,
+                "retcode": 0,
+                "stdout": "1 lock has been successfully removed.",
+                "stderr": "",
+            }
+        )
+        with patch.object(
+            zypper, "list_locks", MagicMock(return_value=list_locks_mock)
+        ), patch.dict(zypper.__salt__, {"cmd.run_all": cmd}):
+            ret = zypper.unhold("foo")
+            assert ret["foo"]["comment"] == "Package foo was already unheld."
+            cmd.assert_not_called()
+            cmd.reset_mock()
+            ret = zypper.unhold(pkgs=["foo", "bar"])
+            assert ret["foo"]["changes"] == {}
+            assert ret["foo"]["comment"] == "Package foo was already unheld."
+            assert ret["bar"]["changes"]["old"] == "hold"
+            assert ret["bar"]["changes"]["new"] == ""
+            assert ret["bar"]["comment"] == "Package bar is no longer held."
+            cmd.assert_called_once_with(
+                ["zypper", "--non-interactive", "--no-refresh", "rl", "bar"],
+                env={},
+                output_loglevel="trace",
+                python_shell=False,
+            )
+
+
+    def test_pkg_list_holds(self):
+        """
+        Tests listing of calculated held packages with Zypper
+        """
+
+        # Test openSUSE 15.3
+        list_locks_mock = {
+            "bar": {"type": "package", "match_type": "glob", "case_sensitive": "on"},
+            "minimal_base": {
+                "type": "pattern",
+                "match_type": "glob",
+                "case_sensitive": "on",
+            },
+            "baz": {"type": "package", "match_type": "glob", "case_sensitive": "on"},
+        }
+        installed_pkgs = {
+            "foo": [{"edition": "1.2.3-1.1"}],
+            "bar": [{"edition": "2.3.4-2.1", "epoch": "2"}],
+        }
+
+        def zypper_search_mock(name, *_args, **_kwargs):
+            if name in installed_pkgs:
+                return {name: installed_pkgs.get(name)}
+
+        with patch.object(
+            zypper, "list_locks", MagicMock(return_value=list_locks_mock)
+        ), patch.object(
+            zypper, "search", MagicMock(side_effect=zypper_search_mock)
+        ), patch.object(
+            zypper, "info_installed", MagicMock(side_effect=zypper_search_mock)
+        ):
+            ret = zypper.list_holds()
+            assert len(ret) == 1
+            assert "bar-2:2.3.4-2.1.*" in ret
