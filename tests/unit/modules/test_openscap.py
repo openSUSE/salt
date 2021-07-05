@@ -1,18 +1,8 @@
-# -*- coding: utf-8 -*-
-
-# Import python libs
-from __future__ import absolute_import, print_function, unicode_literals
-
 from subprocess import PIPE
 
-# Import salt libs
 import salt.modules.openscap as openscap
-
-# Import 3rd-party libs
 from salt.ext import six
 from tests.support.mock import MagicMock, Mock, patch
-
-# Import salt test libs
 from tests.support.unit import TestCase
 
 
@@ -51,7 +41,7 @@ class OpenscapTestCase(TestCase):
             ),
         ):
             response = openscap.xccdf(
-                "eval --profile Default {0}".format(self.policy_file)
+                "eval --profile Default {}".format(self.policy_file)
             )
 
             self.assertEqual(openscap.tempfile.mkdtemp.call_count, 1)
@@ -98,7 +88,7 @@ class OpenscapTestCase(TestCase):
             ),
         ):
             response = openscap.xccdf(
-                "eval --profile Default {0}".format(self.policy_file)
+                "eval --profile Default {}".format(self.policy_file)
             )
 
             self.assertEqual(openscap.tempfile.mkdtemp.call_count, 1)
@@ -137,10 +127,7 @@ class OpenscapTestCase(TestCase):
 
     def test_openscap_xccdf_eval_fail_no_profile(self):
         response = openscap.xccdf("eval --param Default /unknown/param")
-        if six.PY2:
-            error = "argument --profile is required"
-        else:
-            error = "the following arguments are required: --profile"
+        error = "the following arguments are required: --profile"
         self.assertEqual(
             response,
             {"error": error, "upload_dir": None, "success": False, "returncode": None},
@@ -200,7 +187,7 @@ class OpenscapTestCase(TestCase):
             ),
         ):
             response = openscap.xccdf(
-                "eval --profile Default {0}".format(self.policy_file)
+                "eval --profile Default {}".format(self.policy_file)
             )
 
             self.assertEqual(
@@ -214,11 +201,8 @@ class OpenscapTestCase(TestCase):
             )
 
     def test_openscap_xccdf_eval_fail_not_implemented_action(self):
-        response = openscap.xccdf("info {0}".format(self.policy_file))
-        if six.PY2:
-            mock_err = "argument action: invalid choice: 'info' (choose from u'eval')"
-        else:
-            mock_err = "argument action: invalid choice: 'info' (choose from 'eval')"
+        response = openscap.xccdf("info {}".format(self.policy_file))
+        mock_err = "argument action: invalid choice: 'info' (choose from 'eval')"
 
         self.assertEqual(
             response,
