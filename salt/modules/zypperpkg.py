@@ -2071,6 +2071,76 @@ def purge(
     return _uninstall(inclusion_detection, name=name, pkgs=pkgs, root=root)
 
 
+def list_holds(pattern=None, full=True, root=None, **kwargs):
+    """
+    List information on locked packages.
+
+    .. note::
+        This function returns the computed output of ``list_locks``
+        to show exact locked packages.
+
+    pattern
+        Regular expression used to match the package name
+
+    full : True
+        Show the full hold definition including version and epoch. Set to
+        ``False`` to return just the name of the package(s) being held.
+
+    root
+        Operate on a different root directory.
+
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' pkg.list_holds
+        salt '*' pkg.list_holds full=False
+    """
+    locks = list_locks(root=root)
+    ret = []
+    inst_pkgs = {}
+    for solv_name, lock in locks.items():
+        if lock.get("type", "package") != "package":
+            continue
+        try:
+            found_pkgs = search(
+                solv_name,
+                root=root,
+                match=None if "*" in solv_name else "exact",
+                case_sensitive=(lock.get("case_sensitive", "on") == "on"),
+                installed_only=True,
+                details=True,
+                all_versions=True,
+                ignore_no_matching_item=True,
+            )
+        except CommandExecutionError:
+            continue
+        if found_pkgs:
+            for pkg in found_pkgs:
+                if pkg not in inst_pkgs:
+                    inst_pkgs.update(
+                        info_installed(
+                            pkg, root=root, attr="edition,epoch", all_versions=True
+                        )
+                    )
+
+    ptrn_re = re.compile(r"{}-\S+".format(pattern)) if pattern else None
+    for pkg_name, pkg_editions in inst_pkgs.items():
+        for pkg_info in pkg_editions:
+            pkg_ret = (
+                "{}-{}:{}.*".format(
+                    pkg_name, pkg_info.get("epoch", 0), pkg_info.get("edition")
+                )
+                if full
+                else pkg_name
+            )
+            if pkg_ret not in ret and (not ptrn_re or ptrn_re.match(pkg_ret)):
+                ret.append(pkg_ret)
+
+    return ret
+
+
 def list_locks(root=None):
     """
     List current package locks.
@@ -2141,43 +2211,68 @@ def clean_locks(root=None):
     return out
 
 
-def unhold(name=None, pkgs=None, **kwargs):
+def unhold(name=None, pkgs=None, root=None, **kwargs):
     """
-    Remove specified package lock.
+    Remove a package hold.
+
+    name
+        A package name to unhold, or a comma-separated list of package names to
+        unhold.
+
+    pkgs
+        A list of packages to unhold.  The ``name`` parameter will be ignored if
+        this option is passed.
 
     root
-        operate on a different root directory.
+        Operate on a different root directory.
 
     CLI Example:
 
     .. code-block:: bash
 
-        salt '*' pkg.remove_lock <package name>
-        salt '*' pkg.remove_lock <package1>,<package2>,<package3>
-        salt '*' pkg.remove_lock pkgs='["foo", "bar"]'
+        salt '*' pkg.unhold <package name>
+        salt '*' pkg.unhold <package1>,<package2>,<package3>
+        salt '*' pkg.unhold pkgs='["foo", "bar"]'
     """
     ret = {}
-    root = kwargs.get("root")
-    if (not name and not pkgs) or (name and pkgs):
+    if not name and not pkgs:
         raise CommandExecutionError("Name or packages must be specified.")
-    elif name:
-        pkgs = [name]
 
-    locks = list_locks(root)
-    try:
-        pkgs = list(__salt__["pkg_resource.parse_targets"](pkgs)[0].keys())
-    except MinionError as exc:
-        raise CommandExecutionError(exc)
+    targets = []
+    if pkgs:
+        targets.extend(pkgs)
+    else:
+        targets.append(name)
 
+    locks = list_locks()
     removed = []
-    missing = []
-    for pkg in pkgs:
-        if locks.get(pkg):
-            removed.append(pkg)
-            ret[pkg]["comment"] = "Package {} is no longer held.".format(pkg)
+
+    for target in targets:
+        version = None
+        if isinstance(target, dict):
+            (target, version) = next(iter(target.items()))
+        ret[target] = {"name": target, "changes": {}, "result": True, "comment": ""}
+        if locks.get(target):
+            lock_ver = None
+            if "version" in locks.get(target):
+                lock_ver = locks.get(target)["version"]
+                lock_ver = lock_ver.lstrip("= ")
+            if version and lock_ver != version:
+                ret[target]["result"] = False
+                ret[target][
+                    "comment"
+                ] = "Unable to unhold package {} as it is held with the other version.".format(
+                    target
+                )
+            else:
+                removed.append(
+                    target if not lock_ver else "{}={}".format(target, lock_ver)
+                )
+                ret[target]["changes"]["new"] = ""
+                ret[target]["changes"]["old"] = "hold"
+                ret[target]["comment"] = "Package {} is no longer held.".format(target)
         else:
-            missing.append(pkg)
-            ret[pkg]["comment"] = "Package {} unable to be unheld.".format(pkg)
+            ret[target]["comment"] = "Package {} was already unheld.".format(target)
 
     if removed:
         __zypper__(root=root).call("rl", *removed)
@@ -2223,47 +2318,57 @@ def remove_lock(packages, root=None, **kwargs):  # pylint: disable=unused-argume
     return {"removed": len(removed), "not_found": missing}
 
 
-def hold(name=None, pkgs=None, **kwargs):
+def hold(name=None, pkgs=None, root=None, **kwargs):
     """
-    Add a package lock. Specify packages to lock by exact name.
+    Add a package hold.  Specify one of ``name`` and ``pkgs``.
+
+    name
+        A package name to hold, or a comma-separated list of package names to
+        hold.
+
+    pkgs
+        A list of packages to hold.  The ``name`` parameter will be ignored if
+        this option is passed.
 
     root
-        operate on a different root directory.
+        Operate on a different root directory.
+
 
     CLI Example:
 
     .. code-block:: bash
 
-        salt '*' pkg.add_lock <package name>
-        salt '*' pkg.add_lock <package1>,<package2>,<package3>
-        salt '*' pkg.add_lock pkgs='["foo", "bar"]'
-
-    :param name:
-    :param pkgs:
-    :param kwargs:
-    :return:
+        salt '*' pkg.hold <package name>
+        salt '*' pkg.hold <package1>,<package2>,<package3>
+        salt '*' pkg.hold pkgs='["foo", "bar"]'
     """
     ret = {}
-    root = kwargs.get("root")
-    if (not name and not pkgs) or (name and pkgs):
+    if not name and not pkgs:
         raise CommandExecutionError("Name or packages must be specified.")
-    elif name:
-        pkgs = [name]
 
-    locks = list_locks(root=root)
+    targets = []
+    if pkgs:
+        targets.extend(pkgs)
+    else:
+        targets.append(name)
+
+    locks = list_locks()
     added = []
-    try:
-        pkgs = list(__salt__["pkg_resource.parse_targets"](pkgs)[0].keys())
-    except MinionError as exc:
-        raise CommandExecutionError(exc)
 
-    for pkg in pkgs:
-        ret[pkg] = {"name": pkg, "changes": {}, "result": False, "comment": ""}
-        if not locks.get(pkg):
-            added.append(pkg)
-            ret[pkg]["comment"] = "Package {} is now being held.".format(pkg)
+    for target in targets:
+        version = None
+        if isinstance(target, dict):
+            (target, version) = next(iter(target.items()))
+        ret[target] = {"name": target, "changes": {}, "result": True, "comment": ""}
+        if not locks.get(target):
+            added.append(target if not version else "{}={}".format(target, version))
+            ret[target]["changes"]["new"] = "hold"
+            ret[target]["changes"]["old"] = ""
+            ret[target]["comment"] = "Package {} is now being held.".format(target)
         else:
-            ret[pkg]["comment"] = "Package {} is already set to be held.".format(pkg)
+            ret[target]["comment"] = "Package {} is already set to be held.".format(
+                target
+            )
 
     if added:
         __zypper__(root=root).call("al", *added)
