@@ -1547,6 +1547,7 @@ _OS_NAME_MAP = {
     "slesexpand": "RES",
     "linuxmint": "Mint",
     "neon": "KDE neon",
+    "rocky": "Rocky",
     "alibabaclo": "Alinux",
 }
 
@@ -1621,6 +1622,7 @@ _OS_FAMILY_MAP = {
     "Funtoo": "Gentoo",
     "AIX": "AIX",
     "TurnKey": "Debian",
+    "Rocky": "RedHat",
     "AstraLinuxCE": "Debian",
     "Alinux": "RedHat",
 }
