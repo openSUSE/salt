@@ -264,8 +264,8 @@ class OpenscapTestCase(TestCase):
             openscap.Popen.assert_called_once_with(
                 expected_cmd,
                 cwd=openscap.tempfile.mkdtemp.return_value,
-                stderr=subprocess.PIPE,
-                stdout=subprocess.PIPE,
+                stderr=PIPE,
+                stdout=PIPE,
             )
             openscap.__salt__["cp.push_dir"].assert_called_once_with(
                 self.random_temp_dir
@@ -318,8 +318,8 @@ class OpenscapTestCase(TestCase):
             openscap.Popen.assert_called_once_with(
                 expected_cmd,
                 cwd=openscap.tempfile.mkdtemp.return_value,
-                stderr=subprocess.PIPE,
-                stdout=subprocess.PIPE,
+                stderr=PIPE,
+                stdout=PIPE,
             )
             openscap.__salt__["cp.push_dir"].assert_called_once_with(
                 self.random_temp_dir
@@ -369,8 +369,8 @@ class OpenscapTestCase(TestCase):
             openscap.Popen.assert_called_once_with(
                 expected_cmd,
                 cwd=openscap.tempfile.mkdtemp.return_value,
-                stderr=subprocess.PIPE,
-                stdout=subprocess.PIPE,
+                stderr=PIPE,
+                stdout=PIPE,
             )
             openscap.__salt__["cp.push_dir"].assert_called_once_with(
                 self.random_temp_dir
@@ -429,8 +429,8 @@ class OpenscapTestCase(TestCase):
             openscap.Popen.assert_called_once_with(
                 expected_cmd,
                 cwd=openscap.tempfile.mkdtemp.return_value,
-                stderr=subprocess.PIPE,
-                stdout=subprocess.PIPE,
+                stderr=PIPE,
+                stdout=PIPE,
             )
 
     def test_new_openscap_xccdf_eval_evaluation_error(self):
