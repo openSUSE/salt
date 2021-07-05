@@ -1560,6 +1560,7 @@ _OS_NAME_MAP = {
     "linuxmint": "Mint",
     "neon": "KDE neon",
     "pop": "Pop",
+    "rocky": "Rocky",
     "alibabaclo": "Alinux",
 }
 
@@ -1637,6 +1638,7 @@ _OS_FAMILY_MAP = {
     "AIX": "AIX",
     "TurnKey": "Debian",
     "Pop": "Debian",
+    "Rocky": "RedHat",
     "AstraLinuxCE": "Debian",
     "Alinux": "RedHat",
 }
