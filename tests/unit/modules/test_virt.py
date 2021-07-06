@@ -5057,6 +5057,10 @@ class VirtTestCase(TestCase, LoaderModuleMockMixin):
             {"qemu", "kvm"}, {domainCaps["domain"] for domainCaps in caps["domains"]},
         )
 
+        self.mock_conn.getDomainCapabilities.assert_called_with(
+            "/usr/bin/qemu-system-x86_64", "x86_64", None, "kvm"
+        )
+
     def test_network_tag(self):
         """
         Test virt._get_net_xml() with VLAN tag
