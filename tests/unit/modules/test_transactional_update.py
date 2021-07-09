@@ -165,7 +165,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                         cmd.replace("_", ".")
                         if cmd.startswith("grub")
                         else cmd.replace("_", "-"),
-                    ]
+                    ],
+                    env={"SYSTEMD_IGNORE_CHROOT": 1},
                 )
 
     def test_run_error(self):
@@ -192,7 +193,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                     "--flag",
                     "p1",
                     "p2",
-                ]
+                ],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
 
     def test_run_array(self):
@@ -214,7 +216,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                     "--flag",
                     "p1",
                     "p2",
-                ]
+                ],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
 
     def test_pkg_commands(self):
@@ -239,7 +242,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                         "pkg1",
                         "pkg2",
                         "pkg3",
-                    ]
+                    ],
+                    env={"SYSTEMD_IGNORE_CHROOT": 1},
                 )
 
     def test_rollback_error(self):
@@ -255,7 +259,7 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
         with patch.dict(tu.__salt__, salt_mock):
             assert tu.rollback() == "output"
             salt_mock["cmd.run_all"].assert_called_with(
-                ["transactional-update", "rollback"]
+                ["transactional-update", "rollback"], env={"SYSTEMD_IGNORE_CHROOT": 1}
             )
 
     def test_rollback_snapshot_number(self):
@@ -266,7 +270,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
         with patch.dict(tu.__salt__, salt_mock):
             assert tu.rollback(10) == "output"
             salt_mock["cmd.run_all"].assert_called_with(
-                ["transactional-update", "rollback", 10]
+                ["transactional-update", "rollback", 10],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
 
     def test_rollback_snapshot_str(self):
@@ -277,7 +282,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
         with patch.dict(tu.__salt__, salt_mock):
             assert tu.rollback("10") == "output"
             salt_mock["cmd.run_all"].assert_called_with(
-                ["transactional-update", "rollback", "10"]
+                ["transactional-update", "rollback", "10"],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
 
     def test_rollback_last(self):
@@ -288,7 +294,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
         with patch.dict(tu.__salt__, salt_mock):
             assert tu.rollback("last") == "output"
             salt_mock["cmd.run_all"].assert_called_with(
-                ["transactional-update", "rollback", "last"]
+                ["transactional-update", "rollback", "last"],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
 
     def test_pending_transaction(self):
@@ -312,7 +319,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                 with patch.dict(tu.__salt__, salt_mock):
                     assert tu.pending_transaction() is result
                     salt_mock["cmd.run_all"].assert_called_with(
-                        ["snapper", "--no-dbus", "list", "--columns", "number"]
+                        ["snapper", "--no-dbus", "list", "--columns", "number"],
+                        env={"SYSTEMD_IGNORE_CHROOT": 1},
                     )
 
     def test_pending_transaction_in_transaction(self):
@@ -404,7 +412,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                     "quiet",
                     "--",
                     "test.ping",
-                ]
+                ],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
             utils_mock["files.rm_rf"].assert_called_once()
 
@@ -460,7 +469,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                     "quiet",
                     "--",
                     "test.ping",
-                ]
+                ],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
             utils_mock["files.rm_rf"].assert_called_once()
 
@@ -510,7 +520,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                     "quiet",
                     "--",
                     "test.ping",
-                ]
+                ],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
             utils_mock["files.rm_rf"].assert_called_once()
 
@@ -566,7 +577,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                     "quiet",
                     "--",
                     "transactional_update.dup",
-                ]
+                ],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
             utils_mock["files.rm_rf"].assert_called_once()
             pending_transaction.assert_called_once()
@@ -619,7 +631,8 @@ class TransactionalUpdateTestCase(TestCase, LoaderModuleMockMixin):
                     "--",
                     "module.function",
                     "key=value",
-                ]
+                ],
+                env={"SYSTEMD_IGNORE_CHROOT": 1},
             )
             utils_mock["files.rm_rf"].assert_called_once()
 
