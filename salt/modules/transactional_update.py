@@ -345,7 +345,7 @@ def _pkg_params(pkg, pkgs, args):
 
 def _cmd(cmd, retcode=False):
     """Utility function to run commands."""
-    result = __salt__["cmd.run_all"](cmd)
+    result = __salt__["cmd.run_all"](cmd, env={"SYSTEMD_IGNORE_CHROOT": 1})
     if retcode:
         return result["retcode"]
 
