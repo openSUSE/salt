@@ -304,6 +304,24 @@ class ServiceTestCase(TestCase, LoaderModuleMockMixin):
                                 service.__context__, {"service.state": "running"}
                             )
 
+    def test_running_in_offline_mode(self):
+        """
+        Tests the case in which a service.running state is executed on an offline environemnt
+
+        """
+        name = "thisisnotarealservice"
+        with patch.object(service, "_offline", MagicMock(return_value=True)):
+            ret = service.running(name=name)
+            self.assertDictEqual(
+                ret,
+                {
+                    "changes": {},
+                    "comment": "Running in OFFLINE mode. Nothing to do",
+                    "result": True,
+                    "name": name,
+                },
+            )
+
     def test_dead(self):
         """
             Test to ensure that the named service is dead
@@ -443,6 +461,24 @@ class ServiceTestCase(TestCase, LoaderModuleMockMixin):
                 },
             )
 
+    def test_dead_in_offline_mode(self):
+        """
+        Tests the case in which a service.dead state is executed on an offline environemnt
+
+        """
+        name = "thisisnotarealservice"
+        with patch.object(service, "_offline", MagicMock(return_value=True)):
+            ret = service.dead(name=name)
+            self.assertDictEqual(
+                ret,
+                {
+                    "changes": {},
+                    "comment": "Running in OFFLINE mode. Nothing to do",
+                    "result": True,
+                    "name": name,
+                },
+            )
+
     def test_enabled(self):
         """
             Test to verify that the service is enabled
@@ -567,8 +603,11 @@ class ServiceTestCaseFunctional(TestCase, LoaderModuleMockMixin):
     @slowTest
     def test_running_with_reload(self):
         with patch.dict(service.__opts__, {"test": False}):
-            service.dead(self.service_name, enable=False)
-            result = service.running(name=self.service_name, enable=True, reload=False)
+            with patch("salt.utils.systemd.offline", MagicMock(return_value=False)):
+                service.dead(self.service_name, enable=False)
+                result = service.running(
+                    name=self.service_name, enable=True, reload=False
+                )
 
         if salt.utils.platform.is_windows():
             comment = "Started Service {}".format(self.service_name)
