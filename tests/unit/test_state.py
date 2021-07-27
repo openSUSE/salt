@@ -179,166 +179,6 @@ class StateCompilerTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
                 )
                 self.assertEqual(expected_result, return_result)
 
-    def test_verify_unless_list_cmd(self):
-        """
-        If any of the unless commands return False (non 0) then the state should
-        run (no skip_watch).
-        """
-        low_data = {
-            "state": "cmd",
-            "name": 'echo "something"',
-            "__sls__": "tests.cmd",
-            "__env__": "base",
-            "__id__": "check unless",
-            "unless": ["exit 0", "exit 1"],
-            "order": 10001,
-            "fun": "run",
-        }
-        expected_result = {
-            "comment": "unless condition is false",
-            "result": False,
-        }
-        with patch("salt.state.State._gather_pillar") as state_patch:
-            minion_opts = self.get_temp_config("minion")
-            state_obj = salt.state.State(minion_opts)
-            return_result = state_obj._run_check_unless(low_data, {})
-            self.assertEqual(expected_result, return_result)
-
-    def test_verify_unless_list_cmd_different_order(self):
-        """
-        If any of the unless commands return False (non 0) then the state should
-        run (no skip_watch). The order shouldn't matter.
-        """
-        low_data = {
-            "state": "cmd",
-            "name": 'echo "something"',
-            "__sls__": "tests.cmd",
-            "__env__": "base",
-            "__id__": "check unless",
-            "unless": ["exit 1", "exit 0"],
-            "order": 10001,
-            "fun": "run",
-        }
-        expected_result = {
-            "comment": "unless condition is false",
-            "result": False,
-        }
-        with patch("salt.state.State._gather_pillar") as state_patch:
-            minion_opts = self.get_temp_config("minion")
-            state_obj = salt.state.State(minion_opts)
-            return_result = state_obj._run_check_unless(low_data, {})
-            self.assertEqual(expected_result, return_result)
-
-    def test_verify_onlyif_list_cmd_different_order(self):
-        low_data = {
-            "state": "cmd",
-            "name": 'echo "something"',
-            "__sls__": "tests.cmd",
-            "__env__": "base",
-            "__id__": "check onlyif",
-            "onlyif": ["exit 1", "exit 0"],
-            "order": 10001,
-            "fun": "run",
-        }
-        expected_result = {
-            "comment": "onlyif condition is false",
-            "result": True,
-            "skip_watch": True,
-        }
-        with patch("salt.state.State._gather_pillar") as state_patch:
-            minion_opts = self.get_temp_config("minion")
-            state_obj = salt.state.State(minion_opts)
-            return_result = state_obj._run_check_onlyif(low_data, {})
-            self.assertEqual(expected_result, return_result)
-
-    def test_verify_unless_list_cmd_valid(self):
-        """
-        If any of the unless commands return False (non 0) then the state should
-        run (no skip_watch). This tests all commands return False.
-        """
-        low_data = {
-            "state": "cmd",
-            "name": 'echo "something"',
-            "__sls__": "tests.cmd",
-            "__env__": "base",
-            "__id__": "check unless",
-            "unless": ["exit 1", "exit 1"],
-            "order": 10001,
-            "fun": "run",
-        }
-        expected_result = {"comment": "unless condition is false", "result": False}
-        with patch("salt.state.State._gather_pillar") as state_patch:
-            minion_opts = self.get_temp_config("minion")
-            state_obj = salt.state.State(minion_opts)
-            return_result = state_obj._run_check_unless(low_data, {})
-            self.assertEqual(expected_result, return_result)
-
-    def test_verify_onlyif_list_cmd_valid(self):
-        low_data = {
-            "state": "cmd",
-            "name": 'echo "something"',
-            "__sls__": "tests.cmd",
-            "__env__": "base",
-            "__id__": "check onlyif",
-            "onlyif": ["exit 0", "exit 0"],
-            "order": 10001,
-            "fun": "run",
-        }
-        expected_result = {"comment": "onlyif condition is true", "result": False}
-        with patch("salt.state.State._gather_pillar") as state_patch:
-            minion_opts = self.get_temp_config("minion")
-            state_obj = salt.state.State(minion_opts)
-            return_result = state_obj._run_check_onlyif(low_data, {})
-            self.assertEqual(expected_result, return_result)
-
-    def test_verify_unless_list_cmd_invalid(self):
-        """
-        If any of the unless commands return False (non 0) then the state should
-        run (no skip_watch). This tests all commands return True
-        """
-        low_data = {
-            "state": "cmd",
-            "name": 'echo "something"',
-            "__sls__": "tests.cmd",
-            "__env__": "base",
-            "__id__": "check unless",
-            "unless": ["exit 0", "exit 0"],
-            "order": 10001,
-            "fun": "run",
-        }
-        expected_result = {
-            "comment": "unless condition is true",
-            "result": True,
-            "skip_watch": True,
-        }
-        with patch("salt.state.State._gather_pillar") as state_patch:
-            minion_opts = self.get_temp_config("minion")
-            state_obj = salt.state.State(minion_opts)
-            return_result = state_obj._run_check_unless(low_data, {})
-            self.assertEqual(expected_result, return_result)
-
-    def test_verify_onlyif_list_cmd_invalid(self):
-        low_data = {
-            "state": "cmd",
-            "name": 'echo "something"',
-            "__sls__": "tests.cmd",
-            "__env__": "base",
-            "__id__": "check onlyif",
-            "onlyif": ["exit 1", "exit 1"],
-            "order": 10001,
-            "fun": "run",
-        }
-        expected_result = {
-            "comment": "onlyif condition is false",
-            "result": True,
-            "skip_watch": True,
-        }
-        with patch("salt.state.State._gather_pillar") as state_patch:
-            minion_opts = self.get_temp_config("minion")
-            state_obj = salt.state.State(minion_opts)
-            return_result = state_obj._run_check_onlyif(low_data, {})
-            self.assertEqual(expected_result, return_result)
-
     def test_verify_unless_parse(self):
         low_data = {
             "unless": [
@@ -544,20 +384,23 @@ class StateCompilerTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
             self.assertEqual(expected_result, return_result)
 
     def test_verify_unless_list_cmd(self):
+        """
+        If any of the unless commands return False (non 0) then the state should
+        run (no skip_watch).
+        """
         low_data = {
             "state": "cmd",
             "name": 'echo "something"',
             "__sls__": "tests.cmd",
             "__env__": "base",
             "__id__": "check unless",
-            "unless": ["/bin/true", "/bin/false"],
+            "unless": ["exit 0", "exit 1"],
             "order": 10001,
             "fun": "run",
         }
         expected_result = {
-            "comment": "unless condition is true",
-            "result": True,
-            "skip_watch": True,
+            "comment": "unless condition is false",
+            "result": False,
         }
         with patch("salt.state.State._gather_pillar") as state_patch:
             minion_opts = self.get_temp_config("minion")
@@ -566,20 +409,23 @@ class StateCompilerTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
             self.assertEqual(expected_result, return_result)
 
     def test_verify_unless_list_cmd_different_order(self):
+        """
+        If any of the unless commands return False (non 0) then the state should
+        run (no skip_watch). The order shouldn't matter.
+        """
         low_data = {
             "state": "cmd",
             "name": 'echo "something"',
             "__sls__": "tests.cmd",
             "__env__": "base",
             "__id__": "check unless",
-            "unless": ["/bin/false", "/bin/true"],
+            "unless": ["exit 1", "exit 0"],
             "order": 10001,
             "fun": "run",
         }
         expected_result = {
-            "comment": "unless condition is true",
-            "result": True,
-            "skip_watch": True,
+            "comment": "unless condition is false",
+            "result": False,
         }
         with patch("salt.state.State._gather_pillar") as state_patch:
             minion_opts = self.get_temp_config("minion")
@@ -594,7 +440,7 @@ class StateCompilerTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
             "__sls__": "tests.cmd",
             "__env__": "base",
             "__id__": "check onlyif",
-            "onlyif": ["/bin/false", "/bin/true"],
+            "onlyif": ["exit 1", "exit 0"],
             "order": 10001,
             "fun": "run",
         }
@@ -610,13 +456,17 @@ class StateCompilerTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
             self.assertEqual(expected_result, return_result)
 
     def test_verify_unless_list_cmd_valid(self):
+        """
+        If any of the unless commands return False (non 0) then the state should
+        run (no skip_watch). This tests all commands return False.
+        """
         low_data = {
             "state": "cmd",
             "name": 'echo "something"',
             "__sls__": "tests.cmd",
             "__env__": "base",
             "__id__": "check unless",
-            "unless": ["/bin/false", "/bin/false"],
+            "unless": ["exit 1", "exit 1"],
             "order": 10001,
             "fun": "run",
         }
@@ -634,7 +484,7 @@ class StateCompilerTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
             "__sls__": "tests.cmd",
             "__env__": "base",
             "__id__": "check onlyif",
-            "onlyif": ["/bin/true", "/bin/true"],
+            "onlyif": ["exit 0", "exit 0"],
             "order": 10001,
             "fun": "run",
         }
@@ -646,13 +496,17 @@ class StateCompilerTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
             self.assertEqual(expected_result, return_result)
 
     def test_verify_unless_list_cmd_invalid(self):
+        """
+        If any of the unless commands return False (non 0) then the state should
+        run (no skip_watch). This tests all commands return True
+        """
         low_data = {
             "state": "cmd",
             "name": 'echo "something"',
             "__sls__": "tests.cmd",
             "__env__": "base",
             "__id__": "check unless",
-            "unless": ["/bin/true", "/bin/true"],
+            "unless": ["exit 0", "exit 0"],
             "order": 10001,
             "fun": "run",
         }
@@ -674,7 +528,7 @@ class StateCompilerTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
             "__sls__": "tests.cmd",
             "__env__": "base",
             "__id__": "check onlyif",
-            "onlyif": ["/bin/false", "/bin/false"],
+            "onlyif": ["exit 1", "exit 1"],
             "order": 10001,
             "fun": "run",
         }
