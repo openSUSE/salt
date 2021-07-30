@@ -30,7 +30,7 @@ ARCHES_ALPHA = (
     'alpha', 'alphaev4', 'alphaev45', 'alphaev5', 'alphaev56',
     'alphapca56', 'alphaev6', 'alphaev67', 'alphaev68', 'alphaev7'
 )
-ARCHES_ARM = ('armv5tel', 'armv5tejl', 'armv6l', 'armv7l')
+ARCHES_ARM = ('armv5tel', 'armv5tejl', 'armv6l', 'armv7l', 'aarch64')
 ARCHES_SH = ('sh3', 'sh4', 'sh4a')
 
 ARCHES = ARCHES_64 + ARCHES_32 + ARCHES_PPC + ARCHES_S390 + \
