@@ -184,11 +184,11 @@ class AESReqServerMixin(object):
         tagged "auth" and returns a dict with information about the auth
         event
 
-        # Verify that the key we are receiving matches the stored key
-        # Store the key if it is not there
-        # Make an RSA key with the pub key
-        # Encrypt the AES key as an encrypted salt.payload
-        # Package the return and return it
+            - Verify that the key we are receiving matches the stored key
+            - Store the key if it is not there
+            - Make an RSA key with the pub key
+            - Encrypt the AES key as an encrypted salt.payload
+            - Package the return and return it
         """
 
         if not salt.utils.verify.valid_id(self.opts, load["id"]):
@@ -460,7 +460,7 @@ class AESReqServerMixin(object):
         # and an empty request comes in
         try:
             pub = salt.crypt.get_rsa_pub_key(pubfn)
-        except (ValueError, IndexError, TypeError) as err:
+        except salt.crypt.InvalidKeyError as err:
             log.error('Corrupt public key "%s": %s', pubfn, err)
             return {"enc": "clear", "load": {"ret": False}}
 

@@ -11,6 +11,7 @@ import fnmatch
 import logging
 import os
 import shutil
+import sys
 
 # Import salt libs
 import salt.cache
@@ -652,17 +653,27 @@ class Key(object):
             keydirs.append(self.REJ)
         if include_denied:
             keydirs.append(self.DEN)
+        invalid_keys = []
         for keydir in keydirs:
             for key in matches.get(keydir, []):
+                key_path = os.path.join(self.opts["pki_dir"], keydir, key)
+                try:
+                    salt.crypt.get_rsa_pub_key(key_path)
+                except salt.exceptions.InvalidKeyError:
+                    log.error("Invalid RSA public key: %s", key)
+                    invalid_keys.append((keydir, key))
+                    continue
                 try:
                     shutil.move(
-                        os.path.join(self.opts["pki_dir"], keydir, key),
-                        os.path.join(self.opts["pki_dir"], self.ACC, key),
+                        key_path, os.path.join(self.opts["pki_dir"], self.ACC, key),
                     )
                     eload = {"result": True, "act": "accept", "id": key}
                     self.event.fire_event(eload, salt.utils.event.tagify(prefix="key"))
                 except (IOError, OSError):
                     pass
+        for keydir, key in invalid_keys:
+            matches[keydir].remove(key)
+            sys.stderr.write("Unable to accept invalid key for {}.\n".format(key))
         return self.name_match(match) if match is not None else self.dict_match(matches)
 
     def accept_all(self):
