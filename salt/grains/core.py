@@ -87,7 +87,7 @@ if salt.utils.platform.is_windows():
         HAS_WMI = True
     except ImportError:
         log.exception(
-            "Unable to import Python wmi module, some core grains " "will be missing"
+            "Unable to import Python wmi module, some core grains will be missing"
         )
 
 
