@@ -132,6 +132,10 @@ DEBUG="{{DEBUG}}"
 if [ -n "$DEBUG" ]
     then set -x
 fi
+SALTDIR="{{SALTDIR}}"
+if [ -n "$SALTDIR" ]
+    then find "$SALTDIR" -name 'salt_state*.tgz' -mtime +1 -delete 2>/dev/null || true
+fi
 SET_PATH="{{SET_PATH}}"
 if [ -n "$SET_PATH" ]
     then export PATH={{SET_PATH}}
@@ -903,6 +907,9 @@ class Single:
             self.wipe = False
         else:
             self.wipe = bool(self.opts.get("ssh_wipe"))
+        self.wipe_state = ""
+        if kwargs.get("wipe_state"):
+            self.wipe_state = kwargs["wipe_state"]
         if kwargs.get("thin_dir"):
             self.thin_dir = kwargs["thin_dir"]
         elif self.winrm:
@@ -1315,6 +1322,7 @@ OPTIONS.hashfunc = '{hashfunc}'
 OPTIONS.version = '{version}'
 OPTIONS.ext_mods = '{ext_mods}'
 OPTIONS.wipe = {wipe}
+OPTIONS.wipe_state = '{wipe_state}'
 OPTIONS.tty = {tty}
 OPTIONS.cmd_umask = {cmd_umask}
 OPTIONS.code_checksum = {code_checksum}
@@ -1327,6 +1335,7 @@ ARGS = {arguments}\n'''.format(
             version=salt.version.__version__,
             ext_mods=self.mods.get("version", ""),
             wipe=self.wipe,
+            wipe_state=self.wipe_state,
             tty=self.tty,
             cmd_umask=self.cmd_umask,
             code_checksum=thin_code_digest,
@@ -1342,6 +1351,7 @@ ARGS = {arguments}\n'''.format(
                 SSH_PY_CODE=py_code_enc,
                 HOST_PY_MAJOR=sys.version_info[0],
                 SET_PATH=self.set_path,
+                SALTDIR=self.thin_dir,
             )
         else:
             cmd = saltwinshell.gen_shim(py_code_enc)
