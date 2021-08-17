@@ -6,6 +6,7 @@ import base64
 import binascii
 import copy
 import datetime
+import gc
 import getpass
 import hashlib
 import logging
@@ -49,6 +50,8 @@ from salt.template import compile_template
 from salt.utils.platform import is_windows
 from salt.utils.process import Process
 from salt.utils.zeromq import zmq
+
+from unittest.mock import patch
 
 try:
     import saltwinshell
@@ -203,6 +206,15 @@ if not is_windows():
         SSH_PY_SHIM = ssh_py_shim.read()
 
 log = logging.getLogger(__name__)
+
+
+class FakeLock:
+
+    def acquire(self):
+        pass
+
+    def release(self):
+        pass
 
 
 class SSH:
@@ -537,37 +549,38 @@ class SSH:
         Run the routine in a "Thread", put a dict on the queue
         """
         opts = copy.deepcopy(opts)
-        single = Single(
-            opts,
-            opts["argv"],
-            host,
-            mods=self.mods,
-            fsclient=self.fsclient,
-            thin=self.thin,
-            mine=mine,
-            **target
-        )
-        ret = {"id": single.id}
-        logging._acquireLock()
-        stdout, stderr, retcode = single.run()
-        logging._releaseLock()
-        # This job is done, yield
-        try:
-            data = salt.utils.json.find_json(stdout)
-            if len(data) < 2 and "local" in data:
-                ret["ret"] = data["local"]
-            else:
+        ret = {}
+        fake_lock = FakeLock()
+        with patch("importlib._bootstrap._get_module_lock", return_value=fake_lock):
+            single = Single(
+                opts,
+                opts["argv"],
+                host,
+                mods=self.mods,
+                fsclient=self.fsclient,
+                thin=self.thin,
+                mine=mine,
+                **target
+            )
+            ret = {"id": single.id}
+            stdout, stderr, retcode = single.run()
+            # This job is done, yield
+            try:
+                data = salt.utils.json.find_json(stdout)
+                if len(data) < 2 and "local" in data:
+                    ret["ret"] = data["local"]
+                else:
+                    ret["ret"] = {
+                        "stdout": stdout,
+                        "stderr": stderr,
+                        "retcode": retcode,
+                    }
+            except Exception:  # pylint: disable=broad-except
                 ret["ret"] = {
                     "stdout": stdout,
                     "stderr": stderr,
                     "retcode": retcode,
                 }
-        except Exception:  # pylint: disable=broad-except
-            ret["ret"] = {
-                "stdout": stdout,
-                "stderr": stderr,
-                "retcode": retcode,
-            }
         que.put(ret)
 
     def handle_ssh(self, mine=False):
@@ -618,14 +631,9 @@ class SSH:
                     self.targets[host],
                     mine,
                 )
-                try:
-                    logging._acquireLock()
-                    routine = Process(target=self.handle_routine, args=args)
-                    routine.start()
-                except:
-                    pass
-                finally:
-                    logging._releaseLock()
+                routine = Process(target=self.handle_routine, args=args)
+                gc.collect()
+                routine.start()
                 running[host] = {"thread": routine}
                 continue
             ret = {}
