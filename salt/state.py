@@ -906,9 +906,14 @@ class State:
             cmd_opts[run_cmd_arg] = low_data.get(run_cmd_arg)
 
         if "shell" in low_data:
-            cmd_opts["shell"] = low_data["shell"]
+            shell = low_data["shell"]
         elif "shell" in self.opts["grains"]:
-            cmd_opts["shell"] = self.opts["grains"].get("shell")
+            shell = self.opts["grains"].get("shell")
+        else:
+            shell = None
+        # /sbin/nologin always causes the onlyif / unless cmd to fail
+        if shell is not None and shell != "/sbin/nologin":
+            cmd_opts["shell"] = shell
 
         if "onlyif" in low_data:
             _ret = self._run_check_onlyif(low_data, cmd_opts)
