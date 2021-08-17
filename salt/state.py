@@ -942,9 +942,14 @@ class State:
                 cmd_opts[run_cmd_arg] = low.get(run_cmd_arg)
 
         if "shell" in low and "shell" not in cmd_opts_exclude:
-            cmd_opts["shell"] = low["shell"]
+            shell = low["shell"]
         elif "shell" in self.opts["grains"]:
-            cmd_opts["shell"] = self.opts["grains"].get("shell")
+            shell = self.opts["grains"].get("shell")
+        else:
+            shell = None
+        # /sbin/nologin always causes the onlyif / unless cmd to fail
+        if shell is not None and shell != "/sbin/nologin":
+            cmd_opts["shell"] = shell
 
         if "onlyif" in low:
             _ret = self._run_check_onlyif(low, cmd_opts)
