@@ -929,7 +929,8 @@ class State:
 
     def _run_check_onlyif(self, low_data, cmd_opts):
         """
-        Check that unless doesn't return 0, and that onlyif returns a 0.
+        Make sure that all commands return True for the state to run. If any
+        command returns False (non 0), the state will not run
         """
         ret = {"result": False}
 
@@ -938,7 +939,9 @@ class State:
         else:
             low_data_onlyif = low_data["onlyif"]
 
+        # If any are False the state will NOT run
         def _check_cmd(cmd):
+            # Don't run condition (False)
             if cmd != 0 and ret["result"] is False:
                 ret.update(
                     {
@@ -1001,7 +1004,8 @@ class State:
 
     def _run_check_unless(self, low_data, cmd_opts):
         """
-        Check that unless doesn't return 0, and that onlyif returns a 0.
+        Check if any of the commands return False (non 0). If any are False the
+        state will run.
         """
         ret = {"result": False}
 
@@ -1010,8 +1014,10 @@ class State:
         else:
             low_data_unless = low_data["unless"]
 
+        # If any are False the state will run
         def _check_cmd(cmd):
-            if cmd == 0 and ret["result"] is False:
+            # Don't run condition
+            if cmd == 0:
                 ret.update(
                     {
                         "comment": "unless condition is true",
@@ -1020,9 +1026,10 @@ class State:
                     }
                 )
                 return False
-            elif cmd != 0:
+            else:
+                ret.pop("skip_watch", None)
                 ret.update({"comment": "unless condition is false", "result": False})
-            return True
+                return True
 
         for entry in low_data_unless:
             if isinstance(entry, str):
@@ -1034,7 +1041,7 @@ class State:
                 except CommandExecutionError:
                     # Command failed, so notify unless to skip the item
                     cmd = 0
-                if not _check_cmd(cmd):
+                if _check_cmd(cmd):
                     return ret
             elif isinstance(entry, dict):
                 if "fun" not in entry:
@@ -1047,7 +1054,7 @@ class State:
                 if get_return:
                     result = salt.utils.data.traverse_dict_and_list(result, get_return)
                 if self.state_con.get("retcode", 0):
-                    if not _check_cmd(self.state_con["retcode"]):
+                    if _check_cmd(self.state_con["retcode"]):
                         return ret
                 elif result:
                     ret.update(
@@ -1057,11 +1064,11 @@ class State:
                             "result": True,
                         }
                     )
-                    return ret
                 else:
                     ret.update(
                         {"comment": "unless condition is false", "result": False}
                     )
+                    return ret
             else:
                 ret.update(
                     {
@@ -1069,7 +1076,6 @@ class State:
                         "result": False,
                     }
                 )
-                return ret
 
         # No reason to stop, return ret
         return ret
