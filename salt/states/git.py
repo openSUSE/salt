@@ -13,7 +13,6 @@ States to manage git repositories and git configuration
 from __future__ import absolute_import, print_function, unicode_literals
 
 # Import python libs
-import copy
 import errno
 import logging
 import os
@@ -263,34 +262,34 @@ def _not_fast_forward(ret, rev, pre, post, branch, local_branch,
     )
 
 
-def latest(name,
-           rev='HEAD',
-           target=None,
-           branch=None,
-           user=None,
-           password=None,
-           update_head=True,
-           force_checkout=False,
-           force_clone=False,
-           force_fetch=False,
-           force_reset=False,
-           submodules=False,
-           bare=False,
-           mirror=False,
-           remote='origin',
-           fetch_tags=True,
-           sync_tags=True,
-           depth=None,
-           identity=None,
-           https_user=None,
-           https_pass=None,
-           onlyif=None,
-           unless=None,
-           refspec_branch='*',
-           refspec_tag='*',
-           output_encoding=None,
-           **kwargs):
-    '''
+def latest(
+    name,
+    rev="HEAD",
+    target=None,
+    branch=None,
+    user=None,
+    password=None,
+    update_head=True,
+    force_checkout=False,
+    force_clone=False,
+    force_fetch=False,
+    force_reset=False,
+    submodules=False,
+    bare=False,
+    mirror=False,
+    remote="origin",
+    fetch_tags=True,
+    sync_tags=True,
+    depth=None,
+    identity=None,
+    https_user=None,
+    https_pass=None,
+    refspec_branch="*",
+    refspec_tag="*",
+    output_encoding=None,
+    **kwargs
+):
+    """
     Make sure the repository is cloned to the given directory and is
     up-to-date.
 
@@ -545,14 +544,6 @@ def latest(name,
 
         .. versionadded:: 2015.5.0
 
-    onlyif
-        A command to run as a check, run the named command only if the command
-        passed to the ``onlyif`` option returns true
-
-    unless
-        A command to run as a check, only run the named command if the command
-        passed to the ``unless`` option returns false
-
     refspec_branch : *
         A glob expression defining which branches to retrieve when fetching.
         See `git-fetch(1)`_ for more information on how refspecs work.
@@ -627,7 +618,7 @@ def latest(name,
                 - require:
                   - pkg: git
                   - ssh_known_hosts: gitlab.example.com
-    '''
+    """
     ret = {'name': name, 'result': True, 'comment': '', 'changes': {}}
 
     kwargs = salt.utils.args.clean_kwargs(**kwargs)
@@ -745,18 +736,14 @@ def latest(name,
     if 'shell' in __grains__:
         run_check_cmd_kwargs['shell'] = __grains__['shell']
 
-    # check if git.latest should be applied
-    cret = mod_run_check(
-        run_check_cmd_kwargs, onlyif, unless
+    refspecs = (
+        [
+            "refs/heads/{0}:refs/remotes/{1}/{0}".format(refspec_branch, remote),
+            "+refs/tags/{0}:refs/tags/{0}".format(refspec_tag),
+        ]
+        if fetch_tags
+        else []
     )
-    if isinstance(cret, dict):
-        ret.update(cret)
-        return ret
-
-    refspecs = [
-        'refs/heads/{0}:refs/remotes/{1}/{0}'.format(refspec_branch, remote),
-        '+refs/tags/{0}:refs/tags/{0}'.format(refspec_tag)
-    ] if fetch_tags else []
 
     log.info('Checking remote revision for %s', name)
     try:
@@ -2235,25 +2222,25 @@ def present(name,
     return ret
 
 
-def detached(name,
-           rev,
-           target=None,
-           remote='origin',
-           user=None,
-           password=None,
-           force_clone=False,
-           force_checkout=False,
-           fetch_remote=True,
-           hard_reset=False,
-           submodules=False,
-           identity=None,
-           https_user=None,
-           https_pass=None,
-           onlyif=None,
-           unless=None,
-           output_encoding=None,
-           **kwargs):
-    '''
+def detached(
+    name,
+    rev,
+    target=None,
+    remote="origin",
+    user=None,
+    password=None,
+    force_clone=False,
+    force_checkout=False,
+    fetch_remote=True,
+    hard_reset=False,
+    submodules=False,
+    identity=None,
+    https_user=None,
+    https_pass=None,
+    output_encoding=None,
+    **kwargs
+):
+    """
     .. versionadded:: 2016.3.0
 
     Make sure a repository is cloned to the given target directory and is
@@ -2322,14 +2309,6 @@ def detached(name,
     https_pass
         HTTP Basic Auth password for HTTPS (only) clones
 
-    onlyif
-        A command to run as a check, run the named command only if the command
-        passed to the ``onlyif`` option returns true
-
-    unless
-        A command to run as a check, only run the named command if the command
-        passed to the ``unless`` option returns false
-
     output_encoding
         Use this option to specify which encoding to use to decode the output
         from any git commands which are run. This should not be needed in most
@@ -2341,7 +2320,7 @@ def detached(name,
             Unicode characters.
 
         .. versionadded:: 2018.3.1
-    '''
+    """
 
     ret = {'name': name, 'result': True, 'comment': '', 'changes': {}}
 
@@ -2427,17 +2406,6 @@ def detached(name,
         return _fail(ret, exc.__str__())
 
     redacted_fetch_url = salt.utils.url.redact_http_basic_auth(desired_fetch_url)
-
-    # Check if onlyif or unless conditions match
-    run_check_cmd_kwargs = {'runas': user}
-    if 'shell' in __grains__:
-        run_check_cmd_kwargs['shell'] = __grains__['shell']
-    cret = mod_run_check(
-        run_check_cmd_kwargs, onlyif, unless
-    )
-    if isinstance(cret, dict):
-        ret.update(cret)
-        return ret
 
     # Determine if supplied ref is a hash
     remote_rev_type = 'ref'
@@ -3436,77 +3404,3 @@ def config_set(name,
         value_comment
     )
     return ret
-
-
-def mod_run_check(cmd_kwargs, onlyif, unless):
-    '''
-    Execute the onlyif and unless logic. Return a result dict if:
-
-    * onlyif failed (onlyif != 0)
-    * unless succeeded (unless == 0)
-
-    Otherwise, returns ``True``
-    '''
-    cmd_kwargs = copy.deepcopy(cmd_kwargs)
-    cmd_kwargs.update({
-        'use_vt': False,
-        'bg': False,
-        'ignore_retcode': True,
-        'python_shell': True,
-    })
-
-    if onlyif is not None:
-        if not isinstance(onlyif, list):
-            onlyif = [onlyif]
-
-        for command in onlyif:
-            if not isinstance(command, six.string_types) and command:
-                # Boolean or some other non-string which resolves to True
-                continue
-            try:
-                if __salt__['cmd.retcode'](command, **cmd_kwargs) == 0:
-                    # Command exited with a zero retcode
-                    continue
-            except Exception as exc:  # pylint: disable=broad-except
-                log.exception(
-                    'The following onlyif command raised an error: %s',
-                    command
-                )
-                return {
-                    'comment': 'onlyif raised error ({0}), see log for '
-                               'more details'.format(exc),
-                    'result': False
-                }
-
-            return {'comment': 'onlyif condition is false',
-                    'skip_watch': True,
-                    'result': True}
-
-    if unless is not None:
-        if not isinstance(unless, list):
-            unless = [unless]
-
-        for command in unless:
-            if not isinstance(command, six.string_types) and not command:
-                # Boolean or some other non-string which resolves to False
-                break
-            try:
-                if __salt__['cmd.retcode'](command, **cmd_kwargs) != 0:
-                    # Command exited with a non-zero retcode
-                    break
-            except Exception as exc:  # pylint: disable=broad-except
-                log.exception(
-                    'The following unless command raised an error: %s',
-                    command
-                )
-                return {
-                    'comment': 'unless raised error ({0}), see log for '
-                               'more details'.format(exc),
-                    'result': False
-                }
-        else:
-            return {'comment': 'unless condition is true',
-                    'skip_watch': True,
-                    'result': True}
-
-    return True
