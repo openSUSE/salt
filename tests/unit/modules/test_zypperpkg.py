@@ -2125,3 +2125,23 @@ pattern() = package-c"""
             ret = zypper.list_holds()
             assert len(ret) == 1
             assert "bar-2:2.3.4-2.1.*" in ret
+
+    def test_normalize_name(self):
+        """
+        Test that package is normalized only when it should be
+        """
+        with patch.dict(zypper.__grains__, {"osarch": "x86_64"}):
+            result = zypper.normalize_name("foo")
+            assert result == "foo", result
+            result = zypper.normalize_name("foo.x86_64")
+            assert result == "foo", result
+            result = zypper.normalize_name("foo.noarch")
+            assert result == "foo", result
+
+        with patch.dict(zypper.__grains__, {"osarch": "aarch64"}):
+            result = zypper.normalize_name("foo")
+            assert result == "foo", result
+            result = zypper.normalize_name("foo.aarch64")
+            assert result == "foo", result
+            result = zypper.normalize_name("foo.noarch")
+            assert result == "foo", result
