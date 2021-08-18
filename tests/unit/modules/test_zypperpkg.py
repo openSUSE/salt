@@ -2477,3 +2477,23 @@ pattern() = package-c"""
         with patch("salt.modules.zypperpkg.__zypper__", zypper_mock):
             assert zypper.services_need_restart() == expected
             zypper_mock(root=None).nolock.call.assert_called_with("ps", "-sss")
+
+    def test_normalize_name(self):
+        """
+        Test that package is normalized only when it should be
+        """
+        with patch.dict(zypper.__grains__, {"osarch": "x86_64"}):
+            result = zypper.normalize_name("foo")
+            assert result == "foo", result
+            result = zypper.normalize_name("foo.x86_64")
+            assert result == "foo", result
+            result = zypper.normalize_name("foo.noarch")
+            assert result == "foo", result
+
+        with patch.dict(zypper.__grains__, {"osarch": "aarch64"}):
+            result = zypper.normalize_name("foo")
+            assert result == "foo", result
+            result = zypper.normalize_name("foo.aarch64")
+            assert result == "foo", result
+            result = zypper.normalize_name("foo.noarch")
+            assert result == "foo", result
