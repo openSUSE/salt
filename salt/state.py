@@ -56,6 +56,7 @@ from salt.exceptions import (
 from salt.utils.odict import OrderedDict, DefaultOrderedDict
 # Explicit late import to avoid circular import. DO NOT MOVE THIS.
 import salt.utils.yamlloader as yamlloader
+from salt.exceptions import CommandExecutionError, SaltRenderError, SaltReqTimeoutError
 
 # Import third party libs
 # pylint: disable=import-error,no-name-in-module,redefined-builtin
@@ -97,6 +98,7 @@ STATE_RUNTIME_KEYWORDS = frozenset([
     'failhard',
     'onlyif',
     'unless',
+    'creates',
     'retry',
     'order',
     'parallel',
@@ -868,6 +870,14 @@ class State(object):
                 # If either result is True, the returned result should be True
                 ret['skip_watch'] = _ret['skip_watch'] or ret['skip_watch']
 
+        if "creates" in low_data:
+            _ret = self._run_check_creates(low_data)
+            ret["result"] = _ret["result"] or ret["result"]
+            ret["comment"].append(_ret["comment"])
+            if "skip_watch" in _ret:
+                # If either result is True, the returned result should be True
+                ret["skip_watch"] = _ret["skip_watch"] or ret["skip_watch"]
+
         return ret
 
     def _run_check_function(self, entry):
@@ -882,31 +892,43 @@ class State(object):
         return self.functions[fun](*cdata['args'], **cdata['kwargs'])
 
     def _run_check_onlyif(self, low_data, cmd_opts):
-        '''
-        Check that unless doesn't return 0, and that onlyif returns a 0.
-        '''
-        ret = {'result': False}
+        """
+        Make sure that all commands return True for the state to run. If any
+        command returns False (non 0), the state will not run
+        """
+        ret = {"result": False}
 
         if not isinstance(low_data['onlyif'], list):
             low_data_onlyif = [low_data['onlyif']]
         else:
             low_data_onlyif = low_data['onlyif']
 
+        # If any are False the state will NOT run
         def _check_cmd(cmd):
-            if cmd != 0 and ret['result'] is False:
-                ret.update({'comment': 'onlyif condition is false',
-                            'skip_watch': True,
-                            'result': True})
+            # Don't run condition (False)
+            if cmd != 0 and ret["result"] is False:
+                ret.update(
+                    {
+                        "comment": "onlyif condition is false",
+                        "skip_watch": True,
+                        "result": True,
+                    }
+                )
                 return False
             elif cmd == 0:
-                ret.update({'comment': 'onlyif condition is true', 'result': False})
+                ret.update({"comment": "onlyif condition is true", "result": False})
             return True
 
         for entry in low_data_onlyif:
             if isinstance(entry, six.string_types):
-                cmd = self.functions['cmd.retcode'](
-                    entry, ignore_retcode=True, python_shell=True, **cmd_opts)
-                log.debug('Last command return code: %s', cmd)
+                try:
+                    cmd = self.functions["cmd.retcode"](
+                        entry, ignore_retcode=True, python_shell=True, **cmd_opts
+                    )
+                except CommandExecutionError:
+                    # Command failed, notify onlyif to skip running the item
+                    cmd = 100
+                log.debug("Last command return code: %s", cmd)
                 if not _check_cmd(cmd):
                     return ret
             elif isinstance(entry, dict):
@@ -934,31 +956,45 @@ class State(object):
         return ret
 
     def _run_check_unless(self, low_data, cmd_opts):
-        '''
-        Check that unless doesn't return 0, and that onlyif returns a 0.
-        '''
-        ret = {'result': False}
+        """
+        Check if any of the commands return False (non 0). If any are False the
+        state will run.
+        """
+        ret = {"result": False}
 
         if not isinstance(low_data['unless'], list):
             low_data_unless = [low_data['unless']]
         else:
             low_data_unless = low_data['unless']
 
+        # If any are False the state will run
         def _check_cmd(cmd):
-            if cmd == 0 and ret['result'] is False:
-                ret.update({'comment': 'unless condition is true',
-                            'skip_watch': True,
-                            'result': True})
+            # Don't run condition
+            if cmd == 0:
+                ret.update(
+                    {
+                        "comment": "unless condition is true",
+                        "skip_watch": True,
+                        "result": True,
+                    }
+                )
                 return False
-            elif cmd != 0:
-                ret.update({'comment': 'unless condition is false', 'result': False})
-            return True
+            else:
+                ret.pop("skip_watch", None)
+                ret.update({"comment": "unless condition is false", "result": False})
+                return True
 
         for entry in low_data_unless:
             if isinstance(entry, six.string_types):
-                cmd = self.functions['cmd.retcode'](entry, ignore_retcode=True, python_shell=True, **cmd_opts)
-                log.debug('Last command return code: %s', cmd)
-                if not _check_cmd(cmd):
+                try:
+                    cmd = self.functions["cmd.retcode"](
+                        entry, ignore_retcode=True, python_shell=True, **cmd_opts
+                    )
+                    log.debug("Last command return code: %s", cmd)
+                except CommandExecutionError:
+                    # Command failed, so notify unless to skip the item
+                    cmd = 0
+                if _check_cmd(cmd):
                     return ret
             elif isinstance(entry, dict):
                 if 'fun' not in entry:
@@ -967,20 +1003,29 @@ class State(object):
                     return ret
 
                 result = self._run_check_function(entry)
-                if self.state_con.get('retcode', 0):
-                    if not _check_cmd(self.state_con['retcode']):
+                if self.state_con.get("retcode", 0):
+                    if _check_cmd(self.state_con["retcode"]):
                         return ret
                 elif result:
-                    ret.update({'comment': 'unless condition is true',
-                                'skip_watch': True,
-                                'result': True})
-                    return ret
+                    ret.update(
+                        {
+                            "comment": "unless condition is true",
+                            "skip_watch": True,
+                            "result": True,
+                        }
+                    )
                 else:
-                    ret.update({'comment': 'unless condition is false',
-                                'result': False})
+                    ret.update(
+                        {"comment": "unless condition is false", "result": False}
+                    )
+                    return ret
             else:
-                ret.update({'comment': 'unless condition is false, bad type passed', 'result': False})
-                return ret
+                ret.update(
+                    {
+                        "comment": "unless condition is false, bad type passed",
+                        "result": False,
+                    }
+                )
 
         # No reason to stop, return ret
         return ret
@@ -1002,6 +1047,30 @@ class State(object):
             elif cmd != 0:
                 ret.update({'comment': 'check_cmd determined the state failed', 'result': False})
                 return ret
+        return ret
+
+    def _run_check_creates(self, low_data):
+        """
+        Check that listed files exist
+        """
+        ret = {"result": False}
+
+        if isinstance(low_data["creates"], six.string_types) and os.path.exists(
+            low_data["creates"]
+        ):
+            ret["comment"] = "{0} exists".format(low_data["creates"])
+            ret["result"] = True
+            ret["skip_watch"] = True
+        elif isinstance(low_data["creates"], list) and all(
+            [os.path.exists(path) for path in low_data["creates"]]
+        ):
+            ret["comment"] = "All files in creates exist"
+            ret["result"] = True
+            ret["skip_watch"] = True
+        else:
+            ret["comment"] = "Creates files not found"
+            ret["result"] = False
+
         return ret
 
     def reset_run_num(self):
@@ -1953,8 +2022,11 @@ class State(object):
             # that's not found in cdata, we look for what we're being passed in
             # the original data, namely, the special dunder __env__. If that's
             # not found we default to 'base'
-            if ('unless' in low and '{0[state]}.mod_run_check'.format(low) not in self.states) or \
-                    ('onlyif' in low and '{0[state]}.mod_run_check'.format(low) not in self.states):
+            req_list = ("unless", "onlyif", "creates")
+            if (
+                any(req in low for req in req_list)
+                and "{0[state]}.mod_run_check".format(low) not in self.states
+            ):
                 ret.update(self._run_check(low))
 
             if not self.opts.get('lock_saltenv', False):
