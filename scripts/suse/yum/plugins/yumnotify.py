@@ -5,6 +5,7 @@
 
 import hashlib
 import os
+import sys
 
 from yum import config
 from yum.plugins import TYPE_CORE
@@ -62,5 +63,5 @@ def posttrans_hook(conduit):
                         chksum=_get_checksum(), mtime=_get_mtime()
                     )
                 )
-        except Exception:  # pylint: disable=broad-except:
-            pass
+        except (IOError, OSError) as e:
+            sys.stderr.write("Unable to save the cookie file: {}\n".format(e))

@@ -65,8 +65,8 @@ class DriftDetector(Plugin):
                             chksum=self._get_checksum(), mtime=self._get_mtime()
                         )
                     )
-            except Exception:  # pylint: disable=broad-except:
-                pass
+            except (IOError, OSError) as e:
+                sys.stderr.write("Unable to save the cookie file: {}\n".format(e))
 
         self.ack()
 

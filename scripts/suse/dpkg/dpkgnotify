@@ -2,6 +2,7 @@
 
 import os
 import hashlib
+import sys
 
 CK_PATH = "/var/cache/salt/minion/dpkg.cookie"
 DPKG_PATH = "/var/lib/dpkg/status"
@@ -46,8 +47,8 @@ def dpkg_post_invoke():
                         chksum=_get_checksum(), mtime=_get_mtime()
                     )
                 )
-        except Exception:  # pylint: disable=broad-except:
-            pass
+        except (IOError, OSError) as e:
+            sys.stderr.write("Unable to save the cookie file: {}\n".format(e))
 
 
 if __name__ == "__main__":
