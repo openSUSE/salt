@@ -52,15 +52,21 @@ class DriftDetector(Plugin):
 
     def PLUGINEND(self, headers, body):
         """
-        Hook when plugin closes Zypper's transaction.        
+        Hook when plugin closes Zypper's transaction.
         """
         if "SALT_RUNNING" not in os.environ:
-            with open(self.ck_path, "w") as ck_fh:
-                ck_fh.write(
-                    "{chksum} {mtime}\n".format(
-                        chksum=self._get_checksum(), mtime=self._get_mtime()
+            try:
+                ck_dir = os.path.dirname(self.ck_path)
+                if not os.path.exists(ck_dir):
+                   os.makedirs(ck_dir)
+                with open(self.ck_path, "w") as ck_fh:
+                    ck_fh.write(
+                        "{chksum} {mtime}\n".format(
+                            chksum=self._get_checksum(), mtime=self._get_mtime()
+                        )
                     )
-                )
+            except Exception:  # pylint: disable=broad-except:
+                pass
 
         self.ack()
 
