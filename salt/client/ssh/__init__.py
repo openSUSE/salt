@@ -154,6 +154,8 @@ elif [ "$SUDO" ] && [ -n "$SUDO_USER" ]
 then SUDO="sudo "
 fi
 EX_PYTHON_INVALID={EX_THIN_PYTHON_INVALID}
+SSH_PY_CODE='import base64;
+exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
 PYTHON_CMDS="python3 /usr/libexec/platform-python python27 python2.7 python26 python2.6 python2 python"
 for py_cmd in $PYTHON_CMDS
 do
@@ -174,13 +176,9 @@ do
             exec $SUDO PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH \
                      MANPATH=$MANPATH XDG_DATA_DIRS=$XDG_DATA_DIRS \
                      PKG_CONFIG_PATH=$PKG_CONFIG_PATH \
-                     "$py_cmd_path" -c \
-                   'import base64;
-                   exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+                     "$py_cmd_path" -c "$SSH_PY_CODE"
         else
-            exec $SUDO "$py_cmd_path" -c \
-                   'import base64;
-                   exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+            exec $SUDO "$py_cmd_path" -c "$SSH_PY_CODE"
         fi
         exit 0
     else

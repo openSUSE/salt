@@ -9,6 +9,7 @@ separate file, for convenience of development.
 """
 from __future__ import absolute_import, print_function
 
+import fcntl
 import hashlib
 import os
 import shutil
@@ -273,6 +274,11 @@ def main(argv):  # pylint: disable=W0613
     """
     Main program body
     """
+    try:
+        lock_fh = open("{0}.lock".format(OPTIONS.saltdir), "w")
+        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+    except (IOError, OSError):
+        pass
     thin_path = os.path.join(OPTIONS.saltdir, THIN_ARCHIVE)
     if os.path.isfile(thin_path):
         if OPTIONS.checksum != get_hash(thin_path, OPTIONS.hashfunc):
