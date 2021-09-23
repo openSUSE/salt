@@ -24,6 +24,17 @@ log = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="session")
+def ext_pillar_file_tree_root_dir(pillar_tree_root_dir):
+    """
+    Fixture which returns the salt pillar file tree directory path.
+    Creates the directory if it does not yet exist.
+    """
+    dirname = pillar_tree_root_dir / "file-tree"
+    dirname.mkdir(exist_ok=True)
+    return dirname
+
+
+@pytest.fixture(scope="session")
 def salt_minion_id():
     return random_string("minion-")
 
