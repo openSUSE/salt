@@ -58,6 +58,26 @@ def salt_auto_account_factory():
     return TestAccount(username="saltdev-auto")
 
 
+@pytest.fixture(scope="module")
+def salt_ssh_roster_file(sshd_server, salt_master):
+    roster_contents = """
+    localhost:
+      host: 127.0.0.1
+      port: {}
+      user: {}
+      mine_functions:
+        test.arg: ['itworked']
+    """.format(
+        sshd_server.listen_port, RUNTIME_VARS.RUNNING_TESTS_USER
+    )
+    if salt.utils.platform.is_darwin():
+        roster_contents += "  set_path: $PATH:/usr/local/bin/\n"
+    with pytest.helpers.temp_file(
+        "roster", roster_contents, salt_master.config_dir
+    ) as roster_file:
+        yield roster_file
+
+
 @pytest.fixture(scope="session")
 def salt_minion_id():
     return random_string("minion-")
