@@ -137,6 +137,33 @@ These columns define list grouping
 The range for with_lists is 1 to number_of_fields, inclusive.
 Numbers outside this range are ignored.
 
+If you specify `as_json: True` in the mapping expression and query only for
+single value, returned data are considered in JSON format and will be merged
+directly.
+
+.. code-block:: yaml
+
+  ext_pillar:
+    - sql_base:
+        - query: "SELECT json_pillar FROM pillars WHERE minion_id = %s"
+          as_json: True
+
+The processed JSON entries are recursively merged in a single dictionary.
+Additionnaly if `as_list` is set to `True` the lists will be merged in case of collision.
+
+For instance the following rows:
+
+    {"a": {"b": [1, 2]}, "c": 3}
+    {"a": {"b": [1, 3]}, "d": 4}
+
+will result in the following pillar with `as_list=False`
+
+    {"a": {"b": [1, 3], "c": 3, "d": 4}
+
+and in with `as_list=True`
+
+    {"a": {"b": [1, 2, 3], "c": 3, "d": 4}
+
 Finally, if you pass the queries in via a mapping, the key will be the
 first level name where as passing them in as a list will place them in the
 root.  This isolates the query results into their own subtrees.
@@ -179,6 +206,7 @@ from salt.ext import six
 from salt.ext.six.moves import range
 
 # Import Salt libs
+from salt.utils.dictupdate import update
 from salt.utils.odict import OrderedDict
 
 # Please don't strip redundant parentheses from this file.
@@ -208,6 +236,7 @@ class SqlBaseExtPillar(six.with_metaclass(abc.ABCMeta, object)):
     num_fields = 0
     depth = 0
     as_list = False
+    as_json = False
     with_lists = None
     ignore_null = False
 
@@ -267,6 +296,7 @@ class SqlBaseExtPillar(six.with_metaclass(abc.ABCMeta, object)):
                 "query": "",
                 "depth": 0,
                 "as_list": False,
+                "as_json": False,
                 "with_lists": None,
                 "ignore_null": False,
             }
@@ -324,6 +354,13 @@ class SqlBaseExtPillar(six.with_metaclass(abc.ABCMeta, object)):
         for ret in rows:
             # crd is the Current Return Data level, to make this non-recursive.
             crd = self.focus
+
+            # We have just one field without any key, assume returned row is already a dict
+            # aka JSON storage
+            if self.as_json and self.num_fields == 1:
+                crd = update(crd, ret[0], merge_lists=self.as_list)
+                continue
+
             # Walk and create dicts above the final layer
             for i in range(0, self.depth - 1):
                 # At the end we'll use listify to find values to make a list of
@@ -443,6 +480,7 @@ class SqlBaseExtPillar(six.with_metaclass(abc.ABCMeta, object)):
                 )
                 self.enter_root(root)
                 self.as_list = details["as_list"]
+                self.as_json = details["as_json"]
                 if details["with_lists"]:
                     self.with_lists = details["with_lists"]
                 else:
