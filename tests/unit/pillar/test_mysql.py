@@ -20,7 +20,7 @@ class MysqlPillarTestCase(TestCase):
         qbuffer = return_data.extract_queries(args, kwargs)
         self.assertEqual([
             [None, {'query': 'SELECT blah', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}]
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}]
         ], qbuffer)
 
     def test_002_extract_queries_list(self):
@@ -34,28 +34,31 @@ class MysqlPillarTestCase(TestCase):
             {'query': 'SELECT blah6', 'depth': 2},
             {'query': 'SELECT blah7', 'as_list': True},
             {'query': 'SELECT blah8', 'with_lists': '1'},
-            {'query': 'SELECT blah9', 'with_lists': '1,2'}
+            {'query': 'SELECT blah9', 'with_lists': '1,2'},
+            {'query': 'SELECT json1', 'as_json': True}
         ], {}
         qbuffer = return_data.extract_queries(args, kwargs)
         self.assertEqual([
             [None, {'query': 'SELECT blah', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah2', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah3', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah4', 'depth': 2, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah5', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah6', 'depth': 2, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah7', 'depth': 0, 'as_list': True,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah8', 'depth': 0, 'as_list': False,
-                    'with_lists': [1], 'ignore_null': False}],
+                    'as_json': False, 'with_lists': [1], 'ignore_null': False}],
             [None, {'query': 'SELECT blah9', 'depth': 0, 'as_list': False,
-                    'with_lists': [1, 2], 'ignore_null': False}]
+                    'as_json': False, 'with_lists': [1, 2], 'ignore_null': False}],
+            [None, {'query': 'SELECT json1', 'depth': 0, 'as_list': False,
+                    'as_json': True, 'with_lists': None, 'ignore_null': False}]
         ], qbuffer)
 
     def test_003_extract_queries_kwarg(self):
@@ -68,23 +71,26 @@ class MysqlPillarTestCase(TestCase):
             '5': {'query': 'SELECT blah5'},
             '6': {'query': 'SELECT blah6', 'depth': 2},
             '7': {'query': 'SELECT blah7', 'as_list': True},
+            '8': {'query': 'SELECT json1', 'as_json': True},
         }
         qbuffer = return_data.extract_queries(args, kwargs)
         self.assertEqual([
             ['1', {'query': 'SELECT blah', 'depth': 0, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['2', {'query': 'SELECT blah2', 'depth': 0, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['3', {'query': 'SELECT blah3', 'depth': 0, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['4', {'query': 'SELECT blah4', 'depth': 2, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['5', {'query': 'SELECT blah5', 'depth': 0, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['6', {'query': 'SELECT blah6', 'depth': 2, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['7', {'query': 'SELECT blah7', 'depth': 0, 'as_list': True,
-                   'with_lists': None, 'ignore_null': False}]
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
+            ['8', {'query': 'SELECT json1', 'depth': 0, 'as_list': False,
+                   'as_json': True, 'with_lists': None, 'ignore_null': False}]
         ], qbuffer)
 
     def test_004_extract_queries_mixed(self):
@@ -101,17 +107,17 @@ class MysqlPillarTestCase(TestCase):
         qbuffer = return_data.extract_queries(args, kwargs)
         self.assertEqual([
             [None, {'query': 'SELECT blah1', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah2', 'depth': 2, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah3', 'depth': 0, 'as_list': True,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['1', {'query': 'SELECT blah1', 'depth': 0, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['2', {'query': 'SELECT blah2', 'depth': 2, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['3', {'query': 'SELECT blah3', 'depth': 0, 'as_list': True,
-                   'with_lists': None, 'ignore_null': False}]
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}]
         ], qbuffer)
 
     def test_005_extract_queries_bogus_list(self):
@@ -135,21 +141,21 @@ class MysqlPillarTestCase(TestCase):
         qbuffer = return_data.extract_queries(args, kwargs)
         self.assertEqual([
             [None, {'query': 'SELECT blah', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah2', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah3', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah4', 'depth': 2, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah5', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah6', 'depth': 0, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah7', 'depth': 2, 'as_list': False,
-                    'with_lists': None, 'ignore_null': False}],
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}],
             [None, {'query': 'SELECT blah8', 'depth': 0, 'as_list': True,
-                    'with_lists': None, 'ignore_null': False}]
+                    'as_json': False, 'with_lists': None, 'ignore_null': False}]
         ], qbuffer)
 
     def test_006_extract_queries_bogus_kwargs(self):
@@ -163,9 +169,9 @@ class MysqlPillarTestCase(TestCase):
         qbuffer = return_data.extract_queries(args, kwargs)
         self.assertEqual([
             ['1', {'query': 'SELECT blah', 'depth': 0, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}],
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}],
             ['3', {'query': 'SELECT blah2', 'depth': 0, 'as_list': False,
-                   'with_lists': None, 'ignore_null': False}]
+                   'as_json': False, 'with_lists': None, 'ignore_null': False}]
         ], qbuffer)
 
     def test_011_enter_root(self):
@@ -622,3 +628,4 @@ class MysqlPillarTestCase(TestCase):
                         )
             else:
                 raise ValueError("Unexpected value {0}".format(x))
+
