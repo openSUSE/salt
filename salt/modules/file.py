@@ -1078,6 +1078,10 @@ def find(path, *args, **kwargs):
         return 'error: {0}'.format(ex)
 
     ret = [item for i in [finder.find(p) for p in glob.glob(os.path.expanduser(path))] for item in i]
+    if six.PY2:
+        ret = [i.decode('utf-8', 'replace') if isinstance(i, str) else i for i in ret]
+    else:
+        ret = [i.encode('utf-8', 'replace').decode('utf-8') for i in ret]
     ret.sort()
     return ret
 

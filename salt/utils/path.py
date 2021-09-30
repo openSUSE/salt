@@ -453,4 +453,4 @@ def os_walk(top, *args, **kwargs):
     else:
         top_query = salt.utils.stringutils.to_str(top)
     for item in os.walk(top_query, *args, **kwargs):
-        yield salt.utils.data.decode(item, preserve_tuples=True)
+        yield salt.utils.data.decode(item, keep=True, preserve_tuples=True)
