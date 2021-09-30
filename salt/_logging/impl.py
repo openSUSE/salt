@@ -288,31 +288,37 @@ class SaltLoggingClass(
         else:
             extra["exc_info_on_loglevel"] = exc_info_on_loglevel
 
-        if sys.version_info < (3,):
-            LOGGING_LOGGER_CLASS._log(
-                self, level, msg, args, exc_info=exc_info, extra=extra
-            )
-        elif sys.version_info < (3, 8):
-            LOGGING_LOGGER_CLASS._log(
-                self,
-                level,
-                msg,
-                args,
-                exc_info=exc_info,
-                extra=extra,
-                stack_info=stack_info,
-            )
-        else:
-            LOGGING_LOGGER_CLASS._log(
-                self,
-                level,
-                msg,
-                args,
-                exc_info=exc_info,
-                extra=extra,
-                stack_info=stack_info,
-                stacklevel=stacklevel,
-            )
+        try:
+            logging._acquireLock()
+            if sys.version_info < (3,):
+                LOGGING_LOGGER_CLASS._log(
+                    self, level, msg, args, exc_info=exc_info, extra=extra
+                )
+            elif sys.version_info < (3, 8):
+                LOGGING_LOGGER_CLASS._log(
+                    self,
+                    level,
+                    msg,
+                    args,
+                    exc_info=exc_info,
+                    extra=extra,
+                    stack_info=stack_info,
+                )
+            else:
+                LOGGING_LOGGER_CLASS._log(
+                    self,
+                    level,
+                    msg,
+                    args,
+                    exc_info=exc_info,
+                    extra=extra,
+                    stack_info=stack_info,
+                    stacklevel=stacklevel,
+                )
+        except:
+            pass
+        finally:
+            logging._releaseLock()
 
     def makeRecord(
         self,
