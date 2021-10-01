@@ -905,9 +905,9 @@ class Single:
             self.wipe = False
         else:
             self.wipe = bool(self.opts.get("ssh_wipe"))
-        self.wipe_state = ""
-        if kwargs.get("wipe_state"):
-            self.wipe_state = kwargs["wipe_state"]
+        self.wipe_state_file = ""
+        if kwargs.get("wipe_state_file"):
+            self.wipe_state_file = kwargs["wipe_state_file"]
         if kwargs.get("thin_dir"):
             self.thin_dir = kwargs["thin_dir"]
         elif self.winrm:
@@ -1320,7 +1320,7 @@ OPTIONS.hashfunc = '{hashfunc}'
 OPTIONS.version = '{version}'
 OPTIONS.ext_mods = '{ext_mods}'
 OPTIONS.wipe = {wipe}
-OPTIONS.wipe_state = '{wipe_state}'
+OPTIONS.wipe_state_file = '{wipe_state_file}'
 OPTIONS.tty = {tty}
 OPTIONS.cmd_umask = {cmd_umask}
 OPTIONS.code_checksum = {code_checksum}
@@ -1333,7 +1333,7 @@ ARGS = {arguments}\n'''.format(
             version=salt.version.__version__,
             ext_mods=self.mods.get("version", ""),
             wipe=self.wipe,
-            wipe_state=self.wipe_state,
+            wipe_state_file=self.wipe_state_file,
             tty=self.tty,
             cmd_umask=self.cmd_umask,
             code_checksum=thin_code_digest,

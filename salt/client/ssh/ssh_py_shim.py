@@ -401,9 +401,9 @@ def main(argv):  # pylint: disable=W0613
         shutil.rmtree(OPTIONS.saltdir)
     else:
         retcode = subprocess.call(salt_argv)
-    if OPTIONS.wipe_state:
+    if OPTIONS.wipe_state_file:
         try:
-            os.remove(os.path.join(OPTIONS.saltdir, OPTIONS.wipe_state))
+            os.remove(os.path.join(OPTIONS.saltdir, OPTIONS.wipe_state_file))
         except OSError:
             pass
     if OPTIONS.cmd_umask is not None:

@@ -52,7 +52,7 @@ def _ssh_state(chunks, st_kwargs, kwargs, test=False):
         cmd,
         fsclient=__context__["fileclient"],
         minion_opts=__salt__.minion_opts,
-        wipe_state=trans_tar_name,
+        wipe_state_file=trans_tar_name,
         **st_kwargs
     )
     single.shell.send(trans_tar, "{}/{}".format(__opts__["thin_dir"], trans_tar_name))
@@ -229,7 +229,7 @@ def sls(mods, saltenv="base", test=None, exclude=None, **kwargs):
         cmd,
         fsclient=__context__["fileclient"],
         minion_opts=__salt__.minion_opts,
-        wipe_state=trans_tar_name,
+        wipe_state_file=trans_tar_name,
         **st_kwargs
     )
     single.shell.send(trans_tar, "{}/{}".format(opts["thin_dir"], trans_tar_name))
@@ -373,7 +373,7 @@ def low(data, **kwargs):
         cmd,
         fsclient=__context__["fileclient"],
         minion_opts=__salt__.minion_opts,
-        wipe_state=trans_tar_name,
+        wipe_state_file=trans_tar_name,
         **st_kwargs
     )
     single.shell.send(trans_tar, "{}/{}".format(__opts__["thin_dir"], trans_tar_name))
@@ -461,7 +461,7 @@ def high(data, **kwargs):
         cmd,
         fsclient=__context__["fileclient"],
         minion_opts=__salt__.minion_opts,
-        wipe_state=trans_tar_name,
+        wipe_state_file=trans_tar_name,
         **st_kwargs
     )
     single.shell.send(trans_tar, "{}/{}".format(opts["thin_dir"], trans_tar_name))
@@ -704,7 +704,7 @@ def highstate(test=None, **kwargs):
         cmd,
         fsclient=__context__["fileclient"],
         minion_opts=__salt__.minion_opts,
-        wipe_state=trans_tar_name,
+        wipe_state_file=trans_tar_name,
         **st_kwargs
     )
     single.shell.send(trans_tar, "{}/{}".format(opts["thin_dir"], trans_tar_name))
@@ -783,7 +783,7 @@ def top(topfn, test=None, **kwargs):
         cmd,
         fsclient=__context__["fileclient"],
         minion_opts=__salt__.minion_opts,
-        wipe_state=trans_tar_name,
+        wipe_state_file=trans_tar_name,
         **st_kwargs
     )
     single.shell.send(trans_tar, "{}/{}".format(opts["thin_dir"], trans_tar_name))
@@ -1132,7 +1132,7 @@ def single(fun, name, test=None, **kwargs):
         cmd,
         fsclient=__context__["fileclient"],
         minion_opts=__salt__.minion_opts,
-        wipe_state=trans_tar_name,
+        wipe_state_file=trans_tar_name,
         **st_kwargs
     )
 
