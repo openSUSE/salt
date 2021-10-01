@@ -2105,7 +2105,7 @@ def run(
     skip_translate=None,
     ignore_collisions=False,
     validate_ip_addrs=True,
-    client_timeout=salt.utils.dockermod.CLIENT_TIMEOUT,
+    client_timeout=salt.utils.docker.CLIENT_TIMEOUT,
     **kwargs
 ):
     """
