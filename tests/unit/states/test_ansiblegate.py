@@ -83,9 +83,10 @@ class AnsiblegateTestCase(TestCase, LoaderModuleMockMixin):
         Test ansible.playbooks states executions success.
         """
 
-        success_output = json.loads(
-            playbooks_examples_dir.joinpath("success_example_with_skipped.json").read_text()
-        )
+        with salt.utils.files.fopen(
+            os.path.join(self.playbooks_examples_dir, "success_example_with_skipped.json")
+        ) as f:
+            success_output = json.loads(f.read())
 
         with patch.dict(
             ansiblegate.__salt__,
