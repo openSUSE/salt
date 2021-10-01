@@ -275,8 +275,11 @@ def main(argv):  # pylint: disable=W0613
     Main program body
     """
     try:
+        # Create lock file with the name of saltdir and .lock extension
+        # The lock file is used to prevent simultaneous state applies
+        # Each next session will wait for the lock to be released
         lock_fh = open("{0}.lock".format(OPTIONS.saltdir), "w")
-        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+        fcntl.flock(lock_fh, fcntl.LOCK_EX)
     except (IOError, OSError):
         pass
     thin_path = os.path.join(OPTIONS.saltdir, THIN_ARCHIVE)
