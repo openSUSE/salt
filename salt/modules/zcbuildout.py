@@ -121,7 +121,7 @@ def _salt_callback(func, **kwargs):
                             out=out.get("out", out),
                         )
         except Exception:  # pylint: disable=broad-except
-            trace = traceback.format_exc(None)
+            trace = traceback.format_exc()
             LOG.error(trace)
             _invalid(status)
         LOG.clear()
