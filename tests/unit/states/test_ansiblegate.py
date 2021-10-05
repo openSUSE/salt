@@ -78,7 +78,7 @@ class AnsiblegateTestCase(TestCase, LoaderModuleMockMixin):
                 )
 
     @patch("salt.utils.path.which", MagicMock(return_value=True))
-    def test_ansible_playbooks_states_success_with_skipped(self, playbooks_examples_dir):
+    def test_ansible_playbooks_states_success_with_skipped(self):
         """
         Test ansible.playbooks states executions success.
         """
@@ -89,12 +89,12 @@ class AnsiblegateTestCase(TestCase, LoaderModuleMockMixin):
             success_output = json.loads(f.read())
 
         with patch.dict(
-            ansiblegate.__salt__,
+            ansible.__salt__,
             {"ansible.playbooks": MagicMock(return_value=success_output)},
         ), patch("salt.utils.path.which", return_value=True), patch.dict(
-            ansiblegate.__opts__, {"test": False}
+            ansible.__opts__, {"test": False}
         ):
-            ret = ansiblegate.playbooks("foobar")
+            ret = ansible.playbooks("foobar")
             assert ret["result"] is True
             assert ret["comment"] == "No changes to be made from playbook foobar"
             assert ret["changes"] == {
