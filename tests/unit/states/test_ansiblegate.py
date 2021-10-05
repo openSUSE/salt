@@ -74,7 +74,7 @@ class AnsiblegateTestCase(TestCase, LoaderModuleMockMixin):
                 )
 
     @patch("salt.utils.path.which", MagicMock(return_value=True))
-    def test_ansible_playbooks_states_success_with_skipped(playbooks_examples_dir):
+    def test_ansible_playbooks_states_success_with_skipped(self, playbooks_examples_dir):
         """
         Test ansible.playbooks states executions success.
         """
