@@ -78,6 +78,37 @@ class AnsiblegateTestCase(TestCase, LoaderModuleMockMixin):
                 )
 
     @patch("salt.utils.path.which", MagicMock(return_value=True))
+    def test_ansible_playbooks_states_success_with_skipped(self):
+        """
+        Test ansible.playbooks states executions success.
+        """
+
+        with salt.utils.files.fopen(
+            os.path.join(self.playbooks_examples_dir, "success_example_with_skipped.json")
+        ) as f:
+            success_output = json.loads(f.read())
+
+        with patch.dict(
+            ansible.__salt__,
+            {"ansible.playbooks": MagicMock(return_value=success_output)},
+        ), patch("salt.utils.path.which", return_value=True), patch.dict(
+            ansible.__opts__, {"test": False}
+        ):
+            ret = ansible.playbooks("foobar")
+            assert ret["result"] is True
+            assert ret["comment"] == "No changes to be made from playbook foobar"
+            assert ret["changes"] == {
+                "all": {
+                    "install git CentOS": {"uyuni-stable-min-sles15sp3.tf.local": {}},
+                    "install git SUSE": {"uyuni-stable-min-centos7.tf.local": {}},
+                    "install git Ubuntu": {
+                        "uyuni-stable-min-centos7.tf.local": {},
+                        "uyuni-stable-min-sles15sp3.tf.local": {},
+                    },
+                }
+            }
+
+    @patch("salt.utils.path.which", MagicMock(return_value=True))
     def test_ansible_playbooks_states_failed(self):
         """
         Test ansible.playbooks failed states executions.
