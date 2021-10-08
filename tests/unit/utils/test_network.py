@@ -1270,11 +1270,6 @@ class NetworkTestCase(TestCase):
         ):
             self.assertEqual(network.get_fqhostname(), host)
 
-    def test_netlink_tool_remote_on(self):
-        with patch("subprocess.check_output", return_value=NETLINK_SS):
-            remotes = network._netlink_tool_remote_on("4505", "remote")
-            self.assertEqual(remotes, {"127.0.0.1", "::ffff:1.2.3.4"})
-
     def test_is_fqdn(self):
         """
         Test is_fqdn function passes possible FQDN names.
