@@ -1,0 +1,37 @@
+name: unit-opensuse-leap
+
+on:
+  push:
+    branches:
+      - openSUSE-3000
+      - openSUSE-3000.3
+      - openSUSE-3002.2
+      - openSUSE-3003.3
+  pull_request:
+    branches:
+      - openSUSE-3000
+      - openSUSE-3000.3
+      - openSUSE-3002.2
+      - openSUSE-3003.3
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Salt
+        uses: actions/checkout@v2
+        with:
+          path: salt
+      - name: Checkout Salt Toaster
+        uses: actions/checkout@v2
+        with:
+          repository: openSUSE/salt-toaster
+          path: salt-toaster
+      - name: Unit tests
+        env:
+          DOCKER_IMAGE: "ghcr.io/opensuse/salt-toaster-leap15.3-devel"
+          DISTRO: "opensuse153"
+          FLAVOR: "devel"
+          SALT_REPO: "${{ github.workspace }}/salt"
+        working-directory: ./salt-toaster
+        run: make saltstack.unit
