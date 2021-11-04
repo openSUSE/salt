@@ -783,7 +783,7 @@ class StateTestCase(TestCase, LoaderModuleMockMixin):
                                   'result': 'False'})
 
             mock = MagicMock(side_effect=["A", None, None])
-            with patch.object(state, '_check_queue', mock):
+            with patch.object(state, "running", mock):
                 self.assertEqual(state.highstate("whitelist=sls1.sls"), "A")
 
                 with patch.dict(state.__opts__, {"test": "A"}):
