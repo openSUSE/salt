@@ -19,6 +19,9 @@ class DnfNotifyPlugin(dnf.Plugin):
     def transaction(self):
         if "SALT_RUNNING" not in os.environ:
             try:
+                ck_dir = os.path.dirname(self.cookie_file)
+                if not os.path.exists(ck_dir):
+                    os.makedirs(ck_dir)
                 with open(self.cookie_file, "w") as ck_fh:
                     ck_fh.write(
                         "{chksum} {mtime}\n".format(
