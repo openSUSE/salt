@@ -7,6 +7,7 @@ import sys
 CK_PATH = "/var/cache/salt/minion/dpkg.cookie"
 DPKG_PATH = "/var/lib/dpkg/status"
 
+
 def _get_mtime():
     """
     Get the modified time of the Package Database.
@@ -47,8 +48,8 @@ def dpkg_post_invoke():
                         chksum=_get_checksum(), mtime=_get_mtime()
                     )
                 )
-        except (IOError, OSError) as e:
-            sys.stderr.write("Unable to save the cookie file: {}\n".format(e))
+        except OSError as e:
+            print("Unable to save the cookie file: %s" % (e), file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,6 @@
 
 import hashlib
 import os
-import sys
 
 from yum import config
 from yum.plugins import TYPE_CORE
@@ -53,15 +52,7 @@ def posttrans_hook(conduit):
     """
     # Integrate Yum with Salt
     if "SALT_RUNNING" not in os.environ:
-        try:
-            ck_dir = os.path.dirname(CK_PATH)
-            if not os.path.exists(ck_dir):
-                os.makedirs(ck_dir)
-            with open(CK_PATH, "w") as ck_fh:
-                ck_fh.write(
-                    "{chksum} {mtime}\n".format(
-                        chksum=_get_checksum(), mtime=_get_mtime()
-                    )
-                )
-        except (IOError, OSError) as e:
-            sys.stderr.write("Unable to save the cookie file: {}\n".format(e))
+        with open(CK_PATH, "w") as ck_fh:
+            ck_fh.write(
+                "{chksum} {mtime}\n".format(chksum=_get_checksum(), mtime=_get_mtime())
+            )
