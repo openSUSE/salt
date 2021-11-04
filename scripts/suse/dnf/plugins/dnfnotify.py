@@ -1,3 +1,5 @@
+from dnfpluginscore import _, logger
+
 import hashlib
 import os
 
@@ -16,12 +18,15 @@ class DnfNotifyPlugin(dnf.Plugin):
 
     def transaction(self):
         if "SALT_RUNNING" not in os.environ:
-            with open(self.cookie_file, "w") as ck_fh:
-                ck_fh.write(
-                    "{chksum} {mtime}\n".format(
-                        chksum=self._get_checksum(), mtime=self._get_mtime()
+            try:
+                with open(self.cookie_file, "w") as ck_fh:
+                    ck_fh.write(
+                        "{chksum} {mtime}\n".format(
+                            chksum=self._get_checksum(), mtime=self._get_mtime()
+                        )
                     )
-                )
+            except OSError:
+                logger.error(_("Unable to save cookie file: %s"), self.cookie_file)
 
     def _get_mtime(self):
         """
