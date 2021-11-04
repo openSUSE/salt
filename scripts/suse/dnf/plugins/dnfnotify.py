@@ -28,8 +28,8 @@ class DnfNotifyPlugin(dnf.Plugin):
                             chksum=self._get_checksum(), mtime=self._get_mtime()
                         )
                     )
-            except OSError:
-                logger.error(_("Unable to save cookie file: %s"), self.cookie_file)
+            except OSError as e:
+                logger.error(_("Unable to save cookie file: %s"), e)
 
     def _get_mtime(self):
         """
