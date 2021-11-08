@@ -77,7 +77,7 @@ def test_importable_installation_error(_extra_requirements, pip_contraint):
         sys.stdout.flush()
         sys.exit(2)
     except Exception as exc:
-        traceback.print_exc(exc, file=sys.stdout)
+        traceback.print_exc(file=sys.stdout)
         sys.stdout.flush()
         sys.exit(3)
     sys.exit(0)
