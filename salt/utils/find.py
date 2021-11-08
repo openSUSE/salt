@@ -648,7 +648,10 @@ class Finder(object):
             depth = path_depth(relpath) + 1
             if depth >= self.mindepth and (self.maxdepth is None or self.maxdepth >= depth):
                 for name in dirs + files:
-                    fullpath = os.path.join(dirpath, name)
+                    try:
+                        fullpath = os.path.join(dirpath, name)
+                    except UnicodeDecodeError:
+                        fullpath = os.path.join(dirpath.encode('utf-8'), name)
                     match, fstat = self._check_criteria(dirpath, name, fullpath)
                     if match:
                         for result in self._perform_actions(fullpath, fstat=fstat):
