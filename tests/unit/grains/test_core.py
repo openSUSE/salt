@@ -109,16 +109,49 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
         '''
         Parse correct CPE_NAME data v2.3 formatted
         :return:
-        '''
-        for cpe, cpe_ret in [('cpe:2.3:o:microsoft:windows_xp:5.1.601:beta:*:*:*:*:*:*',
-                              {'phase': 'beta', 'version': '5.1.601', 'product': 'windows_xp',
-                               'vendor': 'microsoft', 'part': 'operating system'}),
-                             ('cpe:2.3:h:corellian:millenium_falcon:1.0:*:*:*:*:*:*:*',
-                              {'phase': None, 'version': '1.0', 'product': 'millenium_falcon',
-                               'vendor': 'corellian', 'part': 'hardware'}),
-                             ('cpe:2.3:*:dark_empire:light_saber:3.0:beta:*:*:*:*:*:*',
-                              {'phase': 'beta', 'version': '3.0', 'product': 'light_saber',
-                               'vendor': 'dark_empire', 'part': None})]:
+        """
+        for cpe, cpe_ret in [
+            (
+                "cpe:2.3:o:microsoft:windows_xp:5.1.601:beta:*:*:*:*:*:*",
+                {
+                    "phase": "beta",
+                    "version": "5.1.601",
+                    "product": "windows_xp",
+                    "vendor": "microsoft",
+                    "part": "operating system",
+                },
+            ),
+            (
+                "cpe:2.3:h:corellian:millenium_falcon:1.0:*:*:*:*:*:*:*",
+                {
+                    "phase": None,
+                    "version": "1.0",
+                    "product": "millenium_falcon",
+                    "vendor": "corellian",
+                    "part": "hardware",
+                },
+            ),
+            (
+                "cpe:2.3:*:dark_empire:light_saber:3.0:beta:*:*:*:*:*:*",
+                {
+                    "phase": "beta",
+                    "version": "3.0",
+                    "product": "light_saber",
+                    "vendor": "dark_empire",
+                    "part": None,
+                },
+            ),
+            (
+                "cpe:2.3:o:amazon:amazon_linux:2",
+                {
+                    "phase": None,
+                    "version": "2",
+                    "product": "amazon_linux",
+                    "vendor": "amazon",
+                    "part": "operating system",
+                },
+            ),
+        ]:
             ret = core._parse_cpe_name(cpe)
             for key in cpe_ret:
                 assert key in ret
