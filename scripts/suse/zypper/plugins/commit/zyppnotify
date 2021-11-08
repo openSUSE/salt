@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 # Copyright (c) 2016 SUSE Linux LLC
 # All Rights Reserved.
@@ -55,12 +55,18 @@ class DriftDetector(Plugin):
         Hook when plugin closes Zypper's transaction.
         """
         if "SALT_RUNNING" not in os.environ:
-            with open(self.ck_path, "w") as ck_fh:
-                ck_fh.write(
-                    "{chksum} {mtime}\n".format(
-                        chksum=self._get_checksum(), mtime=self._get_mtime()
+            try:
+                ck_dir = os.path.dirname(self.ck_path)
+                if not os.path.exists(ck_dir):
+                    os.makedirs(ck_dir)
+                with open(self.ck_path, "w") as ck_fh:
+                    ck_fh.write(
+                        "{chksum} {mtime}\n".format(
+                            chksum=self._get_checksum(), mtime=self._get_mtime()
+                        )
                     )
-                )
+            except OSError as e:
+                print("Unable to save the cookie file: %s" % (e), file=sys.stderr)
 
         self.ack()
 
