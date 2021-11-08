@@ -151,6 +151,16 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
                     "part": None,
                 },
             ),
+            (
+                "cpe:2.3:o:amazon:amazon_linux:2",
+                {
+                    "phase": None,
+                    "version": "2",
+                    "product": "amazon_linux",
+                    "vendor": "amazon",
+                    "part": "operating system",
+                },
+            ),
         ]:
             ret = core._parse_cpe_name(cpe)
             for key in cpe_ret:
