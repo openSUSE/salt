@@ -109,7 +109,7 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
         '''
         Parse correct CPE_NAME data v2.3 formatted
         :return:
-        """
+        '''
         for cpe, cpe_ret in [
             (
                 "cpe:2.3:o:microsoft:windows_xp:5.1.601:beta:*:*:*:*:*:*",
