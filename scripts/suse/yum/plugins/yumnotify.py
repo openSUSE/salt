@@ -63,4 +63,4 @@ def posttrans_hook(conduit):
                     )
                 )
         except OSError as e:
-            print("Unable to save the cookie file: %s" % (e), file=sys.stderr)
+            sys.stderr.write("Unable to save the cookie file: %s\n" % (e))
