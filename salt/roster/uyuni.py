@@ -76,12 +76,13 @@ def targets(tgt, tgt_type="glob", **kwargs):
     rhnSQL.initDB()
     sql_servers = """
         SELECT S.id AS server_id,
-               S.name AS server_name,
-               S.hostname AS server_hostname,
+               SMI.minion_id AS minion_id,
                SSCM.label AS server_contact_method
         FROM rhnServer AS S
         LEFT JOIN suseServerContactMethod AS SSCM ON
              (SSCM.id=S.contact_method_id)
+        LEFT JOIN suseMinionInfo AS SMI ON
+             (SMI.server_id=S.id)
         WHERE SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
     """
     sql_server_path = """
@@ -99,7 +100,7 @@ def targets(tgt, tgt_type="glob", **kwargs):
             break
         user = SSH_PUSH_SUDO_USER if SSH_PUSH_SUDO_USER else "root"
         server = {
-            "host": row["server_hostname"],
+            "host": row["minion_id"],
             "user": user,
             "port": SSH_PUSH_PORT,
             "timeout": SALT_SSH_CONNECT_TIMEOUT,
@@ -156,6 +157,6 @@ def targets(tgt, tgt_type="glob", **kwargs):
                     % (SSH_PUSH_PORT_HTTPS, COBBLER_HOST, SSL_PORT)
                 }
             )
-        ret[row["server_name"]] = server
+        ret[row["minion_id"]] = server
     rhnSQL.closeDB()
     return __utils__["roster_matcher.targets"](ret, tgt, tgt_type, "ipv4")
