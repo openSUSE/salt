@@ -83,7 +83,8 @@ def targets(tgt, tgt_type="glob", **kwargs):
              (SSCM.id=S.contact_method_id)
         LEFT JOIN suseMinionInfo AS SMI ON
              (SMI.server_id=S.id)
-        WHERE SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
+        WHERE SMI.minion_id IS NOT NULL AND
+              SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
     """
     sql_server_path = """
         SELECT SP.hostname AS proxy_hostname
