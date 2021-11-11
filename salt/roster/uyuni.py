@@ -4,6 +4,7 @@ Read in the roster from Uyuni DB
 """
 from __future__ import absolute_import, print_function, unicode_literals
 
+import hashlib
 import logging
 
 # Import Salt libs
@@ -11,7 +12,6 @@ import salt.cache
 import salt.config
 import salt.loader
 
-cache = None
 log = logging.getLogger(__name__)
 
 try:
@@ -28,6 +28,7 @@ except TypeError:
 
 __virtualname__ = "uyuni"
 
+cache = None
 
 COBBLER_HOST = "localhost"
 PROXY_SSH_PUSH_USER = "mgrsshtunnel"
@@ -155,25 +156,34 @@ def targets(tgt, tgt_type="glob", **kwargs):
     ret = {}
     rhnSQL.initDB()
 
-    cache_ts = cache.fetch("roster/uyuni", "ts")
+    cache_fp = cache.fetch("roster/uyuni", "fp")
     ret = cache.fetch("roster/uyuni", "minions")
-    if cache_ts is not None:
+    if cache_fp is not None:
         query = """
-            SELECT EXTRACT(EPOCH FROM GREATEST(
-                       (SELECT MAX(SP.modified) FROM rhnServerPath AS SP),
-                       (SELECT MAX(S.modified) FROM rhnServer AS S)
-                   )) AS ts
+            SELECT FORMAT('%s|%s',
+                          (SELECT FORMAT('%s|%s',
+                                         EXTRACT(EPOCH FROM MAX(S.modified)),
+                                         COUNT(*)
+                                  ) FROM rhnServer AS S
+                          ),
+                          (SELECT FORMAT('%s|%s',
+                                         EXTRACT(EPOCH FROM MAX(SP.modified)),
+                                         COUNT(*)
+                                  ) FROM rhnServerPath AS SP
+                          )
+                   ) AS fp
         """
         h = rhnSQL.prepare(query)
         h.execute()
         row = h.fetchone_dict()
-        if row and row["ts"]:
-            if row["ts"] == cache_ts:
+        if row and row["fp"]:
+            new_fp = hashlib.sha256(row["fp"].encode()).hexdigest()
+            if new_fp == cache_fp:
                 log.debug("Return the cached data")
                 return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
             else:
                 log.debug("Invalidate cache")
-                cache_ts = row["ts"]
+                cache_fp = new_fp
                 ret = {}
 
     query = """
@@ -202,7 +212,6 @@ def targets(tgt, tgt_type="glob", **kwargs):
     row = h.fetchone_dict()
     while True:
         if prow is not None and (row is None or row["server_id"] != prow["server_id"]):
-            log.warning("{}/{}: {}".format(prow["minion_id"], prow["tunnel"], proxies))
             ret[prow["minion_id"]] = _getSSHMinion(
                 minion_id=prow["minion_id"], proxies=proxies, tunnel=prow["tunnel"]
             )
@@ -216,7 +225,7 @@ def targets(tgt, tgt_type="glob", **kwargs):
 
     rhnSQL.closeDB()
 
-    cache.store("roster/uyuni", "ts", cache_ts)
+    cache.store("roster/uyuni", "fp", cache_fp)
     cache.store("roster/uyuni", "minions", ret)
 
     return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
