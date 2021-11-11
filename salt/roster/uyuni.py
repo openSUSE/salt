@@ -67,6 +67,80 @@ def __virtual__():
     return (HAS_UYUNI and __virtualname__, "Uyuni is not installed on the system")
 
 
+def _getSSHOptions(minion_id=None, proxies=None, tunnel=False, user=None):
+    ssh_options = []
+
+    proxyCommand = "ProxyCommand='"
+    i = 0
+    for proxy in proxies:
+        proxyCommand += (
+            "/usr/bin/ssh -i %s -o StrictHostKeyChecking=no -o User=%s %s %s "
+            % (
+                SSH_KEY_PATH if i == 0 else PROXY_SSH_PUSH_KEY,
+                PROXY_SSH_PUSH_USER,
+                "-W %s:%s" % (minion_id, SSH_PUSH_PORT)
+                if not tunnel and i == len(proxies) - 1
+                else "",
+                proxy,
+            )
+        )
+        i += 1
+    if tunnel:
+        proxyCommand += (
+            "/usr/bin/ssh -i {pushKey} -o StrictHostKeyChecking=no "
+            "-o User={user} -R {pushPort}:{proxy}:{sslPort} {minion} "
+            "ssh -i {ownKey} -W {minion}:{sshPort} "
+            "-o StrictHostKeyChecking=no -o User={user} {minion}".format(
+                pushKey=PROXY_SSH_PUSH_KEY,
+                user=user,
+                pushPort=SSH_PUSH_PORT_HTTPS,
+                proxy=proxies[len(proxies) - 1],
+                sslPort=SSL_PORT,
+                minion=minion_id,
+                ownKey="{}{}".format(
+                    "/root" if user == "root" else "/home/{}".format(user),
+                    "/.ssh/mgr_own_id",
+                ),
+                sshPort=SSH_PUSH_PORT,
+            )
+        )
+    proxyCommand += "'"
+
+    return ssh_options
+
+
+def _getSSHMinion(minion_id=None, proxies=[], tunnel=False):
+    user = SSH_PUSH_SUDO_USER if SSH_PUSH_SUDO_USER else "root"
+    minion = {
+        "host": minion_id,
+        "user": user,
+        "port": SSH_PUSH_PORT,
+        "timeout": SALT_SSH_CONNECT_TIMEOUT,
+    }
+    if tunnel:
+        minion.update({"minion_opts": {"master": minion_id}})
+    if proxies:
+        minion.update(
+            {
+                "ssh_options": _getSSHOptions(
+                    minion_id=minion_id,
+                    proxies=proxies,
+                    tunnel=tunnel,
+                    user=user,
+                )
+            }
+        )
+    elif tunnel:
+        minion.update(
+            {
+                "remote_port_forwards": "%d:%s:%d"
+                % (SSH_PUSH_PORT_HTTPS, COBBLER_HOST, SSL_PORT)
+            }
+        )
+
+    return minion
+
+
 def targets(tgt, tgt_type="glob", **kwargs):
     """
     Return the targets from the Uyuni DB
@@ -74,90 +148,45 @@ def targets(tgt, tgt_type="glob", **kwargs):
 
     ret = {}
     rhnSQL.initDB()
+
     sql_servers = """
         SELECT S.id AS server_id,
                SMI.minion_id AS minion_id,
-               SSCM.label AS server_contact_method
+               SSCM.label='ssh-push-tunnel' AS tunnel,
+               SP.hostname AS proxy_hostname
         FROM rhnServer AS S
         LEFT JOIN suseServerContactMethod AS SSCM ON
              (SSCM.id=S.contact_method_id)
         LEFT JOIN suseMinionInfo AS SMI ON
              (SMI.server_id=S.id)
+        LEFT JOIN rhnServerPath AS SP ON
+             (SP.server_id=S.id)
         WHERE SMI.minion_id IS NOT NULL AND
               SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
+        ORDER BY S.id, SP.position DESC
     """
-    sql_server_path = """
-        SELECT SP.hostname AS proxy_hostname
-        FROM rhnServerPath AS SP
-        WHERE SP.server_id = :server_id
-        ORDER BY SP.position DESC
-    """
+
     h = rhnSQL.prepare(sql_servers)
-    sph = rhnSQL.prepare(sql_server_path)
     h.execute()
+
+    prow = None
+    proxies = []
+
+    row = h.fetchone_dict()
     while True:
-        row = h.fetchone_dict()
-        if not row:
-            break
-        user = SSH_PUSH_SUDO_USER if SSH_PUSH_SUDO_USER else "root"
-        server = {
-            "host": row["minion_id"],
-            "user": user,
-            "port": SSH_PUSH_PORT,
-            "timeout": SALT_SSH_CONNECT_TIMEOUT,
-        }
-        tunnel = row["server_contact_method"] == "ssh-push-tunnel"
-        if tunnel:
-            server.update({"minion_opts": {"master": row["server_hostname"]}})
-        sph.execute(server_id=row["server_id"])
-        proxies = sph.fetchall_dict()
-        if proxies:
-            proxyCommand = "ProxyCommand='"
-            i = 0
-            for proxy in proxies:
-                proxyCommand += (
-                    "/usr/bin/ssh -i %s -o StrictHostKeyChecking=no -o User=%s %s %s "
-                    % (
-                        SSH_KEY_PATH if i == 0 else PROXY_SSH_PUSH_KEY,
-                        PROXY_SSH_PUSH_USER,
-                        "-W %s:%s" % (row["server_hostname"], SSH_PUSH_PORT)
-                        if not tunnel and i == len(proxies) - 1
-                        else "",
-                        proxy["proxy_hostname"],
-                    )
-                )
-                i += 1
-            if tunnel:
-                fmt_data = {
-                    "pushKey": PROXY_SSH_PUSH_KEY,
-                    "user": user,
-                    "pushPort": SSH_PUSH_PORT_HTTPS,
-                    "proxy": proxies[len(proxies) - 1]["proxy_hostname"],
-                    "sslPort": SSL_PORT,
-                    "minion": row["server_hostname"],
-                    "ownKey": "{}{}".format(
-                        "/root" if user == "root" else "/home/{}".format(user),
-                        "/.ssh/mgr_own_id",
-                    ),
-                    "sshPort": SSH_PUSH_PORT,
-                }
-                proxyCommand += (
-                    "/usr/bin/ssh -i {pushKey} -o StrictHostKeyChecking=no "
-                    "-o User={user} -R {pushPort}:{proxy}:{sslPort} {minion} "
-                    "ssh -i {ownKey} -W {minion}:{sshPort} "
-                    "-o StrictHostKeyChecking=no -o User={user} {minion}".format(
-                        **fmt_data
-                    )
-                )
-            proxyCommand += "'"
-            server.update({"ssh_options": [proxyCommand]})
-        elif tunnel:
-            server.update(
-                {
-                    "remote_port_forwards": "%d:%s:%d"
-                    % (SSH_PUSH_PORT_HTTPS, COBBLER_HOST, SSL_PORT)
-                }
+        if prow is not None and (row is None or row["server_id"] != prow["server_id"]):
+            log.warning("{}/{}: {}".format(prow["minion_id"], prow["tunnel"], proxies))
+            ret[prow["minion_id"]] = _getSSHMinion(
+                minion_id=prow["minion_id"], proxies=proxies, tunnel=prow["tunnel"]
             )
-        ret[row["minion_id"]] = server
+            proxies = []
+        elif row and row["proxy_hostname"]:
+            proxies.append(row["proxy_hostname"])
+        if row is None:
+            break
+        prow = row
+        row = h.fetchone_dict()
+
     rhnSQL.closeDB()
+
     return __utils__["roster_matcher.targets"](ret, tgt, tgt_type, "ipv4")
