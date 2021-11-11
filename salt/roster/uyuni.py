@@ -6,11 +6,12 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import logging
 
-import salt.config
-
 # Import Salt libs
+import salt.cache
+import salt.config
 import salt.loader
 
+cache = None
 log = logging.getLogger(__name__)
 
 try:
@@ -43,9 +44,11 @@ SSL_PORT = 443
 
 
 def __virtual__():
+    global cache
     global SSH_PUSH_PORT_HTTPS
     global SALT_SSH_CONNECT_TIMEOUT
     global COBBLER_HOST
+
     if HAS_UYUNI:
         initCFG("web")
         try:
@@ -64,6 +67,9 @@ def __virtual__():
         log.debug("ssh_push_port_https: %d" % (SSH_PUSH_PORT_HTTPS))
         log.debug("salt_ssh_connect_timeout: %d" % (SALT_SSH_CONNECT_TIMEOUT))
         log.debug("cobbler.host: %s" % (COBBLER_HOST))
+
+        cache = salt.cache.Cache(__opts__)
+
     return (HAS_UYUNI and __virtualname__, "Uyuni is not installed on the system")
 
 
@@ -149,7 +155,28 @@ def targets(tgt, tgt_type="glob", **kwargs):
     ret = {}
     rhnSQL.initDB()
 
-    sql_servers = """
+    cache_ts = cache.fetch("roster/uyuni", "ts")
+    ret = cache.fetch("roster/uyuni", "minions")
+    if cache_ts is not None:
+        query = """
+            SELECT EXTRACT(EPOCH FROM GREATEST(
+                       (SELECT MAX(SP.modified) FROM rhnServerPath AS SP),
+                       (SELECT MAX(S.modified) FROM rhnServer AS S)
+                   )) AS ts
+        """
+        h = rhnSQL.prepare(query)
+        h.execute()
+        row = h.fetchone_dict()
+        if row and row["ts"]:
+            if row["ts"] == cache_ts:
+                log.debug("Return the cached data")
+                return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
+            else:
+                log.debug("Invalidate cache")
+                cache_ts = row["ts"]
+                ret = {}
+
+    query = """
         SELECT S.id AS server_id,
                SMI.minion_id AS minion_id,
                SSCM.label='ssh-push-tunnel' AS tunnel,
@@ -166,7 +193,7 @@ def targets(tgt, tgt_type="glob", **kwargs):
         ORDER BY S.id, SP.position DESC
     """
 
-    h = rhnSQL.prepare(sql_servers)
+    h = rhnSQL.prepare(query)
     h.execute()
 
     prow = None
@@ -189,4 +216,7 @@ def targets(tgt, tgt_type="glob", **kwargs):
 
     rhnSQL.closeDB()
 
-    return __utils__["roster_matcher.targets"](ret, tgt, tgt_type, "ipv4")
+    cache.store("roster/uyuni", "ts", cache_ts)
+    cache.store("roster/uyuni", "minions", ret)
+
+    return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
