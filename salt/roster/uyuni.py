@@ -69,9 +69,34 @@ def __virtual__():
         log.debug("salt_ssh_connect_timeout: %d" % (SALT_SSH_CONNECT_TIMEOUT))
         log.debug("cobbler.host: %s" % (COBBLER_HOST))
 
+        _initDB()
+
         cache = salt.cache.Cache(__opts__)
 
     return (HAS_UYUNI and __virtualname__, "Uyuni is not installed on the system")
+
+
+def _initDB():
+    try:
+        rhnSQL.initDB()
+    except rhnSQL.sql_base.SQLConnectError as e:
+        log.warning(
+            "Unable to connect to the Uyuni DB: \n%s\nWill try to connect later." % (e)
+        )
+
+
+def _prepareSQL(*args, **kwargs):
+    try:
+        return rhnSQL.prepare(*args, **kwargs)
+    except SystemError as e:
+        log.warning("Error during SQL prepare: %s" % (e))
+        log.warning("Trying to reinit DB connection...")
+        _initDB()
+        try:
+            return rhnSQL.prepare(*args, **kwargs)
+        except SystemError as e:
+            log.warning("Unable to re-establish connection to the Uyuni DB")
+            return None
 
 
 def _getSSHOptions(minion_id=None, proxies=None, tunnel=False, user=None):
@@ -154,37 +179,49 @@ def targets(tgt, tgt_type="glob", **kwargs):
     """
 
     ret = {}
-    rhnSQL.initDB()
 
     cache_fp = cache.fetch("roster/uyuni", "fp")
     ret = cache.fetch("roster/uyuni", "minions")
-    if cache_fp is not None:
+    if cache_fp and ret:
         query = """
-            SELECT FORMAT('%s|%s',
-                          (SELECT FORMAT('%s|%s',
-                                         EXTRACT(EPOCH FROM MAX(S.modified)),
-                                         COUNT(*)
-                                  ) FROM rhnServer AS S
-                          ),
-                          (SELECT FORMAT('%s|%s',
-                                         EXTRACT(EPOCH FROM MAX(SP.modified)),
-                                         COUNT(*)
-                                  ) FROM rhnServerPath AS SP
-                          )
+            SELECT FORMAT('%s|%s|%s|%s',
+                       EXTRACT(EPOCH FROM MAX(S.modified)),
+                       COUNT(S.id),
+                       EXTRACT(EPOCH FROM MAX(SP.modified)),
+                       COUNT(SP.proxy_server_id)
                    ) AS fp
-        """
-        h = rhnSQL.prepare(query)
-        h.execute()
-        row = h.fetchone_dict()
-        if row and row["fp"]:
-            new_fp = hashlib.sha256(row["fp"].encode()).hexdigest()
-            if new_fp == cache_fp:
-                log.debug("Return the cached data")
-                return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
-            else:
-                log.debug("Invalidate cache")
-                cache_fp = new_fp
-                ret = {}
+            FROM rhnServer AS S
+            LEFT JOIN suseServerContactMethod AS SSCM ON
+                 (SSCM.id=S.contact_method_id)
+            LEFT JOIN suseMinionInfo AS SMI ON
+                 (SMI.server_id=S.id)
+            LEFT JOIN rhnServerPath AS SP ON
+                 (SP.server_id=S.id)
+            WHERE SMI.minion_id IS NOT NULL AND
+                  S.contact_method_id IN (
+                      SELECT SSCM.id
+                      FROM suseServerContactMethod AS SCCM
+                      WHERE SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
+                  )
+            """
+        h = _prepareSQL(query)
+        if h is not None:
+            h.execute()
+            row = h.fetchone_dict()
+            if row and row["fp"]:
+                new_fp = hashlib.sha256(row["fp"].encode()).hexdigest()
+                if new_fp == cache_fp:
+                    log.debug("Return the cached data")
+                    return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
+                else:
+                    log.debug("Invalidate cache")
+                    cache_fp = new_fp
+                    ret = {}
+        else:
+            log.warning(
+                "Unable to reconnect to the Uyuni DB. Returning cached data instead."
+            )
+            return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
 
     query = """
         SELECT S.id AS server_id,
@@ -203,7 +240,7 @@ def targets(tgt, tgt_type="glob", **kwargs):
         ORDER BY S.id, SP.position DESC
     """
 
-    h = rhnSQL.prepare(query)
+    h = _prepareSQL(query)
     h.execute()
 
     prow = None
@@ -222,8 +259,6 @@ def targets(tgt, tgt_type="glob", **kwargs):
             break
         prow = row
         row = h.fetchone_dict()
-
-    rhnSQL.closeDB()
 
     cache.store("roster/uyuni", "fp", cache_fp)
     cache.store("roster/uyuni", "minions", ret)
