@@ -8,7 +8,7 @@ import datetime
 import salt.exceptions
 from salt.modules import saltsupport
 from tests.support.mixins import LoaderModuleMockMixin
-from tests.support.mock import NO_MOCK, NO_MOCK_REASON, MagicMock, patch
+from tests.support.mock import MagicMock, patch
 from tests.support.unit import TestCase, skipIf
 
 try:
@@ -18,7 +18,6 @@ except ImportError:
 
 
 @skipIf(not bool(pytest), "Pytest required")
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class SaltSupportModuleTestCase(TestCase, LoaderModuleMockMixin):
     """
     Test cases for salt.modules.support::SaltSupportModule
@@ -361,7 +360,6 @@ professor: Farnsworth
 
 
 @skipIf(not bool(pytest), "Pytest required")
-@skipIf(NO_MOCK, NO_MOCK_REASON)
 class LogCollectorTestCase(TestCase, LoaderModuleMockMixin):
     """
     Test cases for salt.modules.support::LogCollector
