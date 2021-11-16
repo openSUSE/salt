@@ -4,7 +4,11 @@ Read in the roster from Uyuni DB
 """
 from __future__ import absolute_import, print_function, unicode_literals
 
+from contextlib import redirect_stderr
+from yaml import dump
+
 import hashlib
+import io
 import logging
 
 # Import Salt libs
@@ -65,6 +69,16 @@ def __virtual__():
             SALT_SSH_CONNECT_TIMEOUT = int(CFG.SALT_SSH_CONNECT_TIMEOUT)
         except (AttributeError, ValueError):
             log.debug("Unable to get `salt_ssh_connect_timeout`. Fallback to default.")
+        # Hacky solution to prevent output to the stderr about missing file
+        with redirect_stderr(io.StringIO()) as f:
+            initCFG("cobbler")
+            s = f.getvalue()
+            if s:
+                log.debug("initCFG stderr: %s" % s)
+            try:
+                COBBLER_HOST = CFG.HOST
+            except AttributeError:
+                log.debug("Unable to get `cobbler.host`. Fallback to default.")
         log.debug("ssh_push_port_https: %d" % (SSH_PUSH_PORT_HTTPS))
         log.debug("salt_ssh_connect_timeout: %d" % (SALT_SSH_CONNECT_TIMEOUT))
         log.debug("cobbler.host: %s" % (COBBLER_HOST))
@@ -100,8 +114,6 @@ def _prepareSQL(*args, **kwargs):
 
 
 def _getSSHOptions(minion_id=None, proxies=None, tunnel=False, user=None):
-    ssh_options = []
-
     proxyCommand = "ProxyCommand='"
     i = 0
     for proxy in proxies:
@@ -138,7 +150,7 @@ def _getSSHOptions(minion_id=None, proxies=None, tunnel=False, user=None):
         )
     proxyCommand += "'"
 
-    return ssh_options
+    return [proxyCommand]
 
 
 def _getSSHMinion(minion_id=None, proxies=[], tunnel=False):
@@ -180,48 +192,48 @@ def targets(tgt, tgt_type="glob", **kwargs):
 
     ret = {}
 
-    cache_fp = cache.fetch("roster/uyuni", "fp")
-    ret = cache.fetch("roster/uyuni", "minions")
-    if cache_fp and ret:
-        query = """
-            SELECT FORMAT('%s|%s|%s|%s',
-                       EXTRACT(EPOCH FROM MAX(S.modified)),
-                       COUNT(S.id),
-                       EXTRACT(EPOCH FROM MAX(SP.modified)),
-                       COUNT(SP.proxy_server_id)
-                   ) AS fp
-            FROM rhnServer AS S
-            LEFT JOIN suseServerContactMethod AS SSCM ON
-                 (SSCM.id=S.contact_method_id)
-            LEFT JOIN suseMinionInfo AS SMI ON
-                 (SMI.server_id=S.id)
-            LEFT JOIN rhnServerPath AS SP ON
-                 (SP.server_id=S.id)
-            WHERE SMI.minion_id IS NOT NULL AND
-                  S.contact_method_id IN (
-                      SELECT SSCM.id
-                      FROM suseServerContactMethod AS SCCM
-                      WHERE SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
-                  )
-            """
-        h = _prepareSQL(query)
-        if h is not None:
-            h.execute()
-            row = h.fetchone_dict()
-            if row and row["fp"]:
-                new_fp = hashlib.sha256(row["fp"].encode()).hexdigest()
-                if new_fp == cache_fp:
-                    log.debug("Return the cached data")
-                    return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
-                else:
-                    log.debug("Invalidate cache")
-                    cache_fp = new_fp
-                    ret = {}
-        else:
-            log.warning(
-                "Unable to reconnect to the Uyuni DB. Returning cached data instead."
-            )
-            return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
+    cache_data = cache.fetch("roster/uyuni", "minions")
+    cache_fp = cache_data.get("fp", None)
+    query = """
+        SELECT FORMAT('%s|%s|%s|%s',
+                      EXTRACT(EPOCH FROM MAX(S.modified)),
+                      COUNT(S.id),
+                      EXTRACT(EPOCH FROM MAX(SP.modified)),
+                      COUNT(SP.proxy_server_id)
+               ) AS fp
+               FROM rhnServer AS S
+               LEFT JOIN suseServerContactMethod AS SSCM ON
+                   (SSCM.id=S.contact_method_id)
+               LEFT JOIN suseMinionInfo AS SMI ON
+                   (SMI.server_id=S.id)
+               LEFT JOIN rhnServerPath AS SP ON
+                   (SP.server_id=S.id)
+               WHERE SMI.minion_id IS NOT NULL AND
+                     S.contact_method_id IN (
+                         SELECT SSCM.id
+                         FROM suseServerContactMethod AS SCCM
+                         WHERE SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
+                     )
+    """
+    h = _prepareSQL(query)
+    if h is not None:
+        h.execute()
+        row = h.fetchone_dict()
+        if row and "fp" in row:
+            new_fp = hashlib.sha256(row["fp"].encode()).hexdigest()
+            if new_fp == cache_fp and "minions" in cache_data and cache_data["minions"]:
+                ret = cache_data["minions"]
+                log.debug("Return the cached data")
+                return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
+            else:
+                log.debug("Invalidate cache")
+                cache_fp = new_fp
+                ret = {}
+    else:
+        log.warning(
+            "Unable to reconnect to the Uyuni DB. Returning cached data instead."
+        )
+        return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
 
     query = """
         SELECT S.id AS server_id,
@@ -253,14 +265,14 @@ def targets(tgt, tgt_type="glob", **kwargs):
                 minion_id=prow["minion_id"], proxies=proxies, tunnel=prow["tunnel"]
             )
             proxies = []
-        elif row and row["proxy_hostname"]:
-            proxies.append(row["proxy_hostname"])
         if row is None:
             break
+        if row["proxy_hostname"]:
+            proxies.append(row["proxy_hostname"])
         prow = row
         row = h.fetchone_dict()
 
-    cache.store("roster/uyuni", "fp", cache_fp)
-    cache.store("roster/uyuni", "minions", ret)
+    cache.store("roster/uyuni", "minions", {"fp": cache_fp, "minions": ret})
+    log.trace("Uyuni DB roster:\n%s" % dump(ret))
 
     return __utils__["roster_matcher.targets"](ret, tgt, tgt_type)
