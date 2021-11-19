@@ -202,14 +202,13 @@ def targets(tgt, tgt_type="glob", **kwargs):
                       COUNT(SP.proxy_server_id)
                ) AS fp
                FROM rhnServer AS S
-               LEFT JOIN suseServerContactMethod AS SSCM ON
-                   (SSCM.id=S.contact_method_id)
-               LEFT JOIN suseMinionInfo AS SMI ON
-                   (SMI.server_id=S.id)
+               INNER JOIN suseServerContactMethod AS SSCM ON
+                     (SSCM.id=S.contact_method_id)
+               INNER JOIN suseMinionInfo AS SMI ON
+                     (SMI.server_id=S.id)
                LEFT JOIN rhnServerPath AS SP ON
-                   (SP.server_id=S.id)
-               WHERE SMI.minion_id IS NOT NULL AND
-                     S.contact_method_id IN (
+                    (SP.server_id=S.id)
+               WHERE S.contact_method_id IN (
                          SELECT SSCM.id
                          FROM suseServerContactMethod AS SCCM
                          WHERE SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
@@ -241,14 +240,13 @@ def targets(tgt, tgt_type="glob", **kwargs):
                SSCM.label='ssh-push-tunnel' AS tunnel,
                SP.hostname AS proxy_hostname
         FROM rhnServer AS S
-        LEFT JOIN suseServerContactMethod AS SSCM ON
-             (SSCM.id=S.contact_method_id)
-        LEFT JOIN suseMinionInfo AS SMI ON
-             (SMI.server_id=S.id)
+        INNER JOIN suseServerContactMethod AS SSCM ON
+              (SSCM.id=S.contact_method_id)
+        INNER JOIN suseMinionInfo AS SMI ON
+              (SMI.server_id=S.id)
         LEFT JOIN rhnServerPath AS SP ON
              (SP.server_id=S.id)
-        WHERE SMI.minion_id IS NOT NULL AND
-              SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
+        WHERE SSCM.label IN ('ssh-push', 'ssh-push-tunnel')
         ORDER BY S.id, SP.position DESC
     """
 
