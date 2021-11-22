@@ -3,12 +3,110 @@
 import textwrap
 
 import pytest
-from saltfactories.utils.functional import StateResult
 
 pytestmark = [
     pytest.mark.slow_test,
 ]
 
+# TODO: remove in favor of
+# from saltfactories.utils import StateResult
+import attr
+@attr.s
+class StateResult:
+    """
+    This class wraps a single salt state return into a more pythonic object in order to simplify assertions
+
+    :param dict raw:
+        A single salt state return result
+
+    .. code-block:: python
+
+        def test_user_absent(loaders):
+            ret = loaders.states.user.absent(name=random_string("account-", uppercase=False))
+            assert ret.result is True
+    """
+
+    raw = attr.ib()
+    state_id = attr.ib(init=False)
+    full_return = attr.ib(init=False)
+    filtered = attr.ib(init=False)
+
+    @state_id.default
+    def _state_id(self):
+        if not isinstance(self.raw, dict):
+            raise ValueError("The state result errored: {}".format(self.raw))
+        return next(iter(self.raw.keys()))
+
+    @full_return.default
+    def _full_return(self):
+        return self.raw[self.state_id]
+
+    @filtered.default
+    def _filtered_default(self):
+        _filtered = {}
+        for key, value in self.full_return.items():
+            if key.startswith("_") or key in ("duration", "start_time"):
+                continue
+            _filtered[key] = value
+        return _filtered
+
+    @property
+    def run_num(self):
+        """
+        The ``__run_num__`` key on the full state return dictionary
+        """
+        return self.full_return["__run_num__"] or 0
+
+    @property
+    def name(self):
+        """
+        The ``name`` key on the full state return dictionary
+        """
+        return self.full_return["name"]
+
+    @property
+    def result(self):
+        """
+        The ``result`` key on the full state return dictionary
+        """
+        return self.full_return["result"]
+
+    @property
+    def changes(self):
+        """
+        The ``changes`` key on the full state return dictionary
+        """
+        return self.full_return["changes"]
+
+    @property
+    def comment(self):
+        """
+        The ``comment`` key on the full state return dictionary
+        """
+        return self.full_return["comment"]
+
+    @property
+    def warnings(self):
+        """
+        The ``warnings`` key on the full state return dictionary
+        """
+        return self.full_return.get("warnings") or []
+
+    def __contains__(self, key):
+        """
+        Checks for the existence of ``key`` in the full state return dictionary
+        """
+        return key in self.full_return
+
+    def __eq__(self, _):
+        raise TypeError(
+            "Please assert comparisons with {}.filtered instead".format(self.__class__.__name__)
+        )
+
+    def __bool__(self):
+        raise TypeError(
+            "Please assert comparisons with {}.filtered instead".format(self.__class__.__name__)
+        )
 
 @pytest.fixture(scope="module")
 def reset_pillar(salt_call_cli):
