@@ -40,6 +40,7 @@ PROXY_SSH_PUSH_KEY = (
     "/var/lib/spacewalk/" + PROXY_SSH_PUSH_USER + "/.ssh/id_susemanager_ssh_push"
 )
 SALT_SSH_CONNECT_TIMEOUT = 180
+SALT_SSH_PREFLIGHT = "/usr/share/susemanager/salt-ssh/preflight.sh"
 SSH_KEY_DIR = "/srv/susemanager/salt/salt_ssh"
 SSH_KEY_PATH = SSH_KEY_DIR + "/mgr_ssh_id"
 SSH_PUSH_PORT = 22
@@ -159,6 +160,8 @@ def _getSSHMinion(minion_id=None, proxies=[], tunnel=False):
         "host": minion_id,
         "user": user,
         "port": SSH_PUSH_PORT,
+        "ssh_pre_flight": SALT_SSH_PREFLIGHT,
+        "ssh_pre_flight_args": "%s:%s" % (proxies[-1] if proxies else COBBLER_HOST, SSH_PUSH_PORT_HTTPS if tunnel else SSL_PORT),
         "timeout": SALT_SSH_CONNECT_TIMEOUT,
     }
     if tunnel:
