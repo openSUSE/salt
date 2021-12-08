@@ -11,6 +11,7 @@ Support for Apache
 
 # Import python libs
 from __future__ import absolute_import, generators, print_function, with_statement, unicode_literals
+import os
 import re
 import logging
 
@@ -121,7 +122,9 @@ def modules():
     ret = {}
     ret['static'] = []
     ret['shared'] = []
-    out = __salt__['cmd.run'](cmd).splitlines()
+    out = __salt__['cmd.run'](
+        cmd, env={'PATH': os.getenv('PATH')}, clean_env=True
+    ).splitlines()
     for line in out:
         comps = line.split()
         if not comps:
@@ -167,7 +170,7 @@ def directives():
     '''
     cmd = '{0} -L'.format(_detect_os())
     ret = {}
-    out = __salt__['cmd.run'](cmd)
+    out = __salt__['cmd.run'](cmd, env={'PATH': os.getenv('PATH')}, clean_env=True)
     out = out.replace('\n\t', '\t')
     for line in out.splitlines():
         if not line:
@@ -195,7 +198,7 @@ def vhosts():
     cmd = '{0} -S'.format(_detect_os())
     ret = {}
     namevhost = ''
-    out = __salt__['cmd.run'](cmd)
+    out = __salt__['cmd.run'](cmd, env={"PATH": os.getenv("PATH")}, clean_env=True)
     for line in out.splitlines():
         if not line:
             continue
@@ -245,7 +248,7 @@ def signal(signal=None):
     else:
         arguments = ' {0}'.format(signal)
     cmd = _detect_os() + arguments
-    out = __salt__['cmd.run_all'](cmd)
+    out = __salt__['cmd.run_all'](cmd, env={'PATH': os.getenv('PATH')}, clean_env=True)
 
     # A non-zero return code means fail
     if out['retcode'] and out['stderr']:
