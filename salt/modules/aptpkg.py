@@ -2038,7 +2038,7 @@ def _parse_repo_keys_output(cmd_ret):
     return ret
 
 
-def get_repo_keys(aptkey=True, keydir=None):
+def get_repo_keys(aptkey=True, keydir=None, **kwargs):
     """
     .. versionadded:: 2017.7.0
 
@@ -2160,6 +2160,7 @@ def add_repo_key(
     aptkey=True,
     keydir=None,
     keyfile=None,
+    **kwargs,
 ):
     """
     .. versionadded:: 2017.7.0
@@ -2227,7 +2228,6 @@ def add_repo_key(
     if not salt.utils.path.which("apt-key"):
         aptkey = False
     cmd = ["apt-key"]
-    kwargs = {}
     # NOTE: Populated below only for the ``not aptkey`` + ``keyserver``
     #   branch, so that the keyring file gpg writes can be chmod'd to be
     #   world-readable afterwards (see the matching os.chmod() call below).
