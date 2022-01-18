@@ -938,7 +938,9 @@ def list_repo_pkgs(*args, **kwargs):
         None
         if _yum() != "yum"
         else LooseVersion(
-            __salt__["cmd.run"](["yum", "--version"], python_shell=False)
+            __salt__["cmd.run"](
+                ["yum", "--version"], python_shell=False, env={"SALT_RUNNING": "1"}
+            )
             .splitlines()[0]
             .strip()
         )
@@ -2434,7 +2436,9 @@ def list_holds(pattern=__HOLD_PATTERN, full=True):
     """
     _check_versionlock()
 
-    out = __salt__["cmd.run"]([_yum(), "versionlock", "list"], python_shell=False)
+    out = __salt__["cmd.run"](
+        [_yum(), "versionlock", "list"], python_shell=False, env={"SALT_RUNNING": "1"}
+    )
     ret = []
     for line in salt.utils.itertools.split(out, "\n"):
         match = _get_hold(line, pattern=pattern, full=full)
@@ -2502,7 +2506,10 @@ def group_list():
     }
 
     out = __salt__["cmd.run_stdout"](
-        [_yum(), "grouplist", "hidden"], output_loglevel="trace", python_shell=False
+        [_yum(), "grouplist", "hidden"],
+        output_loglevel="trace",
+        python_shell=False,
+        env={"SALT_RUNNING": "1"},
     )
     key = None
     for line in salt.utils.itertools.split(out, "\n"):
@@ -2605,7 +2612,7 @@ def group_info(name, expand=False, ignore_groups=None, **kwargs):
     )
 
     cmd = [_yum(), "--quiet"] + options + ["groupinfo", name]
-    out = __salt__["cmd.run_stdout"](cmd, output_loglevel="trace", python_shell=False)
+    out = __salt__["cmd.run_stdout"](cmd, output_loglevel="trace", python_shell=False, env={"SALT_RUNNING": "1"}
 
     g_info = {}
     for line in salt.utils.itertools.split(out, "\n"):
@@ -3366,7 +3373,9 @@ def download(*packages, **kwargs):
 
     cmd = ["yumdownloader", "-q", f"--destdir={CACHE_DIR}"]
     cmd.extend(packages)
-    __salt__["cmd.run"](cmd, output_loglevel="trace", python_shell=False)
+    __salt__["cmd.run"](
+        cmd, output_loglevel="trace", python_shell=False, env={"SALT_RUNNING": "1"}
+    )
     ret = {}
     for dld_result in os.listdir(CACHE_DIR):
         if not dld_result.endswith(".rpm"):
@@ -3442,7 +3451,7 @@ def _get_patches(installed_only=False):
     patches = {}
 
     cmd = [_yum(), "--quiet", "updateinfo", "list", "all"]
-    ret = __salt__["cmd.run_stdout"](cmd, python_shell=False)
+    ret = __salt__["cmd.run_stdout"](cmd, python_shell=False, env={"SALT_RUNNING": "1"})
     parsing_errors = False
 
     for line in salt.utils.itertools.split(ret, os.linesep):
