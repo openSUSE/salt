@@ -1635,3 +1635,36 @@ def test_ip_addrs(linux_interfaces_dict):
     ):
         ret = network.ip_addrs6("eth0")
         assert ret == ["fe80::e23f:49ff:fe85:6aaf"]
+
+
+def test_is_fqdn(self):
+    """
+    Test is_fqdn function passes possible FQDN names.
+
+    :return: None
+    """
+    for fqdn in [
+        "host.domain.com",
+        "something.with.the.dots.still.ok",
+        "UPPERCASE.ALSO.SHOULD.WORK",
+        "MiXeD.CaSe.AcCePtAbLe",
+        "123.host.com",
+        "host123.com",
+        "some_underscore.com",
+        "host-here.com",
+    ]:
+        assert network.is_fqdn(fqdn)
+
+def test_is_not_fqdn(self):
+    """
+    Test is_fqdn function rejects FQDN names.
+
+    :return: None
+    """
+    for fqdn in [
+        "hostname",
+        "/some/path",
+        "$variable.here",
+        f"verylonghostname.{'domain' * 45}",
+    ]:
+        assert not network.is_fqdn(fqdn)

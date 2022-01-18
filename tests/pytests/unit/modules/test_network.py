@@ -45,7 +45,7 @@ def fake_fqdn():
     with patch("socket.getfqdn", autospec=True, return_value=fqdn), patch(
         "socket.gethostbyaddr",
         autospec=True,
-        return_value=("fnord", "fnord fnord"),
+        return_value=("fnord", ["fnord fnord"], []),
     ):
         yield fqdn
 
@@ -105,7 +105,7 @@ def test_fqdns_should_return_sorted_unique_domains(fake_ips):
     with patch("socket.getfqdn", autospec=True, side_effect=fake_domains), patch(
         "socket.gethostbyaddr",
         autospec=True,
-        return_value=("fnord", "fnord fnord"),
+        return_value=("fnord", ["fnord fnord"], []),
     ):
         actual_fqdns = networkmod.fqdns()
         assert actual_fqdns == {
