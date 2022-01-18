@@ -1420,6 +1420,40 @@ def test_ip_bracket(addr, expected, strip):
     assert network.ip_bracket(addr, strip=strip) == expected
 
 
+def test_is_fqdn():
+    """
+    Test is_fqdn function passes possible FQDN names.
+
+    :return: None
+    """
+    for fqdn in [
+        "host.domain.com",
+        "something.with.the.dots.still.ok",
+        "UPPERCASE.ALSO.SHOULD.WORK",
+        "MiXeD.CaSe.AcCePtAbLe",
+        "123.host.com",
+        "host123.com",
+        "some_underscore.com",
+        "host-here.com",
+    ]:
+        assert network.is_fqdn(fqdn)
+
+
+def test_is_not_fqdn():
+    """
+    Test is_fqdn function rejects FQDN names.
+
+    :return: None
+    """
+    for fqdn in [
+        "hostname",
+        "/some/path",
+        "$variable.here",
+        "verylonghostname.{}".format("domain" * 45),
+    ]:
+        assert not network.is_fqdn(fqdn)
+
+
 def test_junos_ifconfig_output_parsing():
     ret = network._junos_interfaces_ifconfig("inet mtu 0 local=" + " " * 3456)
     assert ret == {"inet": {"up": False}}
