@@ -1311,3 +1311,35 @@ class NetworkTestCase(TestCase):
 
         ip_addr_obj = ipaddress.ip_address(test_ipv4)
         self.assertEqual(test_ipv4, network.ip_bracket(ip_addr_obj))
+
+    def test_is_fqdn(self):
+        """
+        Test is_fqdn function passes possible FQDN names.
+
+        :return: None
+        """
+        for fqdn in [
+            "host.domain.com",
+            "something.with.the.dots.still.ok",
+            "UPPERCASE.ALSO.SHOULD.WORK",
+            "MiXeD.CaSe.AcCePtAbLe",
+            "123.host.com",
+            "host123.com",
+            "some_underscore.com",
+            "host-here.com",
+        ]:
+            assert network.is_fqdn(fqdn)
+
+    def test_is_not_fqdn(self):
+        """
+        Test is_fqdn function rejects FQDN names.
+
+        :return: None
+        """
+        for fqdn in [
+            "hostname",
+            "/some/path",
+            "$variable.here",
+            "verylonghostname.{}".format("domain" * 45),
+        ]:
+            assert not network.is_fqdn(fqdn)
