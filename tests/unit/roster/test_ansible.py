@@ -63,7 +63,7 @@ class AnsibleRosterTestCase(TestCase, mixins.LoaderModuleMockMixin):
         opts = salt.config.master_config(
             os.path.join(RUNTIME_VARS.TMP_CONF_DIR, "master")
         )
-        utils = salt.loader.utils(opts, whitelist=["json", "stringutils"])
+        utils = salt.loader.utils(opts, whitelist=["json", "stringutils", "ansible"])
         runner = salt.loader.runner(opts, utils=utils, whitelist=["salt"])
         return {ansible: {"__utils__": utils, "__opts__": {}, "__runner__": runner}}
 
