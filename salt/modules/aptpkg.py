@@ -2197,7 +2197,7 @@ def _parse_repo_keys_output(cmd_ret):
     return ret
 
 
-def get_repo_keys(aptkey=True, keydir=None):
+def get_repo_keys(aptkey=True, keydir=None, **kwargs):
     """
     .. versionadded:: 2017.7.0
 
@@ -2305,6 +2305,7 @@ def add_repo_key(
     aptkey=True,
     keydir=None,
     keyfile=None,
+    **kwargs
 ):
     """
     .. versionadded:: 2017.7.0
@@ -2358,7 +2359,6 @@ def add_repo_key(
     if not salt.utils.path.which("apt-key"):
         aptkey = False
     cmd = ["apt-key"]
-    kwargs = {}
 
     # If the keyid is provided or determined, check it against the existing
     # repo key ids to determine whether it needs to be imported.
