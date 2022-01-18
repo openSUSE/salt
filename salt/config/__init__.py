@@ -987,6 +987,9 @@ VALID_OPTS = immutabletypes.freeze(
         "pass_gnupghome": str,
         # pass renderer: Set PASSWORD_STORE_DIR env for Pass
         "pass_dir": str,
+        # Use Adler32 hashing algorithm for server_id (default False until Sodium, "adler32" after)
+        # Possible values are: False, adler32, crc32
+        "server_id_use_crc": (bool, str),
     }
 )
 
@@ -1292,6 +1295,7 @@ DEFAULT_MINION_OPTS = immutabletypes.freeze(
         "global_state_conditions": None,
         "reactor_niceness": None,
         "fips_mode": False,
+        "server_id_use_crc": False,
     }
 )
 
