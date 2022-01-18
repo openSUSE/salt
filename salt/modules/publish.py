@@ -196,6 +196,8 @@ def _publish(
             else:
                 return ret
 
+    return {}
+
 
 def publish(
     tgt, fun, arg=None, tgt_type="glob", returner="", timeout=5, via_master=None
