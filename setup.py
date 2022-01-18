@@ -1032,6 +1032,46 @@ class SaltDistribution(distutils.dist.Distribution):
         return install_requires
 
     @property
+    def _property_scripts(self):
+        # Scripts common to all scenarios
+        scripts = ["scripts/salt-call"]
+        if self.ssh_packaging or PACKAGED_FOR_SALT_SSH:
+            scripts.append("scripts/salt-ssh")
+            if IS_WINDOWS_PLATFORM and not os.environ.get("SALT_BUILD_ALL_BINS"):
+                return scripts
+            scripts.extend(["scripts/salt-cloud", "scripts/spm"])
+            return scripts
+
+        if IS_WINDOWS_PLATFORM and not os.environ.get("SALT_BUILD_ALL_BINS"):
+            scripts.extend(
+                [
+                    "scripts/salt-cp",
+                    "scripts/salt-minion",
+                ]
+            )
+            return scripts
+
+        # *nix, so, we need all scripts
+        scripts.extend(
+            [
+                "scripts/salt",
+                "scripts/salt-api",
+                "scripts/salt-cloud",
+                "scripts/salt-cp",
+                "scripts/salt-key",
+                "scripts/salt-master",
+                "scripts/salt-minion",
+                "scripts/salt-proxy",
+                "scripts/salt-run",
+                "scripts/salt-support",
+                "scripts/salt-ssh",
+                "scripts/salt-syndic",
+                "scripts/spm",
+            ]
+        )
+        return scripts
+
+    @property
     def _property_entry_points(self):
         entrypoints = {
             "pyinstaller40": [
@@ -1072,6 +1112,7 @@ class SaltDistribution(distutils.dist.Distribution):
                 "salt-master = salt.scripts:salt_master",
                 "salt-minion = salt.scripts:salt_minion",
                 "salt-run = salt.scripts:salt_run",
+                "salt-support = salt.scripts:salt_support",
                 "salt-ssh = salt.scripts:salt_ssh",
                 "salt-syndic = salt.scripts:salt_syndic",
                 "spm = salt.scripts:salt_spm",

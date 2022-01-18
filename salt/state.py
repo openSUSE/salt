@@ -1468,7 +1468,9 @@ class State:
                 names = []
                 if state.startswith("__"):
                     continue
-                chunk = {"state": state, "name": id_}
+                chunk = OrderedDict()
+                chunk["state"] = state
+                chunk["name"] = id_
                 if orchestration_jid is not None:
                     chunk["__orchestration_jid__"] = orchestration_jid
                 if "__sls__" in body:
@@ -2181,9 +2183,16 @@ class State:
                     else:
                         self.format_slots(cdata)
                         with salt.utils.files.set_umask(low.get("__umask__")):
-                            ret = self.states[cdata["full"]](
-                                *cdata["args"], **cdata["kwargs"]
-                            )
+                            if cdata["full"].split(".")[-1] == "__call__":
+                                # __call__ requires OrderedDict to preserve state order
+                                # kwargs are also invalid overall
+                                ret = self.states[cdata["full"]](
+                                    cdata["args"], module=None, state=cdata["kwargs"]
+                                )
+                            else:
+                                ret = self.states[cdata["full"]](
+                                    *cdata["args"], **cdata["kwargs"]
+                                )
                 self.states.inject_globals = {}
             if "check_cmd" in low:
                 state_check_cmd = "{0[state]}.mod_run_check_cmd".format(low)
@@ -3104,12 +3113,33 @@ class State:
         running.update(errors)
         return running
 
+    def inject_default_call(self, high):
+        """
+        Sets .call function to a state, if not there.
+
+        :param high:
+        :return:
+        """
+        for chunk in high:
+            state = high[chunk]
+            for state_ref in state:
+                needs_default = True
+                for argset in state[state_ref]:
+                    if isinstance(argset, str):
+                        needs_default = False
+                        break
+                if needs_default:
+                    order = state[state_ref].pop(-1)
+                    state[state_ref].append("__call__")
+                    state[state_ref].append(order)
+
     def call_high(
         self, high: HighData, orchestration_jid: Union[str, int, None] = None
     ) -> Union[dict, list]:
         """
         Process a high data call and ensure the defined states.
         """
+        self.inject_default_call(high)
         errors = []
         # If there is extension data reconcile it
         high, ext_errors = self.reconcile_extend(high)

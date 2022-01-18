@@ -1004,8 +1004,10 @@ class LazyLoader(salt.utils.lazy.LazyDict):
         mod_names = [module_name] + list(virtual_aliases)
 
         for attr in funcs_to_load:
-            if attr.startswith("_"):
-                # private functions are skipped
+            if attr.startswith("_") and attr != "__call__":
+                # private functions are skipped,
+                # except __call__ which is default entrance
+                # for multi-function batch-like state syntax
                 continue
             func = getattr(mod, attr)
             if not inspect.isfunction(func) and not isinstance(func, functools.partial):

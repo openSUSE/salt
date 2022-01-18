@@ -15,6 +15,7 @@ import salt.utils.jid
 import salt.utils.versions
 import salt.utils.yaml
 from salt.exceptions import SaltInvocationError
+from salt.utils.odict import OrderedDict
 
 log = logging.getLogger(__name__)
 
@@ -402,7 +403,7 @@ def format_call(
     ret = initial_ret is not None and initial_ret or {}
 
     ret["args"] = []
-    ret["kwargs"] = {}
+    ret["kwargs"] = OrderedDict()
 
     aspec = get_function_argspec(fun, is_class_method=is_class_method)
 
