@@ -599,3 +599,18 @@ def salt_pip():
     ] + sys.argv[1:]
     ret = subprocess.run(command, shell=False, check=False)
     sys.exit(ret.returncode)
+
+
+def salt_support():
+    """
+    Run Salt Support that collects system data, logs etc for debug and support purposes.
+    :return:
+    """
+
+    import salt.cli.support.collector
+
+    if "" in sys.path:
+        sys.path.remove("")
+    client = salt.cli.support.collector.SaltSupport()
+    _install_signal_handlers(client)
+    client.run()
