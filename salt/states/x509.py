@@ -191,11 +191,12 @@ import re
 
 import salt.exceptions
 import salt.utils.versions
+import salt.utils.stringutils
 
 try:
     from M2Crypto.RSA import RSAError
 except ImportError:
-    pass
+    RSAError = Exception("RSA Error")
 
 log = logging.getLogger(__name__)
 
@@ -214,7 +215,7 @@ def __virtual__():
         )
         return "x509"
     else:
-        return (False, "Could not load x509 state: m2crypto unavailable")
+        return False, "Could not load x509 state: the x509 is not available"
 
 
 def _revoked_to_list(revs):
@@ -703,7 +704,70 @@ def certificate_managed(name, days_remaining=90, append_certs=None, **kwargs):
             "Old": invalid_reason,
             "New": "Certificate will be valid and up to date",
         }
-        return ret
+        private_key_args.update(managed_private_key)
+        kwargs["public_key_passphrase"] = private_key_args["passphrase"]
+
+        if private_key_args["new"]:
+            rotate_private_key = True
+            private_key_args["new"] = False
+
+        if _check_private_key(
+            private_key_args["name"],
+            bits=private_key_args["bits"],
+            passphrase=private_key_args["passphrase"],
+            new=private_key_args["new"],
+            overwrite=private_key_args["overwrite"],
+        ):
+            private_key = __salt__["x509.get_pem_entry"](
+                private_key_args["name"], pem_type="RSA PRIVATE KEY"
+            )
+        else:
+            new_private_key = True
+            private_key = __salt__["x509.create_private_key"](
+                text=True,
+                bits=private_key_args["bits"],
+                passphrase=private_key_args["passphrase"],
+                cipher=private_key_args["cipher"],
+                verbose=private_key_args["verbose"],
+            )
+
+        kwargs["public_key"] = private_key
+
+    current_days_remaining = 0
+    current_comp = {}
+
+    if os.path.isfile(name):
+        try:
+            current = __salt__["x509.read_certificate"](certificate=name)
+            current_comp = copy.deepcopy(current)
+            if "serial_number" not in kwargs:
+                current_comp.pop("Serial Number")
+                if "signing_cert" not in kwargs:
+                    try:
+                        current_comp["X509v3 Extensions"][
+                            "authorityKeyIdentifier"
+                        ] = re.sub(
+                            r"serial:([0-9A-F]{2}:)*[0-9A-F]{2}",
+                            "serial:--",
+                            current_comp["X509v3 Extensions"]["authorityKeyIdentifier"],
+                        )
+                    except KeyError:
+                        pass
+            current_comp.pop("Not Before")
+            current_comp.pop("MD5 Finger Print")
+            current_comp.pop("SHA1 Finger Print")
+            current_comp.pop("SHA-256 Finger Print")
+            current_notafter = current_comp.pop("Not After")
+            current_days_remaining = (
+                datetime.datetime.strptime(current_notafter, "%Y-%m-%d %H:%M:%S")
+                - datetime.datetime.now()
+            ).days
+            if days_remaining == 0:
+                days_remaining = current_days_remaining - 1
+        except salt.exceptions.SaltInvocationError:
+            current = "{} is not a valid Certificate.".format(name)
+    else:
+        current = "{} does not exist.".format(name)
 
     contents = __salt__["x509.create_certificate"](text=True, **kwargs)
     # Check the module actually returned a cert and not an error message as a string
@@ -899,6 +963,8 @@ def pem_managed(name, text, backup=False, **kwargs):
         Any arguments supported by :py:func:`file.managed <salt.states.file.managed>` are supported.
     """
     file_args, kwargs = _get_file_args(name, **kwargs)
-    file_args["contents"] = __salt__["x509.get_pem_entry"](text=text)
+    file_args["contents"] = salt.utils.stringutils.to_str(
+        __salt__["x509.get_pem_entry"](text=text)
+    )
 
     return __states__["file.managed"](**file_args)
