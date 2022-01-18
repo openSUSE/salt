@@ -9,7 +9,6 @@ Beacon to monitor disk usage.
 import logging
 import re
 
-import salt.utils.beacons
 import salt.utils.platform
 
 try:
@@ -84,8 +83,6 @@ def beacon(config):
     it will override the previously defined threshold.
 
     """
-    whitelist = []
-    config = salt.utils.beacons.remove_hidden_options(config, whitelist)
     parts = psutil.disk_partitions(all=True)
     ret = []
     for mounts in config:

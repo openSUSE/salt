@@ -271,7 +271,6 @@ def test_multi_files_exclude(tmp_path):
 
 
 # Check __get_notifier and ensure that the right bits are in __context__
-# including a beacon_name specific notifier is found.
 def test__get_notifier():
     config = {
         "files": {
@@ -301,10 +300,8 @@ def test__get_notifier():
             },
         },
         "coalesce": True,
-        "beacon_module": "inotify",
-        "_beacon_name": "httpd.inotify",
     }
 
     ret = inotify._get_notifier(config)
     assert "inotify.queue" in inotify.__context__
-    assert "httpd.inotify.notifier" in inotify.__context__
+    assert "inotify.notifier" in inotify.__context__

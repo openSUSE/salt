@@ -92,7 +92,6 @@ import datetime
 import logging
 
 import salt.exceptions
-import salt.utils.beacons
 import salt.utils.platform
 
 log = logging.getLogger(__name__)
@@ -119,9 +118,6 @@ def beacon(config):
     """
     log.debug(config)
     ctime = datetime.datetime.utcnow().isoformat()
-
-    whitelist = []
-    config = salt.utils.beacons.remove_hidden_options(config, whitelist)
 
     if not config:
         config = [
