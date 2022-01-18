@@ -2089,7 +2089,10 @@ def fqdns():
 
     def _lookup_fqdn(ip):
         try:
-            return [socket.getfqdn(socket.gethostbyaddr(ip)[0])]
+            name, aliaslist, addresslist = socket.gethostbyaddr(ip)
+            return [socket.getfqdn(name)] + [
+                als for als in aliaslist if salt.utils.network.is_fqdn(als)
+            ]
         except socket.herror as err:
             if err.errno in (0, HOST_NOT_FOUND, NO_DATA):
                 # No FQDN for this IP address, so we don't need to know this all the time.
