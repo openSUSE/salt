@@ -957,6 +957,9 @@ VALID_OPTS = immutabletypes.freeze(
         # The port to be used when checking if a master is connected to a
         # minion
         "remote_minions_port": int,
+        # Use Adler32 hashing algorithm for server_id (default False until Sodium, "adler32" after)
+        # Possible values are: False, adler32, crc32
+        "server_id_use_crc": (bool, str),
     }
 )
 
@@ -1260,6 +1263,7 @@ DEFAULT_MINION_OPTS = immutabletypes.freeze(
         "disabled_requisites": [],
         "reactor_niceness": None,
         "fips_mode": False,
+        "server_id_use_crc": False,
     }
 )
 
