@@ -1014,6 +1014,9 @@ VALID_OPTS = immutabletypes.freeze(
         "signing_algorithm": str,
         # Master publish channel signing
         "publish_signing_algorithm": str,
+        # Use Adler32 hashing algorithm for server_id (default False until Sodium, "adler32" after)
+        # Possible values are: False, adler32, crc32
+        "server_id_use_crc": (bool, str),
     }
 )
 
@@ -1323,6 +1326,7 @@ DEFAULT_MINION_OPTS = immutabletypes.freeze(
         "features": {},
         "encryption_algorithm": "OAEP-SHA1",
         "signing_algorithm": "PKCS1v15-SHA1",
+        "server_id_use_crc": False,
     }
 )
 
