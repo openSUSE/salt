@@ -91,7 +91,6 @@ markers for specific list items:
 import logging
 
 import salt.exceptions
-import salt.utils.beacons
 import salt.utils.platform
 import salt.utils.timeutil
 
@@ -119,9 +118,6 @@ def beacon(config):
     """
     log.debug(config)
     ctime = salt.utils.timeutil.utcnow().isoformat()
-
-    whitelist = []
-    config = salt.utils.beacons.remove_hidden_options(config, whitelist)
 
     if not config:
         config = [
