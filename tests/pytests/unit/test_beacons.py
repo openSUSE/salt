@@ -105,23 +105,6 @@ def test_beacon_module(minion_opts):
     ]
     assert ret == _expected
 
-    # Ensure that "beacon_name" is available in the call to the beacon function
-    name = "ps.beacon"
-    mocked = {name: MagicMock(return_value=_expected)}
-    mocked[name].__globals__ = {}
-    calls = [
-        call(
-            [
-                {"processes": {"apache2": "stopped"}},
-                {"beacon_module": "ps"},
-                {"_beacon_name": "watch_apache"},
-            ]
-        )
-    ]
-    with patch.object(beacon, "beacons", mocked) as patched:
-        beacon.process(minion_opts["beacons"], minion_opts["grains"])
-        patched[name].assert_has_calls(calls)
-
 
 def test_close_beacons_calls_close_on_modules(minion_opts):
     """
