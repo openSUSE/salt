@@ -225,3 +225,17 @@ def bridge_pytest_and_runtests():
     """
     We're basically overriding the same fixture defined in tests/conftest.py
     """
+
+
+@pytest.fixture
+def minion_config():
+    opts = salt.config.DEFAULT_MINION_OPTS.copy()
+    opts["__role"] = "minion"
+    return opts
+
+
+@pytest.fixture
+def master_config():
+    opts = salt.config.DEFAULT_MASTER_OPTS.copy()
+    opts["__role"] = "master"
+    return opts
