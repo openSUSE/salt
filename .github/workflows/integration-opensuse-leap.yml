@@ -3,16 +3,11 @@ name: integration-opensuse-leap
 on:
   push:
     branches:
-      - openSUSE-3000
-      - openSUSE-3000.3
-      - openSUSE-3002.2
-      - openSUSE-3003.3
+      - openSUSE-3004
   pull_request:
     branches:
-      - openSUSE-3000
-      - openSUSE-3000.3
-      - openSUSE-3002.2
-      - openSUSE-3003.3
+      - openSUSE-3004
+  workflow_dispatch:
 
 jobs:
   integration-tests:
@@ -27,6 +22,7 @@ jobs:
         with:
           repository: openSUSE/salt-toaster
           path: salt-toaster
+          ref: 3004
       - name: Integration tests
         env:
           DOCKER_IMAGE: "ghcr.io/opensuse/salt-toaster-leap15.3-devel"
