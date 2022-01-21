@@ -3,16 +3,11 @@ name: integration-opensuse-leap
 on:
   push:
     branches:
-      - openSUSE-3000
-      - openSUSE-3000.3
-      - openSUSE-3002.2
-      - openSUSE-3003.3
+      - openSUSE/release/3005.1
   pull_request:
     branches:
-      - openSUSE-3000
-      - openSUSE-3000.3
-      - openSUSE-3002.2
-      - openSUSE-3003.3
+      - openSUSE/release/3005.1
+  workflow_dispatch:
 
 jobs:
   integration-tests:
@@ -27,10 +22,16 @@ jobs:
         with:
           repository: openSUSE/salt-toaster
           path: salt-toaster
+          ref: 3005
       - name: Integration tests
         env:
-          DOCKER_IMAGE: "ghcr.io/opensuse/salt-toaster-leap15.3-devel"
-          DISTRO: "leap15.3"
+          # The "ghcr.io/opensuse/salt-toaster-leap15.4-devel" package is currently private.
+          # Uncomment DOCKER_IMAGE once the image is public.
+          #
+          # https://github.com/orgs/openSUSE/packages?repo_name=salt-toaster
+          #
+          # DOCKER_IMAGE: "ghcr.io/opensuse/salt-toaster-leap15.4-devel"
+          DISTRO: "leap15.4"
           FLAVOR: "devel"
           SALT_REPO: "${{ github.workspace }}/salt"
         working-directory: ./salt-toaster
