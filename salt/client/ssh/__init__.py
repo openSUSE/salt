@@ -146,15 +146,22 @@ elif [ "$SUDO" ] && [ -n "$SUDO_USER" ]
 then SUDO="sudo "
 fi
 EX_PYTHON_INVALID={EX_THIN_PYTHON_INVALID}
-PYTHON_CMDS="python3 /usr/libexec/platform-python python27 python2.7 python26 python2.6 python2 python"
+SSH_PY_CODE='import base64;
+                   exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+PYTHON_CMDS="/var/tmp/venv-salt-minion/bin/python python3 /usr/libexec/platform-python python27 python2.7 python26 python2.6 python2 python"
 for py_cmd in $PYTHON_CMDS
 do
     if command -v "$py_cmd" >/dev/null 2>&1 && "$py_cmd" -c "import sys; sys.exit(not (sys.version_info >= (2, 6)));"
     then
         py_cmd_path=`"$py_cmd" -c 'from __future__ import print_function;import sys; print(sys.executable);'`
         cmdpath=`command -v $py_cmd 2>/dev/null || which $py_cmd 2>/dev/null`
+        cmdpath=`readlink -f $cmdpath`
         if file $cmdpath | grep "shell script" > /dev/null
         then
+            if echo $cmdpath | grep venv-salt-minion > /dev/null
+            then
+                exec $SUDO "$cmdpath" -c "$SSH_PY_CODE"
+            fi
             ex_vars="'PATH', 'LD_LIBRARY_PATH', 'MANPATH', \
                    'XDG_DATA_DIRS', 'PKG_CONFIG_PATH'"
             export `$py_cmd -c \
@@ -166,13 +173,9 @@ do
             exec $SUDO PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH \
                      MANPATH=$MANPATH XDG_DATA_DIRS=$XDG_DATA_DIRS \
                      PKG_CONFIG_PATH=$PKG_CONFIG_PATH \
-                     "$py_cmd_path" -c \
-                   'import base64;
-                   exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+                     "$py_cmd_path" -c "$SSH_PY_CODE"
         else
-            exec $SUDO "$py_cmd_path" -c \
-                   'import base64;
-                   exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+            exec $SUDO "$py_cmd_path" -c "$SSH_PY_CODE"
         fi
         exit 0
     else
@@ -916,6 +919,8 @@ class Single:
         self.context = {"master_opts": self.opts, "fileclient": self.fsclient}
 
         self.ssh_pre_flight = kwargs.get("ssh_pre_flight", None)
+        self.ssh_pre_flight_args = kwargs.get("ssh_pre_flight_args", None)
+        self.venv_hash_file = "/var/tmp/venv-salt-minion/venv-hash.txt"
 
         if self.ssh_pre_flight:
             self.ssh_pre_file = os.path.basename(self.ssh_pre_flight)
@@ -1007,7 +1012,7 @@ class Single:
 
         self.shell.send(self.ssh_pre_flight, script)
 
-        return self.execute_script(script)
+        return self.execute_script(script, script_args=self.ssh_pre_flight_args)
 
     def check_thin_dir(self):
         """
@@ -1020,14 +1025,26 @@ class Single:
             return False
         return True
 
+    def check_venv_hash_file(self):
+        """
+        check if the venv exists on the remote machine
+        """
+        stdout, stderr, retcode = self.shell.exec_cmd(
+            "test -f {}".format(self.venv_hash_file)
+        )
+        if retcode != 0:
+            return False
+        return True
+
     def deploy(self):
         """
         Deploy salt-thin
         """
-        self.shell.send(
-            self.thin,
-            os.path.join(self.thin_dir, "salt-thin.tgz"),
-        )
+        if not self.check_venv_hash_file():
+            self.shell.send(
+                self.thin,
+                os.path.join(self.thin_dir, "salt-thin.tgz"),
+            )
         self.deploy_ext()
         return True
 
@@ -1335,15 +1352,24 @@ ARGS = {arguments}\n'''.format(
 
         return cmd
 
-    def execute_script(self, script, extension="py", pre_dir=""):
+    def execute_script(self, script, extension="py", pre_dir="", script_args=None):
         """
         execute a script on the minion then delete
         """
+        args = ""
+        if script_args:
+            args = " {}".format(
+                " ".join(script_args)
+                if isinstance(script_args, (list, tuple))
+                else script_args
+            )
         if extension == "ps1":
             ret = self.shell.exec_cmd('"powershell {}"'.format(script))
         else:
             if not self.winrm:
-                ret = self.shell.exec_cmd("/bin/sh '{}{}'".format(pre_dir, script))
+                ret = self.shell.exec_cmd(
+                    "/bin/sh '{}{}'{}".format(pre_dir, script, args)
+                )
             else:
                 ret = saltwinshell.call_python(self, script)
 
