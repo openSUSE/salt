@@ -275,6 +275,8 @@ def main(argv):  # pylint: disable=W0613
     """
 
     virt_env = os.getenv("VIRTUAL_ENV", None)
+    # VIRTUAL_ENV environment variable is defined by venv-salt-minion wrapper
+    # it's used to check if the shim is running under this wrapper
     venv_salt_call = None
     if virt_env and "venv-salt-minion" in virt_env:
         venv_salt_call = os.path.join(virt_env, "bin", "salt-call")
@@ -285,9 +287,9 @@ def main(argv):  # pylint: disable=W0613
             cache_dir = os.path.join(OPTIONS.saltdir, "running_data", "var", "cache")
             os.makedirs(os.path.join(cache_dir, "salt"))
             os.symlink("salt", os.path.relpath(os.path.join(cache_dir, "venv-salt-minion")))
-            #os.symlink(os.path.join(cache_dir, "salt"), os.path.relpath(os.path.join(cache_dir, "venv-salt-minion")))
 
     if venv_salt_call is None:
+        # Use Salt thin only if Salt Bundle (venv-salt-minion) is not available
         thin_path = os.path.join(OPTIONS.saltdir, THIN_ARCHIVE)
         if os.path.isfile(thin_path):
             if OPTIONS.checksum != get_hash(thin_path, OPTIONS.hashfunc):
