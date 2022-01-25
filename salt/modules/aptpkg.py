@@ -3044,6 +3044,15 @@ def info_installed(*names, **kwargs):
     failhard = kwargs.pop("failhard", True)
     kwargs.pop("errors", None)  # Only for compatibility with RPM
     attr = kwargs.pop("attr", None)  # Package attributes to return
+
+    # status is needed to see if a package is installed. So we have to add it,
+    # even if it's excluded via attr parameter. Otherwise all packages are
+    # returned.
+    if attr:
+        attr_list = set(attr.split(","))
+        attr_list.add("status")
+        attr = ",".join(attr_list)
+
     all_versions = kwargs.pop(
         "all_versions", False
     )  # This is for backward compatible structure only

@@ -443,6 +443,24 @@ def test_info_installed_attr(lowpkg_info_var):
         assert ret["wget"] == expected_pkg
 
 
+def test_info_installed_attr_without_status(lowpkg_info_var):
+    """
+    Test info_installed 'attr' for inclusion of 'status' attribute.
+
+    Since info_installed should only return installed packages, we need to
+    call __salt__['lowpkg.info'] with the 'status' attribute even if the user
+    is not asking for it in 'attr'. Otherwise info_installed would not be able
+    to check if the package is installed and would return everything.
+
+    :return:
+    """
+    mock = MagicMock(return_value=lowpkg_info_var)
+    with patch.dict(aptpkg.__salt__, {"lowpkg.info": mock}):
+        aptpkg.info_installed("wget", attr="version")
+        assert "status" in mock.call_args.kwargs["attr"]
+        assert "version" in mock.call_args.kwargs["attr"]
+
+
 def test_info_installed_all_versions(lowpkg_info_var):
     """
     Test info_installed 'all_versions'.
