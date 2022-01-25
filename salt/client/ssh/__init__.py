@@ -1032,9 +1032,7 @@ class Single:
         stdout, stderr, retcode = self.shell.exec_cmd(
             "test -f {}".format(self.venv_hash_file)
         )
-        if retcode != 0:
-            return False
-        return True
+        return retcode == 0
 
     def deploy(self):
         """
