@@ -418,6 +418,58 @@ def test_info_installed(lowpkg_info_var):
         assert len(aptpkg.info_installed()) == 1
 
 
+def test_info_installed_attr(lowpkg_info_var):
+    """
+    Test info_installed 'attr'.
+    This doesn't test 'attr' behaviour per se, since the underlying function is in dpkg.
+    The test should simply not raise exceptions for invalid parameter.
+
+    :return:
+    """
+    expected_pkg = {
+        "url": "http://www.gnu.org/software/wget/",
+        "packager": "Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>",
+        "name": "wget",
+        "install_date": "2016-08-30T22:20:15Z",
+        "description": "retrieves files from the web",
+        "version": "1.15-1ubuntu1.14.04.2",
+        "architecture": "amd64",
+        "group": "web",
+        "source": "wget",
+    }
+    mock = MagicMock(return_value=lowpkg_info_var)
+    with patch.dict(aptpkg.__salt__, {"lowpkg.info": mock}):
+        ret = aptpkg.info_installed("wget", attr="foo,bar")
+        assert ret["wget"] == expected_pkg
+
+
+def test_info_installed_all_versions(lowpkg_info_var):
+    """
+    Test info_installed 'all_versions'.
+    Since Debian won't return same name packages with the different names,
+    this should just return different structure, backward compatible with
+    the RPM equivalents.
+
+    :return:
+    """
+    expected_pkg = {
+        "url": "http://www.gnu.org/software/wget/",
+        "packager": "Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>",
+        "name": "wget",
+        "install_date": "2016-08-30T22:20:15Z",
+        "description": "retrieves files from the web",
+        "version": "1.15-1ubuntu1.14.04.2",
+        "architecture": "amd64",
+        "group": "web",
+        "source": "wget",
+    }
+    mock = MagicMock(return_value=lowpkg_info_var)
+    with patch.dict(aptpkg.__salt__, {"lowpkg.info": mock}):
+        ret = aptpkg.info_installed("wget", all_versions=True)
+        assert isinstance(ret, dict)
+        assert ret["wget"] == [expected_pkg]
+
+
 def test_owner():
     """
     Test - Return the name of the package that owns the file.
