@@ -1,6 +1,5 @@
 import copy
 import logging
-import multiprocessing
 import os
 import random
 import time
@@ -11,8 +10,6 @@ import salt.utils.args
 from salt.exceptions import SaltClientError  # Temporary
 
 log = logging.getLogger(__name__)
-
-_LOCK = multiprocessing.Lock()
 
 
 class SSHClient:
@@ -56,11 +53,32 @@ class SSHClient:
             ("ssh_identities_only", bool),
             ("ssh_remote_port_forwards", str),
             ("ssh_options", list),
+            ("ssh_max_procs", int),
+            ("ssh_askpass", bool),
+            ("ssh_key_deploy", bool),
+            ("ssh_update_roster", bool),
+            ("ssh_scan_ports", str),
+            ("ssh_scan_timeout", int),
+            ("ssh_timeout", int),
+            ("ssh_log_file", str),
+            ("raw_shell", bool),
+            ("refresh_cache", bool),
+            ("roster", str),
             ("roster_file", str),
             ("rosters", list),
             ("ignore_host_keys", bool),
             ("raw_shell", bool),
             ("extra_filerefs", str),
+            ("min_extra_mods", str),
+            ("thin_extra_mods", str),
+            ("verbose", bool),
+            ("static", bool),
+            ("ssh_wipe", bool),
+            ("rand_thin_dir", bool),
+            ("regen_thin", bool),
+            ("ssh_run_pre_flight", bool),
+            ("no_host_keys", bool),
+            ("saltfile", str),
         ]
         sane_kwargs = {}
         for name, kind in roster_vals:
@@ -105,11 +123,7 @@ class SSHClient:
         opts["selected_target_option"] = tgt_type
         opts["tgt"] = tgt
         opts["arg"] = arg
-        _LOCK.acquire()
-        ret = salt.client.ssh.SSH(opts)
-        time.sleep(0.01)
-        _LOCK.release()
-        return ret
+        return salt.client.ssh.SSH(opts)
 
     def cmd_iter(
         self,
