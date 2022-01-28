@@ -82,7 +82,7 @@ class KiwiExporter(object):
             [
                 line
                 for line in minidom.parseString(
-                    etree.tostring(root, encoding="UTF-8", pretty_print=True)
+                    etree.tostring(root, encoding="UTF-8")
                 )
                 .toprettyxml(indent="  ")
                 .split("\n")
