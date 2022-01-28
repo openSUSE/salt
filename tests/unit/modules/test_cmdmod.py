@@ -302,6 +302,48 @@ class CMDMODTestCase(TestCase, LoaderModuleMockMixin):
                     if not salt.utils.platform.is_darwin():
                         getpwnam_mock.assert_called_with('foobar')
 
+    @skipIf(salt.utils.platform.is_windows(), "Do not run on Windows")
+    def test_os_environment_do_not_pass_notify_socket(self):
+        """
+        Make sure NOTIFY_SOCKET environment variable is not passed
+        to the command if not explicitly set with env parameter.
+        """
+        with patch("pwd.getpwnam") as getpwnam_mock:
+            new_env = os.environ.copy()
+            new_env.update({"NOTIFY_SOCKET": "/run/systemd/notify"})
+            with patch("subprocess.Popen") as popen_mock, patch(
+                "os.environ.copy", return_value=new_env
+            ):
+                popen_mock.return_value = Mock(
+                    communicate=lambda *args, **kwags: [b"", None],
+                    pid=lambda: 1,
+                    retcode=0,
+                )
+
+                with patch.dict(cmdmod.__grains__, {"os": "SUSE", "os_family": "Suse"}):
+                    if sys.platform.startswith(("freebsd", "openbsd")):
+                        shell = "/bin/sh"
+                    else:
+                        shell = "/bin/bash"
+
+                    cmdmod._run("ls", cwd=tempfile.gettempdir(), shell=shell)
+
+                    self.assertTrue(
+                        "NOTIFY_SOCKET" not in popen_mock.call_args_list[0][1]["env"]
+                    )
+
+                    cmdmod._run(
+                        "ls",
+                        cwd=tempfile.gettempdir(),
+                        shell=shell,
+                        env={"NOTIFY_SOCKET": "/run/systemd/notify.new"},
+                    )
+
+                    self.assertEqual(
+                        popen_mock.call_args_list[1][1]["env"]["NOTIFY_SOCKET"],
+                        "/run/systemd/notify.new",
+                    )
+
     @skipIf(not salt.utils.platform.is_darwin(), 'applicable to macOS only')
     def test_shell_properly_handled_on_macOS(self):
         '''
