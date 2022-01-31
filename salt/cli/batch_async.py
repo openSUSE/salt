@@ -9,7 +9,6 @@ import logging
 
 import salt.client
 import salt.ext.tornado
-import tornado
 from salt.cli.batch import batch_get_eauth, batch_get_opts, get_bnum
 
 log = logging.getLogger(__name__)
@@ -109,7 +108,7 @@ class BatchAsync:
         if not self.event:
             return
         try:
-            mtag, data = self.event.unpack(raw, self.event.serial)
+            mtag, data = self.event.unpack(raw)
             for (pattern, op) in self.patterns:
                 if mtag.startswith(pattern[:-1]):
                     minion = data["id"]
