@@ -8823,8 +8823,11 @@ def _volume_upload(conn, pool, volume, file, offset=0, length=0, sparse=False):
         fd = opaque
         cur = os.lseek(fd, 0, os.SEEK_CUR)
 
+        SEEK_DATA = getattr(os, "SEEK_DATA", 3)
+        SEEK_HOLE = getattr(os, "SEEK_HOLE", 4)
+
         try:
-            data = os.lseek(fd, cur, os.SEEK_DATA)
+            data = os.lseek(fd, cur, SEEK_DATA)
         except OSError as e:
             if e.errno != 6:
                 raise e
@@ -8843,7 +8846,7 @@ def _volume_upload(conn, pool, volume, file, offset=0, length=0, sparse=False):
             else:
                 inData = True
 
-                hole = os.lseek(fd, data, os.SEEK_HOLE)
+                hole = os.lseek(fd, data, SEEK_HOLE)
                 if hole < 0:
                     raise RuntimeError("No trailing hole")
 
@@ -8863,6 +8866,9 @@ def _volume_upload(conn, pool, volume, file, offset=0, length=0, sparse=False):
     try:
         pool_obj = conn.storagePoolLookupByName(pool)
         vol_obj = pool_obj.storageVolLookupByName(volume)
+
+        if not hasattr(libvirt, "VIR_STORAGE_VOL_UPLOAD_SPARSE_STREAM"):
+            sparse = False
 
         stream = conn.newStream()
         fd = os.open(file, os.O_RDONLY)
