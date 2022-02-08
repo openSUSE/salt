@@ -146,8 +146,12 @@ elif [ "$SUDO" ] && [ -n "$SUDO_USER" ]
 then SUDO="sudo "
 fi
 EX_PYTHON_INVALID={EX_THIN_PYTHON_INVALID}
+set +x
 SSH_PY_CODE='import base64;
                    exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+if [ -n "$DEBUG" ]
+    then set -x
+fi
 PYTHON_CMDS="/var/tmp/venv-salt-minion/bin/python python3 /usr/libexec/platform-python python27 python2.7 python26 python2.6 python2 python"
 for py_cmd in $PYTHON_CMDS
 do
