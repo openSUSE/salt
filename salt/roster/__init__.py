@@ -69,11 +69,14 @@ class Roster:
             self.backends = backends
         if not backends:
             self.backends = ["flat"]
-        utils = salt.loader.utils(self.opts)
-        runner = salt.loader.runner(self.opts, utils=utils)
-        self.rosters = salt.loader.roster(
-            self.opts, runner=runner, utils=utils, context=context
-        )
+        with salt.utils.files.flopen(
+            os.path.join(self.opts["cachedir"], "loader.roster.lock"), "w"
+        ):
+            utils = salt.loader.utils(self.opts)
+            runner = salt.loader.runner(self.opts, utils=utils)
+            self.rosters = salt.loader.roster(
+                self.opts, runner=runner, utils=utils, context=context
+            )
 
     def _gen_back(self):
         """
