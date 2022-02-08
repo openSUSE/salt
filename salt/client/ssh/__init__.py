@@ -1357,7 +1357,7 @@ ARGS = {arguments}\n'''.format(
         args = ""
         if script_args:
             args = " {}".format(
-                " ".join(script_args)
+                " ".join([str(el) for el in script_args])
                 if isinstance(script_args, (list, tuple))
                 else script_args
             )
