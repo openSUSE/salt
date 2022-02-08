@@ -516,16 +516,19 @@ def fileserver(opts, backends):
     )
 
 
-def roster(opts, runner=None, utils=None, whitelist=None):
+def roster(opts, runner=None, utils=None, whitelist=None, context=None):
     """
     Returns the roster modules
     """
+    if context is None:
+        context = {}
+
     return LazyLoader(
         _module_dirs(opts, "roster"),
         opts,
         tag="roster",
         whitelist=whitelist,
-        pack={"__runner__": runner, "__utils__": utils},
+        pack={"__runner__": runner, "__utils__": utils, "__context__": context},
         extra_module_dirs=utils.module_dirs if utils else None,
     )
 
