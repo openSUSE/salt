@@ -219,7 +219,7 @@ class SSH:
 
     ROSTER_UPDATE_FLAG = "#__needs_update"
 
-    def __init__(self, opts):
+    def __init__(self, opts, context=None):
         self.__parsed_rosters = {SSH.ROSTER_UPDATE_FLAG: True}
         pull_sock = os.path.join(opts["sock_dir"], "master_event_pull.ipc")
         if os.path.exists(pull_sock) and zmq:
@@ -246,7 +246,7 @@ class SSH:
             else "glob"
         )
         self._expand_target()
-        self.roster = salt.roster.Roster(self.opts, self.opts.get("roster", "flat"))
+        self.roster = salt.roster.Roster(self.opts, self.opts.get("roster", "flat"), context=context)
         self.targets = self.roster.targets(self.opts["tgt"], self.tgt_type)
         if not self.targets:
             self._update_targets()
