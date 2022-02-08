@@ -6,6 +6,7 @@ import base64
 import binascii
 import copy
 import datetime
+import gc
 import getpass
 import hashlib
 import logging
@@ -616,6 +617,9 @@ class SSH:
                     mine,
                 )
                 routine = Process(target=self.handle_routine, args=args)
+                # Explicitly call garbage collector to prevent possible segfault
+                # in salt-api child process. (bsc#1188607)
+                gc.collect()
                 routine.start()
                 running[host] = {"thread": routine}
                 continue
