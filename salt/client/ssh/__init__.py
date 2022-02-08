@@ -11,6 +11,7 @@ import hashlib
 import logging
 import multiprocessing
 import os
+import psutil
 import queue
 import re
 import subprocess
@@ -327,6 +328,13 @@ class SSH:
         )
         self.mods = mod_data(self.fsclient)
 
+        self.cache = salt.cache.Cache(self.opts)
+        self.master_id = self.opts["id"]
+        self.max_pid_wait = int(self.opts.get("ssh_max_pid_wait", 600))
+        self.session_flock_file = os.path.join(
+            self.opts["cachedir"], "salt-ssh.session.lock"
+        )
+
     @property
     def parse_tgt(self):
         """
@@ -580,7 +588,7 @@ class SSH:
         """
         que = multiprocessing.Queue()
         running = {}
-        target_iter = self.targets.__iter__()
+        targets_queue = list(self.targets.keys())
         returned = set()
         rets = set()
         init = False
@@ -589,11 +597,40 @@ class SSH:
                 log.error("No matching targets found in roster.")
                 break
             if len(running) < self.opts.get("ssh_max_procs", 25) and not init:
-                try:
-                    host = next(target_iter)
-                except StopIteration:
+                if targets_queue:
+                    host = targets_queue.pop(0)
+                else:
                     init = True
                     continue
+                with salt.utils.files.flopen(self.session_flock_file, "w"):
+                    cached_session = self.cache.fetch("salt-ssh/session", host)
+                    if cached_session is not None and "ts" in cached_session:
+                        prev_session_running = time.time() - cached_session["ts"]
+                        if (
+                            "pid" in cached_session
+                            and cached_session.get("master_id", self.master_id)
+                            == self.master_id
+                        ):
+                            pid_running = (
+                                False
+                                if cached_session["pid"] == 0
+                                else psutil.pid_exists(cached_session["pid"])
+                            )
+                            if (
+                                pid_running and prev_session_running < self.max_pid_wait
+                            ) or (not pid_running and prev_session_running < 3):
+                                targets_queue.append(host)
+                                time.sleep(0.3)
+                                continue
+                    self.cache.store(
+                        "salt-ssh/session",
+                        host,
+                        {
+                            "pid": 0,
+                            "master_id": self.master_id,
+                            "ts": time.time(),
+                        },
+                    )
                 for default in self.defaults:
                     if default not in self.targets[host]:
                         self.targets[host][default] = self.defaults[default]
@@ -627,6 +664,12 @@ class SSH:
                 routine = Process(target=self.handle_routine, args=args)
                 routine.start()
                 running[host] = {"thread": routine}
+                with salt.utils.files.flopen(self.session_flock_file, "w"):
+                    self.cache.store("salt-ssh/session", host, {
+                        "pid": routine.pid,
+                        "master_id": self.master_id,
+                        "ts": time.time(),
+                    })
                 continue
             ret = {}
             try:
@@ -663,6 +706,12 @@ class SSH:
             for host in rets:
                 if host in running:
                     running.pop(host)
+                    with salt.utils.files.flopen(self.session_flock_file, "w"):
+                        self.cache.store("salt-ssh/session", host, {
+                            "pid": 0,
+                            "master_id": self.master_id,
+                            "ts": time.time(),
+                        })
             if len(rets) >= len(self.targets):
                 break
             # Sleep when limit or all threads started
