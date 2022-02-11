@@ -196,6 +196,9 @@ EOF'''.format(
     ]
 )
 
+# The file on a salt-ssh minion used to identify if Salt Bundle was deployed
+VENV_HASH_FILE = "/var/tmp/venv-salt-minion/venv-hash.txt"
+
 if not is_windows() and not is_junos():
     shim_file = os.path.join(os.path.dirname(__file__), "ssh_py_shim.py")
     if not os.path.exists(shim_file):
@@ -924,7 +927,6 @@ class Single:
 
         self.ssh_pre_flight = kwargs.get("ssh_pre_flight", None)
         self.ssh_pre_flight_args = kwargs.get("ssh_pre_flight_args", None)
-        self.venv_hash_file = "/var/tmp/venv-salt-minion/venv-hash.txt"
 
         if self.ssh_pre_flight:
             self.ssh_pre_file = os.path.basename(self.ssh_pre_flight)
@@ -1034,7 +1036,7 @@ class Single:
         check if the venv exists on the remote machine
         """
         stdout, stderr, retcode = self.shell.exec_cmd(
-            "test -f {}".format(self.venv_hash_file)
+            "test -f {}".format(VENV_HASH_FILE)
         )
         return retcode == 0
 
