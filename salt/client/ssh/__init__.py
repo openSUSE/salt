@@ -247,7 +247,9 @@ class SSH:
             else "glob"
         )
         self._expand_target()
-        self.roster = salt.roster.Roster(self.opts, self.opts.get("roster", "flat"), context=context)
+        self.roster = salt.roster.Roster(
+            self.opts, self.opts.get("roster", "flat"), context=context
+        )
         self.targets = self.roster.targets(self.opts["tgt"], self.tgt_type)
         if not self.targets:
             self._update_targets()
@@ -334,6 +336,7 @@ class SSH:
         self.session_flock_file = os.path.join(
             self.opts["cachedir"], "salt-ssh.session.lock"
         )
+        self.ssh_session_grace_time = int(self.opts.get("ssh_session_grace_time", 3))
 
     @property
     def parse_tgt(self):
@@ -618,7 +621,10 @@ class SSH:
                             )
                             if (
                                 pid_running and prev_session_running < self.max_pid_wait
-                            ) or (not pid_running and prev_session_running < 3):
+                            ) or (
+                                not pid_running
+                                and prev_session_running < self.ssh_session_grace_time
+                            ):
                                 targets_queue.append(host)
                                 time.sleep(0.3)
                                 continue
@@ -665,11 +671,15 @@ class SSH:
                 routine.start()
                 running[host] = {"thread": routine}
                 with salt.utils.files.flopen(self.session_flock_file, "w"):
-                    self.cache.store("salt-ssh/session", host, {
-                        "pid": routine.pid,
-                        "master_id": self.master_id,
-                        "ts": time.time(),
-                    })
+                    self.cache.store(
+                        "salt-ssh/session",
+                        host,
+                        {
+                            "pid": routine.pid,
+                            "master_id": self.master_id,
+                            "ts": time.time(),
+                        },
+                    )
                 continue
             ret = {}
             try:
@@ -707,11 +717,15 @@ class SSH:
                 if host in running:
                     running.pop(host)
                     with salt.utils.files.flopen(self.session_flock_file, "w"):
-                        self.cache.store("salt-ssh/session", host, {
-                            "pid": 0,
-                            "master_id": self.master_id,
-                            "ts": time.time(),
-                        })
+                        self.cache.store(
+                            "salt-ssh/session",
+                            host,
+                            {
+                                "pid": 0,
+                                "master_id": self.master_id,
+                                "ts": time.time(),
+                            },
+                        )
             if len(rets) >= len(self.targets):
                 break
             # Sleep when limit or all threads started
