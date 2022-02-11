@@ -334,6 +334,7 @@ class SSH:
         self.session_flock_file = os.path.join(
             self.opts["cachedir"], "salt-ssh.session.lock"
         )
+        self.ssh_session_grace_time = int(self.opts.get("ssh_session_grace_time", 3))
 
     @property
     def parse_tgt(self):
@@ -621,7 +622,7 @@ class SSH:
                             )
                             if (
                                 pid_running and prev_session_running < self.max_pid_wait
-                            ) or (not pid_running and prev_session_running < 3):
+                            ) or (not pid_running and prev_session_running < self.ssh_session_grace_time):
                                 targets_queue.append(host)
                                 time.sleep(0.3)
                                 continue
