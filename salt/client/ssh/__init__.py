@@ -555,6 +555,7 @@ class SSH:
         """
         Run the routine in a "Thread", put a dict on the queue
         """
+        salt.loader.LOAD_LOCK.release()
         opts = copy.deepcopy(opts)
         single = Single(
             opts,
@@ -671,7 +672,11 @@ class SSH:
                 # Explicitly call garbage collector to prevent possible segfault
                 # in salt-api child process. (bsc#1188607)
                 gc.collect()
-                routine.start()
+                try:
+                    salt.loader.LOAD_LOCK.acquire()
+                    routine.start()
+                finally:
+                    salt.loader.LOAD_LOCK.release()
                 running[host] = {"thread": routine}
                 with salt.utils.files.flopen(self.session_flock_file, "w"):
                     self.cache.store(

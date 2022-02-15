@@ -88,6 +88,16 @@ LIBCLOUD_FUNCS_NOT_SUPPORTED = (
 # Will be set to pyximport module at runtime if cython is enabled in config.
 pyximport = None
 
+LOAD_LOCK = threading.Lock()
+
+
+def LazyLoader(*args, **kwargs):
+    try:
+        LOAD_LOCK.acquire()
+        return _LazyLoader(*args, **kwargs)
+    finally:
+        LOAD_LOCK.release()
+
 
 def static_loader(
     opts,
@@ -660,7 +670,14 @@ def render(opts, functions, states=None, proxy=None, context=None):
     )
     rend = FilterDictWrapper(ret, ".render")
 
-    if not check_render_pipe_str(
+    def _check_render_pipe_str(pipestr, renderers, blacklist, whitelist):
+        try:
+            LOAD_LOCK.acquire()
+            return check_render_pipe_str(pipestr, renderers, blacklist, whitelist)
+        finally:
+            LOAD_LOCK.release()
+
+    if not _check_render_pipe_str(
         opts["renderer"], rend, opts["renderer_blacklist"], opts["renderer_whitelist"]
     ):
         err = (
@@ -1150,7 +1167,7 @@ class FilterDictWrapper(MutableMapping):
                 yield key.replace(self.suffix, "")
 
 
-class LazyLoader(salt.utils.lazy.LazyDict):
+class _LazyLoader(salt.utils.lazy.LazyDict):
     """
     A pseduo-dictionary which has a set of keys which are the
     name of the module and function, delimited by a dot. When
