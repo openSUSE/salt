@@ -134,8 +134,6 @@ def test_ssh_kwargs(test_opts):
         ssh_kwargs = salt.utils.parsers.SaltSSHOptionParser().defaults
         assert opt_key in ssh_kwargs
 
-    with patch("salt.roster.get_roster_file", MagicMock(return_value="")), patch(
-        "salt.utils.files.flopen", MagicMock()
-    ):
+    with patch("salt.roster.get_roster_file", MagicMock(return_value="")):
         ssh_obj = client._prep_ssh(**opts)
         assert ssh_obj.opts.get(opt_key, None) == opt_value
