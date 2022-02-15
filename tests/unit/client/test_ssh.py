@@ -136,14 +136,13 @@ class SSHRosterDefaults(TestCase):
             opts = salt.config.master_config(fpath)
             with patch(
                 "salt.roster.get_roster_file", MagicMock(return_value=self.roster)
-            ), patch(
-                "salt.template.compile_template",
-                MagicMock(return_value=salt.utils.yaml.safe_load(self.roster)),
-            ), patch(
-                "salt.utils.files.flopen", MagicMock()
             ):
-                roster = salt.roster.Roster(opts=opts)
-                self.assertEqual(roster.targets("*", "glob"), expected)
+                with patch(
+                    "salt.template.compile_template",
+                    MagicMock(return_value=salt.utils.yaml.safe_load(self.roster)),
+                ):
+                    roster = salt.roster.Roster(opts=opts)
+                    self.assertEqual(roster.targets("*", "glob"), expected)
         finally:
             if os.path.isdir(tempdir):
                 shutil.rmtree(tempdir)
@@ -178,7 +177,8 @@ class SSHSingleTests(TestCase):
         }
 
     def test_single_opts(self):
-        """Sanity check for ssh.Single options"""
+        """ Sanity check for ssh.Single options
+        """
 
         single = ssh.Single(
             self.opts,
