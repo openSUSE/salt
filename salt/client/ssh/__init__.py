@@ -673,6 +673,15 @@ class SSH:
                 # in salt-api child process. (bsc#1188607)
                 gc.collect()
                 try:
+                    # salt.loader.LOAD_LOCK is used to prevent deadlock
+                    # with importlib in combination with using multiprocessing (bsc#1182851)
+                    # If the salt-api child process is creating while LazyLoader instance
+                    # is loading module, new child process gets the lock for this module acquired.
+                    # Touching this module with importlib inside child process leads to deadlock.
+                    #
+                    # salt.loader.LOAD_LOCK is used to prevent salt-api child process creation
+                    # while creating new instance of LazyLoader
+                    # salt.loader.LOAD_LOCK must be released explicitly in self.handle_routine
                     salt.loader.LOAD_LOCK.acquire()
                     routine.start()
                 finally:

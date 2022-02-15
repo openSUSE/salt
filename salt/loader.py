@@ -92,6 +92,8 @@ LOAD_LOCK = threading.Lock()
 
 
 def LazyLoader(*args, **kwargs):
+    # This wrapper is used to prevent deadlocks with importlib (bsc#1182851)
+    # LOAD_LOCK is also used directly in salt.client.ssh.SSH
     try:
         LOAD_LOCK.acquire()
         return _LazyLoader(*args, **kwargs)
