@@ -21,6 +21,7 @@ import tarfile
 import tempfile
 import time
 import uuid
+from collections import deque
 
 import salt.client.ssh.shell
 import salt.client.ssh.wrapper
@@ -595,7 +596,7 @@ class SSH:
         """
         que = multiprocessing.Queue()
         running = {}
-        targets_queue = list(self.targets.keys())
+        targets_queue = deque(self.targets.keys())
         returned = set()
         rets = set()
         init = False
@@ -605,7 +606,7 @@ class SSH:
                 break
             if len(running) < self.opts.get("ssh_max_procs", 25) and not init:
                 if targets_queue:
-                    host = targets_queue.pop(0)
+                    host = targets_queue.popleft()
                 else:
                     init = True
                     continue
