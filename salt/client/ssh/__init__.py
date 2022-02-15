@@ -722,6 +722,11 @@ class SSH:
                             ).format(host)
                             ret = {"id": host, "ret": error}
                             log.error(error)
+                            log.error(
+                                "PID %s did not return any data for host '%s'",
+                                running[host]["thread"].pid,
+                                host,
+                            )
                             yield {ret["id"]: ret["ret"]}
                     running[host]["thread"].join()
                     rets.add(host)
@@ -1168,9 +1173,9 @@ class Single:
                 stdout, stderr, retcode = self.run_ssh_pre_flight()
                 if retcode != 0:
                     log.error(
-                        "Error running ssh_pre_flight script {}".format(
-                            self.ssh_pre_file
-                        )
+                        "Error running ssh_pre_flight script %s for host '%s'",
+                        self.ssh_pre_file,
+                        self.target["host"],
                     )
                     return stdout, stderr, retcode
                 log.info(
