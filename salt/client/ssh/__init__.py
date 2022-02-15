@@ -45,6 +45,7 @@ import salt.utils.stringutils
 import salt.utils.thin
 import salt.utils.url
 import salt.utils.verify
+from salt._logging.impl import LOG_LOCK
 from salt.ext import six
 from salt.ext.six.moves import input  # pylint: disable=import-error,redefined-builtin
 from salt.template import compile_template
@@ -555,6 +556,7 @@ class SSH:
         """
         Run the routine in a "Thread", put a dict on the queue
         """
+        LOG_LOCK.release()
         salt.loader.LOAD_LOCK.release()
         opts = copy.deepcopy(opts)
         single = Single(
@@ -683,8 +685,12 @@ class SSH:
                     # while creating new instance of LazyLoader
                     # salt.loader.LOAD_LOCK must be released explicitly in self.handle_routine
                     salt.loader.LOAD_LOCK.acquire()
+                    # The same solution applied to fix logging deadlock
+                    # LOG_LOCK must be released explicitly in self.handle_routine
+                    LOG_LOCK.acquire()
                     routine.start()
                 finally:
+                    LOG_LOCK.release()
                     salt.loader.LOAD_LOCK.release()
                 running[host] = {"thread": routine}
                 with salt.utils.files.flopen(self.session_flock_file, "w"):
