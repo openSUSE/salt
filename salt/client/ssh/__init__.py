@@ -1169,8 +1169,9 @@ class Single:
         Returns tuple of (stdout, stderr, retcode)
         """
         stdout = stderr = retcode = None
+        raw_shell = self.opts.get("raw_shell", False)
 
-        if self.ssh_pre_flight:
+        if self.ssh_pre_flight and not raw_shell:
             if not self.opts.get("ssh_run_pre_flight", False) and self.check_thin_dir():
                 log.info(
                     "%s thin dir already exists. Not running ssh_pre_flight script",
@@ -1193,7 +1194,7 @@ class Single:
                     "Successfully ran the ssh_pre_flight script: %s", self.ssh_pre_file
                 )
 
-        if self.opts.get("raw_shell", False):
+        if raw_shell:
             cmd_str = " ".join([self._escape_arg(arg) for arg in self.argv])
             stdout, stderr, retcode = self.shell.exec_cmd(cmd_str)
 
