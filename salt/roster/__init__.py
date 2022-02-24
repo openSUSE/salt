@@ -59,7 +59,7 @@ class Roster:
     minion aware
     """
 
-    def __init__(self, opts, backends="flat"):
+    def __init__(self, opts, backends="flat", context=None):
         self.opts = opts
         if isinstance(backends, list):
             self.backends = backends
@@ -71,7 +71,9 @@ class Roster:
             self.backends = ["flat"]
         utils = salt.loader.utils(self.opts)
         runner = salt.loader.runner(self.opts, utils=utils)
-        self.rosters = salt.loader.roster(self.opts, runner=runner, utils=utils)
+        self.rosters = salt.loader.roster(
+            self.opts, runner=runner, utils=utils, context=context
+        )
 
     def _gen_back(self):
         """
