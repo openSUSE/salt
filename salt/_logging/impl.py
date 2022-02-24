@@ -14,6 +14,7 @@ import re
 import socket
 import sys
 import traceback
+import threading
 import types
 import urllib.parse
 
@@ -103,6 +104,10 @@ DFLT_LOG_DATEFMT = "%H:%M:%S"
 DFLT_LOG_DATEFMT_LOGFILE = "%Y-%m-%d %H:%M:%S"
 DFLT_LOG_FMT_CONSOLE = "[%(levelname)-8s] %(message)s"
 DFLT_LOG_FMT_LOGFILE = "%(asctime)s,%(msecs)03d [%(name)-17s:%(lineno)-4d][%(levelname)-8s][%(process)d] %(message)s"
+
+# LOG_LOCK is used to prevent deadlocks on using logging
+# in combination with multiprocessing with salt-api
+LOG_LOCK = threading.Lock()
 
 
 class SaltLogRecord(logging.LogRecord):
@@ -298,6 +303,7 @@ class SaltLoggingClass(LOGGING_LOGGER_CLASS, metaclass=LoggingMixinMeta):
         stacklevel = stacklevel + 1
 
         try:
+            LOG_LOCK.acquire()
             LOGGING_LOGGER_CLASS._log(
                 self,
                 level,
@@ -320,6 +326,8 @@ class SaltLoggingClass(LOGGING_LOGGER_CLASS, metaclass=LoggingMixinMeta):
                 extra=extra,
                 stack_info=stack_info,
             )
+        finally:
+            LOG_LOCK.release()
 
     def makeRecord(
         self,
