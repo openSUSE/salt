@@ -474,6 +474,15 @@ class Shell:
                 if stdout:
                     old_stdout = stdout
                 time.sleep(0.01)
+            if term.exitstatus is None:
+                try:
+                    term.wait()
+                except:  # pylint: disable=broad-except
+                    # It's safe to put the broad exception handling here
+                    # as we just need to ensure the child process in term finished
+                    # to get proper term.exitstatus instead of None
+                    pass
+            return ret_stdout, ret_stderr, term.exitstatus
         finally:
             term.close(terminate=True, kill=True)
         # Ensure term.close is called before querying the exitstatus, otherwise

@@ -280,56 +280,72 @@ def main(argv):  # pylint: disable=W0613
     """
     Main program body
     """
-    thin_path = os.path.join(OPTIONS.saltdir, THIN_ARCHIVE)
-    if os.path.isfile(thin_path):
-        if OPTIONS.checksum != get_hash(thin_path, OPTIONS.hashfunc):
-            need_deployment()
-        unpack_thin(thin_path)
-        # Salt thin now is available to use
-    else:
-        if not sys.platform.startswith("win"):
-            scpstat = subprocess.Popen(["/bin/sh", "-c", "command -v scp"]).wait()
-            if scpstat != 0:
-                sys.exit(EX_SCP_NOT_FOUND)
 
-        if os.path.exists(OPTIONS.saltdir) and not os.path.isdir(OPTIONS.saltdir):
-            sys.stderr.write(
-                'ERROR: salt path "{0}" exists but is not a directory\n'.format(
-                    OPTIONS.saltdir
+    virt_env = os.getenv("VIRTUAL_ENV", None)
+    # VIRTUAL_ENV environment variable is defined by venv-salt-minion wrapper
+    # it's used to check if the shim is running under this wrapper
+    venv_salt_call = None
+    if virt_env and "venv-salt-minion" in virt_env:
+        venv_salt_call = os.path.join(virt_env, "bin", "salt-call")
+        if not os.path.exists(venv_salt_call):
+            venv_salt_call = None
+        elif not os.path.exists(OPTIONS.saltdir):
+            os.makedirs(OPTIONS.saltdir)
+            cache_dir = os.path.join(OPTIONS.saltdir, "running_data", "var", "cache")
+            os.makedirs(os.path.join(cache_dir, "salt"))
+            os.symlink("salt", os.path.relpath(os.path.join(cache_dir, "venv-salt-minion")))
+
+    if venv_salt_call is None:
+        # Use Salt thin only if Salt Bundle (venv-salt-minion) is not available
+        thin_path = os.path.join(OPTIONS.saltdir, THIN_ARCHIVE)
+        if os.path.isfile(thin_path):
+            if OPTIONS.checksum != get_hash(thin_path, OPTIONS.hashfunc):
+                need_deployment()
+            unpack_thin(thin_path)
+            # Salt thin now is available to use
+        else:
+            if not sys.platform.startswith("win"):
+                scpstat = subprocess.Popen(["/bin/sh", "-c", "command -v scp"]).wait()
+                if scpstat != 0:
+                    sys.exit(EX_SCP_NOT_FOUND)
+
+            if os.path.exists(OPTIONS.saltdir) and not os.path.isdir(OPTIONS.saltdir):
+                sys.stderr.write(
+                    'ERROR: salt path "{0}" exists but is'
+                    " not a directory\n".format(OPTIONS.saltdir)
                 )
+                sys.exit(EX_CANTCREAT)
+
+            if not os.path.exists(OPTIONS.saltdir):
+                need_deployment()
+
+            code_checksum_path = os.path.normpath(
+                os.path.join(OPTIONS.saltdir, "code-checksum")
             )
-            sys.exit(EX_CANTCREAT)
-
-        if not os.path.exists(OPTIONS.saltdir):
-            need_deployment()
-
-        code_checksum_path = os.path.normpath(
-            os.path.join(OPTIONS.saltdir, "code-checksum")
-        )
-        if not os.path.exists(code_checksum_path) or not os.path.isfile(
-            code_checksum_path
-        ):
-            sys.stderr.write(
-                "WARNING: Unable to locate current code checksum: {0}.\n".format(
-                    code_checksum_path
+            if not os.path.exists(code_checksum_path) or not os.path.isfile(
+                code_checksum_path
+            ):
+                sys.stderr.write(
+                    "WARNING: Unable to locate current code checksum: {0}.\n".format(
+                        code_checksum_path
+                    )
                 )
-            )
-            need_deployment()
-        with open(code_checksum_path, "r", encoding="utf-8") as vpo:
-            cur_code_cs = vpo.readline().strip()
-        if cur_code_cs != OPTIONS.code_checksum:
-            sys.stderr.write(
-                "WARNING: current code checksum {0} is different to {1}.\n".format(
-                    cur_code_cs, OPTIONS.code_checksum
+                need_deployment()
+            with open(code_checksum_path, "r") as vpo:
+                cur_code_cs = vpo.readline().strip()
+            if cur_code_cs != OPTIONS.code_checksum:
+                sys.stderr.write(
+                    "WARNING: current code checksum {0} is different to {1}.\n".format(
+                        cur_code_cs, OPTIONS.code_checksum
+                    )
                 )
-            )
-            need_deployment()
-        # Salt thin exists and is up-to-date - fall through and use it
+                need_deployment()
+            # Salt thin exists and is up-to-date - fall through and use it
 
-    salt_call_path = os.path.join(OPTIONS.saltdir, "salt-call")
-    if not os.path.isfile(salt_call_path):
-        sys.stderr.write('ERROR: thin is missing "{0}"\n'.format(salt_call_path))
-        need_deployment()
+        salt_call_path = os.path.join(OPTIONS.saltdir, "salt-call")
+        if not os.path.isfile(salt_call_path):
+            sys.stderr.write('ERROR: thin is missing "{0}"\n'.format(salt_call_path))
+            need_deployment()
 
     with open(os.path.join(OPTIONS.saltdir, "minion"), "w", encoding="utf-8") as config:
         config.write(OPTIONS.config + "\n")
@@ -352,8 +368,8 @@ def main(argv):  # pylint: disable=W0613
         argv_prepared = ARGS
 
     salt_argv = [
-        get_executable(),
-        salt_call_path,
+        sys.executable if venv_salt_call is not None else get_executable(),
+        venv_salt_call if venv_salt_call is not None else salt_call_path,
         "--retcode-passthrough",
         "--local",
         "--metadata",

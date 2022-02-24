@@ -5,12 +5,14 @@ Create ssh executor system
 import base64
 import copy
 import datetime
+import gc
 import getpass
 import hashlib
 import logging
 import multiprocessing
 import os
 import pathlib
+import psutil
 import queue
 import re
 import shlex
@@ -21,6 +23,7 @@ import tarfile
 import tempfile
 import time
 import uuid
+from collections import deque
 
 import salt.client.ssh.shell
 import salt.client.ssh.wrapper
@@ -49,6 +52,7 @@ import salt.utils.url
 import salt.utils.verify
 from salt._logging import LOG_LEVELS
 from salt._logging.mixins import MultiprocessingStateMixin
+from salt._logging.impl import LOG_LOCK
 from salt.template import compile_template
 from salt.utils.process import Process
 from salt.utils.zeromq import zmq
@@ -148,15 +152,26 @@ if [ "$SUDO" ] && [ "$SUDO_USER" ]
 then SUDO="$SUDO -u $SUDO_USER"
 fi
 EX_PYTHON_INVALID={EX_THIN_PYTHON_INVALID}
-PYTHON_CMDS="python3 /usr/libexec/platform-python python27 python2.7 python26 python2.6 python2 python"
+set +x
+SSH_PY_CODE='import base64;
+                   exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+if [ -n "$DEBUG" ]
+    then set -x
+fi
+PYTHON_CMDS="/var/tmp/venv-salt-minion/bin/python python3 /usr/libexec/platform-python python27 python2.7 python26 python2.6 python2 python"
 for py_cmd in $PYTHON_CMDS
 do
     if command -v "$py_cmd" >/dev/null 2>&1 && "$py_cmd" -c "import sys; sys.exit(not (sys.version_info >= (2, 6)));"
     then
         py_cmd_path=`"$py_cmd" -c 'from __future__ import print_function;import sys; print(sys.executable);'`
         cmdpath=`command -v $py_cmd 2>/dev/null || which $py_cmd 2>/dev/null`
+        cmdpath=`readlink -f $cmdpath`
         if file $cmdpath | grep "shell script" > /dev/null
         then
+            if echo $cmdpath | grep venv-salt-minion > /dev/null
+            then
+                exec $SUDO "$cmdpath" -c "$SSH_PY_CODE"
+            fi
             ex_vars="'PATH', 'LD_LIBRARY_PATH', 'MANPATH', \
                    'XDG_DATA_DIRS', 'PKG_CONFIG_PATH'"
             export `$py_cmd -c \
@@ -168,13 +183,9 @@ do
             exec $SUDO PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH \
                      MANPATH=$MANPATH XDG_DATA_DIRS=$XDG_DATA_DIRS \
                      PKG_CONFIG_PATH=$PKG_CONFIG_PATH \
-                     "$py_cmd_path" -c \
-                   'import base64;
-                   exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+                     "$py_cmd_path" -c "$SSH_PY_CODE"
         else
-            exec $SUDO "$py_cmd_path" -c \
-                   'import base64;
-                   exec(base64.b64decode("""{{SSH_PY_CODE}}""").decode("utf-8"))'
+            exec $SUDO "$py_cmd_path" -c "$SSH_PY_CODE"
         fi
         exit 0
     else
@@ -244,6 +255,9 @@ EOF
     ]
 )
 
+# The file on a salt-ssh minion used to identify if Salt Bundle was deployed
+VENV_HASH_FILE = "/var/tmp/venv-salt-minion/venv-hash.txt"
+
 if not salt.utils.platform.is_windows() and not salt.utils.platform.is_junos():
     shim_file = os.path.join(os.path.dirname(__file__), "ssh_py_shim.py")
     if not os.path.exists(shim_file):
@@ -264,7 +278,7 @@ class SSH(MultiprocessingStateMixin):
 
     ROSTER_UPDATE_FLAG = "#__needs_update"
 
-    def __init__(self, opts):
+    def __init__(self, opts, context=None):
         self.__parsed_rosters = {SSH.ROSTER_UPDATE_FLAG: True}
         pull_sock = os.path.join(opts["sock_dir"], "master_event_pull.ipc")
         if os.path.exists(pull_sock) and zmq:
@@ -291,7 +305,9 @@ class SSH(MultiprocessingStateMixin):
             else "glob"
         )
         self._expand_target()
-        self.roster = salt.roster.Roster(self.opts, self.opts.get("roster", "flat"))
+        self.roster = salt.roster.Roster(
+            self.opts, self.opts.get("roster", "flat"), context=context
+        )
         self.targets = self.roster.targets(self.opts["tgt"], self.tgt_type)
         if not self.targets:
             self._update_targets()
@@ -377,6 +393,13 @@ class SSH(MultiprocessingStateMixin):
                 saltext_blocklist=self.opts.get("thin_saltext_blocklist"),
             )
         self.mods = mod_data(self.fsclient)
+        self.cache = salt.cache.Cache(self.opts)
+        self.master_id = self.opts["id"]
+        self.max_pid_wait = int(self.opts.get("ssh_max_pid_wait", 600))
+        self.session_flock_file = os.path.join(
+            self.opts["cachedir"], "salt-ssh.session.lock"
+        )
+        self.ssh_session_grace_time = int(self.opts.get("ssh_session_grace_time", 3))
 
     # __setstate__ and __getstate__ are only used on spawning platforms.
     def __setstate__(self, state):
@@ -642,6 +665,8 @@ class SSH(MultiprocessingStateMixin):
         """
         Run the routine in a "Thread", put a dict on the queue
         """
+        LOG_LOCK.release()
+        salt.loader.LOAD_LOCK.release()
         opts = copy.deepcopy(opts)
         single = Single(
             opts,
@@ -701,7 +726,7 @@ class SSH(MultiprocessingStateMixin):
         """
         que = multiprocessing.Queue()
         running = {}
-        target_iter = iter(self.targets)
+        targets_queue = deque(self.targets.keys())
         returned = set()
         rets = set()
         init = False
@@ -710,11 +735,43 @@ class SSH(MultiprocessingStateMixin):
                 log.error("No matching targets found in roster.")
                 break
             if len(running) < self.opts.get("ssh_max_procs", 25) and not init:
-                try:
-                    host = next(target_iter)
-                except StopIteration:
+                if targets_queue:
+                    host = targets_queue.popleft()
+                else:
                     init = True
                     continue
+                with salt.utils.files.flopen(self.session_flock_file, "w"):
+                    cached_session = self.cache.fetch("salt-ssh/session", host)
+                    if cached_session is not None and "ts" in cached_session:
+                        prev_session_running = time.time() - cached_session["ts"]
+                        if (
+                            "pid" in cached_session
+                            and cached_session.get("master_id", self.master_id)
+                            == self.master_id
+                        ):
+                            pid_running = (
+                                False
+                                if cached_session["pid"] == 0
+                                else psutil.pid_exists(cached_session["pid"])
+                            )
+                            if (
+                                pid_running and prev_session_running < self.max_pid_wait
+                            ) or (
+                                not pid_running
+                                and prev_session_running < self.ssh_session_grace_time
+                            ):
+                                targets_queue.append(host)
+                                time.sleep(0.3)
+                                continue
+                    self.cache.store(
+                        "salt-ssh/session",
+                        host,
+                        {
+                            "pid": 0,
+                            "master_id": self.master_id,
+                            "ts": time.time(),
+                        },
+                    )
                 for default in self.defaults:
                     if default not in self.targets[host]:
                         self.targets[host][default] = self.defaults[default]
@@ -746,8 +803,38 @@ class SSH(MultiprocessingStateMixin):
                     mine,
                 )
                 routine = Process(target=self.handle_routine, args=args)
-                routine.start()
+                # Explicitly call garbage collector to prevent possible segfault
+                # in salt-api child process. (bsc#1188607)
+                gc.collect()
+                try:
+                    # salt.loader.LOAD_LOCK is used to prevent deadlock
+                    # with importlib in combination with using multiprocessing (bsc#1182851)
+                    # If the salt-api child process is creating while LazyLoader instance
+                    # is loading module, new child process gets the lock for this module acquired.
+                    # Touching this module with importlib inside child process leads to deadlock.
+                    #
+                    # salt.loader.LOAD_LOCK is used to prevent salt-api child process creation
+                    # while creating new instance of LazyLoader
+                    # salt.loader.LOAD_LOCK must be released explicitly in self.handle_routine
+                    salt.loader.LOAD_LOCK.acquire()
+                    # The same solution applied to fix logging deadlock
+                    # LOG_LOCK must be released explicitly in self.handle_routine
+                    LOG_LOCK.acquire()
+                    routine.start()
+                finally:
+                    LOG_LOCK.release()
+                    salt.loader.LOAD_LOCK.release()
                 running[host] = {"thread": routine}
+                with salt.utils.files.flopen(self.session_flock_file, "w"):
+                    self.cache.store(
+                        "salt-ssh/session",
+                        host,
+                        {
+                            "pid": routine.pid,
+                            "master_id": self.master_id,
+                            "ts": time.time(),
+                        },
+                    )
                 continue
             ret = {}
             retcode = salt.defaults.exitcodes.EX_OK
@@ -779,12 +866,27 @@ class SSH(MultiprocessingStateMixin):
                             )
                             ret = {"id": host, "ret": error}
                             log.error(error)
+                            log.error(
+                                "PID %s did not return any data for host '%s'",
+                                running[host]["thread"].pid,
+                                host,
+                            )
                             yield {ret["id"]: ret["ret"]}, 1
                     running[host]["thread"].join()
                     rets.add(host)
             for host in rets:
                 if host in running:
                     running.pop(host)
+                    with salt.utils.files.flopen(self.session_flock_file, "w"):
+                        self.cache.store(
+                            "salt-ssh/session",
+                            host,
+                            {
+                                "pid": 0,
+                                "master_id": self.master_id,
+                                "ts": time.time(),
+                            },
+                        )
             if len(rets) >= len(self.targets):
                 break
             # Sleep when limit or all threads started
@@ -1276,6 +1378,15 @@ class Single:
             return False
         return True
 
+    def check_venv_hash_file(self):
+        """
+        check if the venv exists on the remote machine
+        """
+        stdout, stderr, retcode = self.shell.exec_cmd(
+            "test -f {}".format(VENV_HASH_FILE)
+        )
+        return retcode == 0
+
     def deploy(self):
         """
         Deploy salt-thin
@@ -1285,7 +1396,7 @@ class Single:
                 self.thin,
                 os.path.join(self.thin_dir, "salt-relenv.tar.xz"),
             )
-        else:
+        elif not self.check_venv_hash_file():
             self.shell.send(
                 self.thin,
                 os.path.join(self.thin_dir, "salt-thin.tgz"),
@@ -1326,7 +1437,9 @@ class Single:
                 return stdout, stderr, retcode
             log.info("Successfully ran the ssh_pre_hook script: %s", self.ssh_pre_hook)
 
-        if self.ssh_pre_flight:
+        raw_shell = self.opts.get("raw_shell", False)
+
+        if self.ssh_pre_flight and not raw_shell:
             if not self.opts.get("ssh_run_pre_flight", False) and self.check_thin_dir():
                 log.info(
                     "%s thin dir already exists. Not running ssh_pre_flight script",
@@ -1340,14 +1453,16 @@ class Single:
                 stdout, stderr, retcode = self.run_ssh_pre_flight()
                 if retcode != salt.defaults.exitcodes.EX_OK:
                     log.error(
-                        "Error running ssh_pre_flight script %s", self.ssh_pre_file
+                        "Error running ssh_pre_flight script %s for host '%s'",
+                        self.ssh_pre_file,
+                        self.target["host"],
                     )
                     return stdout, stderr, retcode
                 log.info(
                     "Successfully ran the ssh_pre_flight script: %s", self.ssh_pre_file
                 )
 
-        if self.opts.get("raw_shell", False):
+        if raw_shell:
             cmd_str = " ".join([self._escape_arg(arg) for arg in self.argv])
             stdout, stderr, retcode = self.shell.exec_cmd(cmd_str)
 
