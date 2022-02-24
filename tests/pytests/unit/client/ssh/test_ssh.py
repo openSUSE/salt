@@ -1,7 +1,9 @@
 import pytest
 
 import salt.client.ssh.client
+import salt.loader
 import salt.utils.msgpack
+from salt._logging.impl import LOG_LOCK
 from salt.client import ssh
 from tests.support.mock import MagicMock, Mock, patch
 
@@ -477,8 +479,30 @@ def test_key_deploy_no_permission_denied(tmp_path, opts):
     assert mock_key_run.call_count == 0
 
 
+@pytest.fixture
+def handle_routine_locks():
+    """
+    ``SSH.handle_routine`` runs in a child process which is started with
+    ``salt.loader.LOAD_LOCK`` and ``LOG_LOCK`` held by the parent (see
+    ``SSH.run``), and releases both of them on startup. Mimic that, since the
+    tests call ``handle_routine`` directly.
+    """
+    salt.loader.LOAD_LOCK.acquire()
+    LOG_LOCK.acquire()
+    yield
+    # Normally already released by handle_routine, make sure nothing leaks if
+    # the test failed before getting there.
+    for lock in (LOG_LOCK, salt.loader.LOAD_LOCK):
+        try:
+            lock.release()
+        except RuntimeError:
+            pass
+
+
 @pytest.mark.parametrize("retcode,expected", [("null", None), ('"foo"', "foo")])
-def test_handle_routine_remote_invalid_retcode(opts, target, retcode, expected, caplog):
+def test_handle_routine_remote_invalid_retcode(
+    opts, target, retcode, expected, caplog, handle_routine_locks
+):
     """
     Ensure that if a remote returns an invalid retcode as part of the return dict,
     the final exit code is still an integer and set to 1 at least.
@@ -501,7 +525,9 @@ def test_handle_routine_remote_invalid_retcode(opts, target, retcode, expected, 
     assert f"Host 'localhost' reported an invalid retcode: '{expected}'" in caplog.text
 
 
-def test_handle_routine_single_run_invalid_retcode(opts, target, caplog):
+def test_handle_routine_single_run_invalid_retcode(
+    opts, target, caplog, handle_routine_locks
+):
     """
     Ensure that if Single.run() call returns an invalid retcode,
     the final exit code is still an integer and set to 1 at least.
