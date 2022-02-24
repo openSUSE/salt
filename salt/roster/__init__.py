@@ -59,7 +59,7 @@ class Roster:
     minion aware
     """
 
-    def __init__(self, opts, backends="flat"):
+    def __init__(self, opts, backends="flat", context=None):
         self.opts = opts
         if isinstance(backends, list):
             self.backends = backends
@@ -72,7 +72,7 @@ class Roster:
         self.utils = salt.loader.utils(self.opts)
         self.runner = salt.loader.runner(self.opts, utils=self.utils)
         self.rosters = salt.loader.roster(
-            self.opts, runner=self.runner, utils=self.utils
+            self.opts, runner=self.runner, utils=self.utils, context=context
         )
 
     def destroy(self):
