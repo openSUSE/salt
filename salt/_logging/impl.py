@@ -7,6 +7,7 @@
 import logging
 import re
 import sys
+import threading
 import types
 
 # Let's define these custom logging levels before importing the salt._logging.mixins
@@ -88,6 +89,10 @@ LOG_COLORS = {
 SORTED_LEVEL_NAMES = [l[0] for l in sorted(LOG_LEVELS.items(), key=lambda x: x[1])]
 
 MODNAME_PATTERN = re.compile(r"(?P<name>%%\(name\)(?:\-(?P<digits>[\d]+))?s)")
+
+# LOG_LOCK is used to prevent deadlocks on using logging
+# in combination with multiprocessing with salt-api
+LOG_LOCK = threading.Lock()
 
 
 # ----- REMOVE ME ON REFACTOR COMPLETE ------------------------------------------------------------------------------>
@@ -283,31 +288,35 @@ class SaltLoggingClass(
         else:
             extra["exc_info_on_loglevel"] = exc_info_on_loglevel
 
-        if sys.version_info < (3,):
-            LOGGING_LOGGER_CLASS._log(
-                self, level, msg, args, exc_info=exc_info, extra=extra
-            )
-        elif sys.version_info < (3, 8):
-            LOGGING_LOGGER_CLASS._log(
-                self,
-                level,
-                msg,
-                args,
-                exc_info=exc_info,
-                extra=extra,
-                stack_info=stack_info,
-            )
-        else:
-            LOGGING_LOGGER_CLASS._log(
-                self,
-                level,
-                msg,
-                args,
-                exc_info=exc_info,
-                extra=extra,
-                stack_info=stack_info,
-                stacklevel=stacklevel,
-            )
+        try:
+            LOG_LOCK.acquire()
+            if sys.version_info < (3,):
+                LOGGING_LOGGER_CLASS._log(
+                    self, level, msg, args, exc_info=exc_info, extra=extra
+                )
+            elif sys.version_info < (3, 8):
+                LOGGING_LOGGER_CLASS._log(
+                    self,
+                    level,
+                    msg,
+                    args,
+                    exc_info=exc_info,
+                    extra=extra,
+                    stack_info=stack_info,
+                )
+            else:
+                LOGGING_LOGGER_CLASS._log(
+                    self,
+                    level,
+                    msg,
+                    args,
+                    exc_info=exc_info,
+                    extra=extra,
+                    stack_info=stack_info,
+                    stacklevel=stacklevel,
+                )
+        finally:
+            LOG_LOCK.release()
 
     def makeRecord(
         self,

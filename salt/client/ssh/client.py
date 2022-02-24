@@ -107,7 +107,7 @@ class SSHClient:
         return sane_kwargs
 
     def _prep_ssh(
-        self, tgt, fun, arg=(), timeout=None, tgt_type="glob", kwarg=None, **kwargs
+        self, tgt, fun, arg=(), timeout=None, tgt_type="glob", kwarg=None, context=None, **kwargs
     ):
         """
         Prepare the arguments
@@ -122,7 +122,7 @@ class SSHClient:
         opts["selected_target_option"] = tgt_type
         opts["tgt"] = tgt
         opts["arg"] = arg
-        return salt.client.ssh.SSH(opts)
+        return salt.client.ssh.SSH(opts, context=context)
 
     def cmd_iter(
         self,
@@ -159,7 +159,7 @@ class SSHClient:
             final.update(ret)
         return final
 
-    def cmd_sync(self, low):
+    def cmd_sync(self, low, context=None):
         """
         Execute a salt-ssh call synchronously.
 
@@ -192,6 +192,7 @@ class SSHClient:
             low.get("timeout"),
             low.get("tgt_type"),
             low.get("kwarg"),
+            context=context,
             **kwargs
         )
 
