@@ -9,6 +9,7 @@ import inspect
 import logging
 import os
 import re
+import threading
 import time
 import types
 
@@ -31,7 +32,7 @@ from salt.exceptions import LoaderError
 from salt.template import check_render_pipe_str
 from salt.utils import entrypoints
 
-from .lazy import SALT_BASE_PATH, FilterDictWrapper, LazyLoader
+from .lazy import SALT_BASE_PATH, FilterDictWrapper, LazyLoader as _LazyLoader
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +81,18 @@ SALT_INTERNAL_LOADERS_PATHS = (
     str(SALT_BASE_PATH / "utils"),
     str(SALT_BASE_PATH / "wheel"),
 )
+
+LOAD_LOCK = threading.Lock()
+
+
+def LazyLoader(*args, **kwargs):
+    # This wrapper is used to prevent deadlocks with importlib (bsc#1182851)
+    # LOAD_LOCK is also used directly in salt.client.ssh.SSH
+    try:
+        LOAD_LOCK.acquire()
+        return _LazyLoader(*args, **kwargs)
+    finally:
+        LOAD_LOCK.release()
 
 
 def static_loader(
@@ -725,7 +738,7 @@ def fileserver(opts, backends, loaded_base_name=None):
     )
 
 
-def roster(opts, runner=None, utils=None, whitelist=None, loaded_base_name=None):
+def roster(opts, runner=None, utils=None, whitelist=None, loaded_base_name=None, context=None):
     """
     Returns the roster modules
 
@@ -736,12 +749,15 @@ def roster(opts, runner=None, utils=None, whitelist=None, loaded_base_name=None)
     :param str loaded_base_name: The imported modules namespace when imported
                                  by the salt loader.
     """
+    if context is None:
+        context = {}
+
     return LazyLoader(
         _module_dirs(opts, "roster"),
         opts,
         tag="roster",
         whitelist=whitelist,
-        pack={"__runner__": runner, "__utils__": utils},
+        pack={"__runner__": runner, "__utils__": utils, "__context__": context},
         extra_module_dirs=utils.module_dirs if utils else None,
         loaded_base_name=loaded_base_name,
     )
@@ -933,7 +949,14 @@ def render(
     )
     rend = FilterDictWrapper(ret, ".render")
 
-    if not check_render_pipe_str(
+    def _check_render_pipe_str(pipestr, renderers, blacklist, whitelist):
+        try:
+            LOAD_LOCK.acquire()
+            return check_render_pipe_str(pipestr, renderers, blacklist, whitelist)
+        finally:
+            LOAD_LOCK.release()
+
+    if not _check_render_pipe_str(
         opts["renderer"], rend, opts["renderer_blacklist"], opts["renderer_whitelist"]
     ):
         err = (
