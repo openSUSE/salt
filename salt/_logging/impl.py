@@ -92,7 +92,7 @@ MODNAME_PATTERN = re.compile(r"(?P<name>%%\(name\)(?:\-(?P<digits>[\d]+))?s)")
 
 # LOG_LOCK is used to prevent deadlocks on using logging
 # in combination with multiprocessing with salt-api
-LOG_LOCK = threading.Lock()
+LOG_LOCK = threading.RLock()
 
 
 # ----- REMOVE ME ON REFACTOR COMPLETE ------------------------------------------------------------------------------>
