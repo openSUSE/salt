@@ -108,7 +108,7 @@ DFLT_LOG_FMT_LOGFILE = "%(asctime)s,%(msecs)03d [%(name)-17s:%(lineno)-4d][%(lev
 
 # LOG_LOCK is used to prevent deadlocks on using logging
 # in combination with multiprocessing with salt-api
-LOG_LOCK = threading.Lock()
+LOG_LOCK = threading.RLock()
 
 
 class SaltLogRecord(logging.LogRecord):
