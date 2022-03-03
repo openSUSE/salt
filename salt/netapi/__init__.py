@@ -109,49 +109,6 @@ class NetapiClient:
                 "Authorization error occurred."
             )
 
-    def _prep_auth_info(self, clear_load):
-        sensitive_load_keys = []
-        key = None
-        if "token" in clear_load:
-            auth_type = "token"
-            err_name = "TokenAuthenticationError"
-            sensitive_load_keys = ["token"]
-            return auth_type, err_name, key, sensitive_load_keys
-        elif "eauth" in clear_load:
-            auth_type = "eauth"
-            err_name = "EauthAuthenticationError"
-            sensitive_load_keys = ["username", "password"]
-            return auth_type, err_name, key, sensitive_load_keys
-        raise salt.exceptions.EauthAuthenticationError(
-            "No authentication credentials given"
-        )
-
-    def _authorize_ssh(self, low):
-        auth_type, err_name, key, sensitive_load_keys = self._prep_auth_info(low)
-        auth_check = self.loadauth.check_authentication(low, auth_type, key=key)
-        auth_list = auth_check.get("auth_list", [])
-        error = auth_check.get("error")
-        if error:
-            raise salt.exceptions.EauthAuthenticationError(error)
-        delimiter = low.get("kwargs", {}).get("delimiter", DEFAULT_TARGET_DELIM)
-        _res = self.ckminions.check_minions(
-            low["tgt"], low.get("tgt_type", "glob"), delimiter
-        )
-        minions = _res.get("minions", list())
-        missing = _res.get("missing", list())
-        authorized = self.ckminions.auth_check(
-            auth_list,
-            low["fun"],
-            low.get("arg", []),
-            low["tgt"],
-            low.get("tgt_type", "glob"),
-            minions=minions,
-        )
-        if not authorized:
-            raise salt.exceptions.EauthAuthenticationError(
-                "Authorization error occurred."
-            )
-
     def run(self, low):
         """
         Execute the specified function in the specified client by passing the
