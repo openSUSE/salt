@@ -9,6 +9,7 @@
 import logging
 import re
 import sys
+import threading
 import types
 
 import salt.ext.six as six
@@ -95,6 +96,10 @@ LOG_COLORS = {
 SORTED_LEVEL_NAMES = [l[0] for l in sorted(LOG_LEVELS.items(), key=lambda x: x[1])]
 
 MODNAME_PATTERN = re.compile(r"(?P<name>%%\(name\)(?:\-(?P<digits>[\d]+))?s)")
+
+# LOG_LOCK is used to prevent deadlocks on using logging
+# in combination with multiprocessing with salt-api
+LOG_LOCK = threading.RLock()
 
 
 # ----- REMOVE ME ON REFACTOR COMPLETE ------------------------------------------------------------------------------>
@@ -289,7 +294,7 @@ class SaltLoggingClass(
             extra["exc_info_on_loglevel"] = exc_info_on_loglevel
 
         try:
-            logging._acquireLock()
+            LOG_LOCK.acquire()
             if sys.version_info < (3,):
                 LOGGING_LOGGER_CLASS._log(
                     self, level, msg, args, exc_info=exc_info, extra=extra
@@ -315,10 +320,8 @@ class SaltLoggingClass(
                     stack_info=stack_info,
                     stacklevel=stacklevel,
                 )
-        except:
-            pass
         finally:
-            logging._releaseLock()
+            LOG_LOCK.release()
 
     def makeRecord(
         self,

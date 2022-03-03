@@ -88,6 +88,18 @@ LIBCLOUD_FUNCS_NOT_SUPPORTED = (
 # Will be set to pyximport module at runtime if cython is enabled in config.
 pyximport = None
 
+LOAD_LOCK = threading.Lock()
+
+
+def LazyLoader(*args, **kwargs):
+    # This wrapper is used to prevent deadlocks with importlib (bsc#1182851)
+    # LOAD_LOCK is also used directly in salt.client.ssh.SSH
+    try:
+        LOAD_LOCK.acquire()
+        return _LazyLoader(*args, **kwargs)
+    finally:
+        LOAD_LOCK.release()
+
 
 def static_loader(
     opts,
@@ -516,16 +528,19 @@ def fileserver(opts, backends):
     )
 
 
-def roster(opts, runner=None, utils=None, whitelist=None):
+def roster(opts, runner=None, utils=None, whitelist=None, context=None):
     """
     Returns the roster modules
     """
+    if context is None:
+        context = {}
+
     return LazyLoader(
         _module_dirs(opts, "roster"),
         opts,
         tag="roster",
         whitelist=whitelist,
-        pack={"__runner__": runner, "__utils__": utils},
+        pack={"__runner__": runner, "__utils__": utils, "__context__": context},
         extra_module_dirs=utils.module_dirs if utils else None,
     )
 
@@ -657,7 +672,14 @@ def render(opts, functions, states=None, proxy=None, context=None):
     )
     rend = FilterDictWrapper(ret, ".render")
 
-    if not check_render_pipe_str(
+    def _check_render_pipe_str(pipestr, renderers, blacklist, whitelist):
+        try:
+            LOAD_LOCK.acquire()
+            return check_render_pipe_str(pipestr, renderers, blacklist, whitelist)
+        finally:
+            LOAD_LOCK.release()
+
+    if not _check_render_pipe_str(
         opts["renderer"], rend, opts["renderer_blacklist"], opts["renderer_whitelist"]
     ):
         err = (
@@ -1147,7 +1169,7 @@ class FilterDictWrapper(MutableMapping):
                 yield key.replace(self.suffix, "")
 
 
-class LazyLoader(salt.utils.lazy.LazyDict):
+class _LazyLoader(salt.utils.lazy.LazyDict):
     """
     A pseduo-dictionary which has a set of keys which are the
     name of the module and function, delimited by a dot. When

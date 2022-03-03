@@ -47,6 +47,7 @@ class NetapiClient:
         self.loadauth = salt.auth.LoadAuth(apiopts)
         self.key = salt.daemons.masterapi.access_keys(apiopts)
         self.ckminions = salt.utils.minions.CkMinions(apiopts)
+        self.context = {}
 
     def _is_master_running(self):
         """
@@ -207,7 +208,7 @@ class NetapiClient:
         ssh_client = salt.client.ssh.client.SSHClient(
             mopts=self.opts, disable_custom_roster=True
         )
-        return ssh_client.cmd_sync(kwargs)
+        return ssh_client.cmd_sync(kwargs, context=self.context)
 
     def runner(self, fun, timeout=None, full_return=False, **kwargs):
         """
