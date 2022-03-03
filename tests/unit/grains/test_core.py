@@ -6,6 +6,7 @@ import logging
 import os
 import platform
 import socket
+import tempfile
 import textwrap
 
 import salt.grains.core as core
@@ -21,6 +22,7 @@ from salt._compat import ipaddress
 from salt.ext import six
 from tests.support.mixins import LoaderModuleMockMixin
 from tests.support.mock import MagicMock, Mock, mock_open, patch
+from tests.support.runtests import RUNTIME_VARS
 from tests.support.unit import TestCase, skipIf
 
 try:
@@ -2336,3 +2338,91 @@ class CoreGrainsTestCase(TestCase, LoaderModuleMockMixin):
 
         with patch.dict(core.__opts__, {"id": "otherid"}):
             assert core.get_server_id() != expected
+
+    def test_network_grains_cache(self):
+        """
+        Network interfaces are cache is cleared by the loader
+        """
+        call_1 = {
+            "lo": {
+                "up": True,
+                "hwaddr": "00:00:00:00:00:00",
+                "inet": [
+                    {
+                        "address": "127.0.0.1",
+                        "netmask": "255.0.0.0",
+                        "broadcast": None,
+                        "label": "lo",
+                    }
+                ],
+                "inet6": [],
+            },
+            "wlo1": {
+                "up": True,
+                "hwaddr": "29:9f:9f:e9:67:f4",
+                "inet": [
+                    {
+                        "address": "172.16.13.85",
+                        "netmask": "255.255.248.0",
+                        "broadcast": "172.16.15.255",
+                        "label": "wlo1",
+                    }
+                ],
+                "inet6": [],
+            },
+        }
+        call_2 = {
+            "lo": {
+                "up": True,
+                "hwaddr": "00:00:00:00:00:00",
+                "inet": [
+                    {
+                        "address": "127.0.0.1",
+                        "netmask": "255.0.0.0",
+                        "broadcast": None,
+                        "label": "lo",
+                    }
+                ],
+                "inet6": [],
+            },
+            "wlo1": {
+                "up": True,
+                "hwaddr": "29:9f:9f:e9:67:f4",
+                "inet": [
+                    {
+                        "address": "172.16.13.86",
+                        "netmask": "255.255.248.0",
+                        "broadcast": "172.16.15.255",
+                        "label": "wlo1",
+                    }
+                ],
+                "inet6": [],
+            },
+        }
+        tmp_path = tempfile.mkdtemp(dir=RUNTIME_VARS.TMP)
+        cache_dir = os.path.join(tmp_path, "cache")
+        extmods = os.path.join(tmp_path, "extmods")
+        opts = {
+            "cachedir": str(cache_dir),
+            "extension_modules": str(extmods),
+            "optimization_order": [0],
+        }
+        with patch(
+            "salt.utils.network.interfaces", side_effect=[call_1, call_2]
+        ) as interfaces:
+            grains = salt.loader.grain_funcs(opts)
+            assert interfaces.call_count == 0
+            ret = grains["core.ip_interfaces"]()
+            # interfaces has been called
+            assert interfaces.call_count == 1
+            assert ret["ip_interfaces"]["wlo1"] == ["172.16.13.85"]
+            # interfaces has been cached
+            ret = grains["core.ip_interfaces"]()
+            assert interfaces.call_count == 1
+            assert ret["ip_interfaces"]["wlo1"] == ["172.16.13.85"]
+
+            grains = salt.loader.grain_funcs(opts)
+            ret = grains["core.ip_interfaces"]()
+            # A new loader clears the cache and interfaces is called again
+            assert interfaces.call_count == 2
+            assert ret["ip_interfaces"]["wlo1"] == ["172.16.13.86"]
