@@ -52,16 +52,25 @@ except (ImportError, OSError, AttributeError, TypeError):
     pass
 
 
-_INTERFACES = {}
-def _get_interfaces(): #! function
-    '''
-    Provide a dict of the connected interfaces and their ip addresses
-    '''
+class Interfaces:
+    __slots__ = ("interfaces",)
 
-    global _INTERFACES
-    if not _INTERFACES:
-        _INTERFACES = interfaces()
-    return _INTERFACES
+    def __init__(self, interfaces=None):
+        if interfaces is None:
+            interfaces = {}
+        self.interfaces = interfaces
+
+    def __call__(self, *args, **kwargs):
+        if not self.interfaces:
+            self.interfaces = interfaces()
+        return self.interfaces
+
+    def clear(self):
+        self.interfaces = {}
+
+
+_get_interfaces = Interfaces()
+_clear_interfaces = _get_interfaces.clear
 
 
 def sanitize_host(host):

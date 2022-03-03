@@ -28,7 +28,7 @@ import warnings
 import time
 import salt.modules.network
 
-from salt.utils.network import _get_interfaces
+from salt.utils.network import _clear_interfaces, _get_interfaces
 
 # pylint: disable=import-error
 try:
@@ -129,6 +129,10 @@ if not hasattr(os, 'uname'):
 # Possible value for h_errno defined in netdb.h
 HOST_NOT_FOUND = 1
 NO_DATA = 4
+
+
+def __init__(opts):
+    _clear_interfaces()
 
 
 def _windows_cpudata():
