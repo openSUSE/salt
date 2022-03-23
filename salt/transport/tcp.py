@@ -13,6 +13,7 @@ import threading
 import time
 import traceback
 import urllib.parse
+import uuid
 
 import salt.crypt
 import salt.exceptions
@@ -266,12 +267,15 @@ class AsyncTCPReqChannel(salt.transport.client.ReqChannel):
         return {
             "enc": self.crypt,
             "load": load,
+            "version": 2,
         }
 
     @salt.ext.tornado.gen.coroutine
     def crypted_transfer_decode_dictentry(
         self, load, dictkey=None, tries=3, timeout=60
     ):
+        nonce = uuid.uuid4().hex
+        load["nonce"] = nonce
         if not self.auth.authenticated:
             yield self.auth.authenticate()
         ret = yield self.message_client.send(
@@ -285,10 +289,29 @@ class AsyncTCPReqChannel(salt.transport.client.ReqChannel):
         else:
             cipher = PKCS1_OAEP.new(key)
             aes = cipher.decrypt(ret["key"])
+
+        # Decrypt using the public key.
         pcrypt = salt.crypt.Crypticle(self.opts, aes)
-        data = pcrypt.loads(ret[dictkey])
-        data = salt.transport.frame.decode_embedded_strs(data)
-        raise salt.ext.tornado.gen.Return(data)
+        signed_msg = pcrypt.loads(ret[dictkey])
+
+        # Validate the master's signature.
+        master_pubkey_path = os.path.join(self.opts["pki_dir"], "minion_master.pub")
+        if not salt.crypt.verify_signature(
+            master_pubkey_path, signed_msg["data"], signed_msg["sig"]
+        ):
+            raise salt.crypt.AuthenticationError(
+                "Pillar payload signature failed to validate."
+            )
+
+        # Make sure the signed key matches the key we used to decrypt the data.
+        data = salt.payload.loads(signed_msg["data"])
+        if data["key"] != ret["key"]:
+            raise salt.crypt.AuthenticationError("Key verification failed.")
+
+        # Validate the nonce.
+        if data["nonce"] != nonce:
+            raise salt.crypt.AuthenticationError("Pillar nonce verification failed.")
+        raise salt.ext.tornado.gen.Return(data["pillar"])
 
     @salt.ext.tornado.gen.coroutine
     def _crypted_transfer(self, load, tries=3, timeout=60):
@@ -298,6 +321,9 @@ class AsyncTCPReqChannel(salt.transport.client.ReqChannel):
         Indeed, we can fail too early in case of a master restart during a
         minion state execution call
         """
+        nonce = uuid.uuid4().hex
+        if load and isinstance(load, dict):
+            load["nonce"] = nonce
 
         @salt.ext.tornado.gen.coroutine
         def _do_transfer():
@@ -311,7 +337,7 @@ class AsyncTCPReqChannel(salt.transport.client.ReqChannel):
             # communication, we do not subscribe to return events, we just
             # upload the results to the master
             if data:
-                data = self.auth.crypticle.loads(data)
+                data = self.auth.crypticle.loads(data, nonce=nonce)
                 data = salt.transport.frame.decode_embedded_strs(data)
             raise salt.ext.tornado.gen.Return(data)
 
@@ -395,6 +421,7 @@ class AsyncTCPPubChannel(
         return {
             "enc": self.crypt,
             "load": load,
+            "version": 2,
         }
 
     @salt.ext.tornado.gen.coroutine
@@ -696,6 +723,14 @@ class TCPReqServerChannel(
                 )
                 raise salt.ext.tornado.gen.Return()
 
+            version = 0
+            if "version" in payload:
+                version = payload["version"]
+
+            sign_messages = False
+            if version > 1:
+                sign_messages = True
+
             # intercept the "_auth" commands, since the main daemon shouldn't know
             # anything about our key auth
             if (
@@ -704,10 +739,14 @@ class TCPReqServerChannel(
             ):
                 yield stream.write(
                     salt.transport.frame.frame_msg(
-                        self._auth(payload["load"]), header=header
+                        self._auth(payload["load"], sign_messages), header=header
                     )
                 )
                 raise salt.ext.tornado.gen.Return()
+
+            nonce = None
+            if version > 1:
+                nonce = payload["load"].pop("nonce", None)
 
             # TODO: test
             try:
@@ -727,7 +766,7 @@ class TCPReqServerChannel(
             elif req_fun == "send":
                 stream.write(
                     salt.transport.frame.frame_msg(
-                        self.crypticle.dumps(ret), header=header
+                        self.crypticle.dumps(ret, nonce), header=header
                     )
                 )
             elif req_fun == "send_private":
@@ -737,6 +776,8 @@ class TCPReqServerChannel(
                             ret,
                             req_opts["key"],
                             req_opts["tgt"],
+                            nonce,
+                            sign_messages,
                         ),
                         header=header,
                     )
@@ -1381,7 +1422,7 @@ class PubServer(salt.ext.tornado.tcpserver.TCPServer):
     TCP publisher
     """
 
-    def __init__(self, opts, io_loop=None):
+    def __init__(self, opts, io_loop=None, pack_publish=lambda _: _):
         super().__init__(ssl_options=opts.get("ssl"))
         self.io_loop = io_loop
         self.opts = opts
@@ -1408,6 +1449,10 @@ class PubServer(salt.ext.tornado.tcpserver.TCPServer):
             )
         else:
             self.event = None
+        self._pack_publish = pack_publish
+
+    def pack_publish(self, load):
+        return self._pack_publish(load)
 
     def close(self):
         if self._closing:
@@ -1516,6 +1561,7 @@ class PubServer(salt.ext.tornado.tcpserver.TCPServer):
     @salt.ext.tornado.gen.coroutine
     def publish_payload(self, package, _):
         log.debug("TCP PubServer sending payload: %s", package)
+        payload = self.pack_publish(package)
         payload = salt.transport.frame.frame_msg(package["payload"])
 
         to_remove = []
@@ -1591,7 +1637,9 @@ class TCPPubServerChannel(salt.transport.server.PubServerChannel):
             self.io_loop = salt.ext.tornado.ioloop.IOLoop.current()
 
         # Spin up the publisher
-        pub_server = PubServer(self.opts, io_loop=self.io_loop)
+        pub_server = PubServer(
+            self.opts, io_loop=self.io_loop, pack_publish=self.pack_publish
+        )
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         _set_tcp_keepalive(sock, self.opts)
@@ -1634,12 +1682,9 @@ class TCPPubServerChannel(salt.transport.server.PubServerChannel):
         """
         process_manager.add_process(self._publish_daemon, kwargs=kwargs)
 
-    def publish(self, load):
-        """
-        Publish "load" to minions
-        """
+    def pack_publish(self, load):
         payload = {"enc": "aes"}
-
+        load["serial"] = salt.master.SMaster.get_serial()
         crypticle = salt.crypt.Crypticle(
             self.opts, salt.master.SMaster.secrets["aes"]["secret"].value
         )
@@ -1648,20 +1693,6 @@ class TCPPubServerChannel(salt.transport.server.PubServerChannel):
             master_pem_path = os.path.join(self.opts["pki_dir"], "master.pem")
             log.debug("Signing data packet")
             payload["sig"] = salt.crypt.sign_message(master_pem_path, payload["load"])
-        # Use the Salt IPC server
-        if self.opts.get("ipc_mode", "") == "tcp":
-            pull_uri = int(self.opts.get("tcp_master_publish_pull", 4514))
-        else:
-            pull_uri = os.path.join(self.opts["sock_dir"], "publish_pull.ipc")
-        # TODO: switch to the actual asynchronous interface
-        # pub_sock = salt.transport.ipc.IPCMessageClient(self.opts, io_loop=self.io_loop)
-        pub_sock = salt.utils.asynchronous.SyncWrapper(
-            salt.transport.ipc.IPCMessageClient,
-            (pull_uri,),
-            loop_kwarg="io_loop",
-        )
-        pub_sock.connect()
-
         int_payload = {"payload": salt.payload.dumps(payload)}
 
         # add some targeting stuff for lists only (for now)
@@ -1678,5 +1709,21 @@ class TCPPubServerChannel(salt.transport.server.PubServerChannel):
                 int_payload["topic_lst"] = match_ids
             else:
                 int_payload["topic_lst"] = load["tgt"]
+        return int_payload
+
+    def publish(self, load):
+        """
+        Publish "load" to minions
+        """
         # Send it over IPC!
-        pub_sock.send(int_payload)
+        if self.opts.get("ipc_mode", "") == "tcp":
+            pull_uri = int(self.opts.get("tcp_master_publish_pull", 4514))
+        else:
+            pull_uri = os.path.join(self.opts["sock_dir"], "publish_pull.ipc")
+        pub_sock = salt.utils.asynchronous.SyncWrapper(
+            salt.transport.ipc.IPCMessageClient,
+            (pull_uri,),
+            loop_kwarg="io_loop",
+        )
+        pub_sock.connect()
+        pub_sock.send(load)

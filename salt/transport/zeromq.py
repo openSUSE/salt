@@ -8,6 +8,7 @@ import os
 import signal
 import sys
 import threading
+import uuid
 from random import randint
 
 import salt.auth
@@ -55,6 +56,7 @@ except ImportError:
     except ImportError:
         from Crypto.Cipher import PKCS1_OAEP  # nosec
 
+
 log = logging.getLogger(__name__)
 
 
@@ -66,12 +68,12 @@ def _get_master_uri(master_ip, master_port, source_ip=None, source_port=None):
     rc = zmq_connect(socket, "tcp://192.168.1.17:5555;192.168.1.1:5555"); assert (rc == 0);
     Source: http://api.zeromq.org/4-1:zmq-tcp
     """
+
     from salt.utils.zeromq import ip_bracket
 
     master_uri = "tcp://{master_ip}:{master_port}".format(
         master_ip=ip_bracket(master_ip), master_port=master_port
     )
-
     if source_ip or source_port:
         if LIBZMQ_VERSION_INFO >= (4, 1, 6) and ZMQ_VERSION_INFO >= (16, 0, 1):
             # The source:port syntax for ZeroMQ has been added in libzmq 4.1.6
@@ -211,22 +213,27 @@ class AsyncZeroMQReqChannel(salt.transport.client.ReqChannel):
         return {
             "enc": self.crypt,
             "load": load,
+            "version": 2,
         }
 
     @salt.ext.tornado.gen.coroutine
     def crypted_transfer_decode_dictentry(
         self, load, dictkey=None, tries=3, timeout=60
     ):
+        nonce = uuid.uuid4().hex
+        load["nonce"] = nonce
         if not self.auth.authenticated:
             # Return control back to the caller, continue when authentication succeeds
             yield self.auth.authenticate()
-        # Return control to the caller. When send() completes, resume by populating ret with the Future.result
+
+        # Return control to the caller. When send() completes, resume by
+        # populating ret with the Future.result
         ret = yield self.message_client.send(
             self._package_load(self.auth.crypticle.dumps(load)),
             timeout=timeout,
             tries=tries,
         )
-        key = self.auth.get_keys()
+
         if "key" not in ret:
             # Reauth in the case our key is deleted on the master side.
             yield self.auth.authenticate()
@@ -235,15 +242,36 @@ class AsyncZeroMQReqChannel(salt.transport.client.ReqChannel):
                 timeout=timeout,
                 tries=tries,
             )
+
+        key = self.auth.get_keys()
         if HAS_M2:
             aes = key.private_decrypt(ret["key"], RSA.pkcs1_oaep_padding)
         else:
             cipher = PKCS1_OAEP.new(key)
             aes = cipher.decrypt(ret["key"])
+
+        # Decrypt using the public key.
         pcrypt = salt.crypt.Crypticle(self.opts, aes)
-        data = pcrypt.loads(ret[dictkey])
-        data = salt.transport.frame.decode_embedded_strs(data)
-        raise salt.ext.tornado.gen.Return(data)
+        signed_msg = pcrypt.loads(ret[dictkey])
+
+        # Validate the master's signature.
+        master_pubkey_path = os.path.join(self.opts["pki_dir"], "minion_master.pub")
+        if not salt.crypt.verify_signature(
+            master_pubkey_path, signed_msg["data"], signed_msg["sig"]
+        ):
+            raise salt.crypt.AuthenticationError(
+                "Pillar payload signature failed to validate."
+            )
+
+        # Make sure the signed key matches the key we used to decrypt the data.
+        data = salt.payload.loads(signed_msg["data"])
+        if data["key"] != ret["key"]:
+            raise salt.crypt.AuthenticationError("Key verification failed.")
+
+        # Validate the nonce.
+        if data["nonce"] != nonce:
+            raise salt.crypt.AuthenticationError("Pillar nonce verification failed.")
+        raise salt.ext.tornado.gen.Return(data["pillar"])
 
     @salt.ext.tornado.gen.coroutine
     def _crypted_transfer(self, load, tries=3, timeout=60, raw=False):
@@ -260,6 +288,9 @@ class AsyncZeroMQReqChannel(salt.transport.client.ReqChannel):
         :param int tries: The number of times to make before failure
         :param int timeout: The number of seconds on a response before failing
         """
+        nonce = uuid.uuid4().hex
+        if load and isinstance(load, dict):
+            load["nonce"] = nonce
 
         @salt.ext.tornado.gen.coroutine
         def _do_transfer():
@@ -274,7 +305,7 @@ class AsyncZeroMQReqChannel(salt.transport.client.ReqChannel):
             # communication, we do not subscribe to return events, we just
             # upload the results to the master
             if data:
-                data = self.auth.crypticle.loads(data, raw)
+                data = self.auth.crypticle.loads(data, raw, nonce)
             if not raw:
                 data = salt.transport.frame.decode_embedded_strs(data)
             raise salt.ext.tornado.gen.Return(data)
@@ -735,11 +766,23 @@ class ZeroMQReqServerChannel(
             )
             raise salt.ext.tornado.gen.Return()
 
+        version = 0
+        if "version" in payload:
+            version = payload["version"]
+
+        sign_messages = False
+        if version > 1:
+            sign_messages = True
+
         # intercept the "_auth" commands, since the main daemon shouldn't know
         # anything about our key auth
         if payload["enc"] == "clear" and payload.get("load", {}).get("cmd") == "_auth":
-            stream.send(salt.payload.dumps(self._auth(payload["load"])))
+            stream.send(salt.payload.dumps(self._auth(payload["load"], sign_messages)))
             raise salt.ext.tornado.gen.Return()
+
+        nonce = None
+        if version > 1:
+            nonce = payload["load"].pop("nonce", None)
 
         # TODO: test
         try:
@@ -756,7 +799,7 @@ class ZeroMQReqServerChannel(
         if req_fun == "send_clear":
             stream.send(salt.payload.dumps(ret))
         elif req_fun == "send":
-            stream.send(salt.payload.dumps(self.crypticle.dumps(ret)))
+            stream.send(salt.payload.dumps(self.crypticle.dumps(ret, nonce)))
         elif req_fun == "send_private":
             stream.send(
                 salt.payload.dumps(
@@ -764,6 +807,8 @@ class ZeroMQReqServerChannel(
                         ret,
                         req_opts["key"],
                         req_opts["tgt"],
+                        nonce,
+                        sign_messages,
                     )
                 )
             )
@@ -894,6 +939,8 @@ class ZeroMQPubServerChannel(salt.transport.server.PubServerChannel):
                 try:
                     log.debug("Publish daemon getting data from puller %s", pull_uri)
                     package = pull_sock.recv()
+                    package = salt.payload.loads(package)
+                    package = self.pack_publish(package)
                     log.debug("Publish daemon received payload. size=%d", len(package))
 
                     unpacked_package = salt.payload.unpackage(package)
@@ -986,8 +1033,8 @@ class ZeroMQPubServerChannel(salt.transport.server.PubServerChannel):
         """
         if self.pub_sock:
             self.pub_close()
-        ctx = zmq.Context.instance()
-        self._sock_data.sock = ctx.socket(zmq.PUSH)
+        self._sock_data._ctx = zmq.Context()
+        self._sock_data.sock = self._sock_data._ctx.socket(zmq.PUSH)
         self.pub_sock.setsockopt(zmq.LINGER, -1)
         if self.opts.get("ipc_mode", "") == "tcp":
             pull_uri = "tcp://127.0.0.1:{}".format(
@@ -1009,15 +1056,12 @@ class ZeroMQPubServerChannel(salt.transport.server.PubServerChannel):
         if hasattr(self._sock_data, "sock"):
             self._sock_data.sock.close()
             delattr(self._sock_data, "sock")
+            if hasattr(self._sock_data, "_ctx"):
+                self._sock_data._ctx.destroy()
 
-    def publish(self, load):
-        """
-        Publish "load" to minions. This send the load to the publisher daemon
-        process with does the actual sending to minions.
-
-        :param dict load: A load to be sent across the wire to minions
-        """
+    def pack_publish(self, load):
         payload = {"enc": "aes"}
+        load["serial"] = salt.master.SMaster.get_serial()
         crypticle = salt.crypt.Crypticle(
             self.opts, salt.master.SMaster.secrets["aes"]["secret"].value
         )
@@ -1048,9 +1092,18 @@ class ZeroMQPubServerChannel(salt.transport.server.PubServerChannel):
             load.get("jid", None),
             len(payload),
         )
+        return payload
+
+    def publish(self, load):
+        """
+        Publish "load" to minions. This send the load to the publisher daemon
+        process with does the actual sending to minions.
+
+        :param dict load: A load to be sent across the wire to minions
+        """
         if not self.pub_sock:
             self.pub_connect()
-        self.pub_sock.send(payload)
+        self.pub_sock.send(salt.payload.dumps(load))
         log.debug("Sent payload to publish daemon.")
 
 
