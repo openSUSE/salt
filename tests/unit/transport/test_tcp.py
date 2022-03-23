@@ -27,6 +27,13 @@ from salt.transport.tcp import SaltMessageClientPool, SaltMessageClient, TCPPubS
 # Import Salt Testing libs
 from tests.support.unit import TestCase, skipIf
 from tests.support.helpers import get_unused_localhost_port, flaky
+from salt.ext.tornado.testing import AsyncTestCase, gen_test
+from salt.transport.tcp import (
+    SaltMessageClient,
+    SaltMessageClientPool,
+    TCPPubServerChannel,
+)
+from tests.support.helpers import flaky, slowTest
 from tests.support.mixins import AdaptedConfigurationTestCaseMixin
 from tests.support.mock import MagicMock, patch
 from tests.unit.transport.mixins import PubChannelMixin, ReqChannelMixin, run_loop_in_thread
@@ -61,11 +68,13 @@ class BaseTCPReqCase(TestCase, AdaptedConfigurationTestCaseMixin):
         )
 
         cls.minion_config = cls.get_temp_config(
-            'minion',
-            **{'transport': 'tcp',
-               'master_ip': '127.0.0.1',
-               'master_port': ret_port,
-               'master_uri': 'tcp://127.0.0.1:{0}'.format(ret_port)}
+            "minion",
+            **{
+                "transport": "tcp",
+                "master_ip": "127.0.0.1",
+                "master_port": ret_port,
+                "master_uri": "tcp://127.0.0.1:{}".format(ret_port),
+            }
         )
 
         cls.process_manager = salt.utils.process.ProcessManager(name='ReqServer_ProcessManager')
@@ -174,12 +183,14 @@ class BaseTCPPubCase(AsyncTestCase, AdaptedConfigurationTestCaseMixin):
         )
 
         cls.minion_config = cls.get_temp_config(
-            'minion',
-            **{'transport': 'tcp',
-               'master_ip': '127.0.0.1',
-               'auth_timeout': 1,
-               'master_port': ret_port,
-               'master_uri': 'tcp://127.0.0.1:{0}'.format(ret_port)}
+            "minion",
+            **{
+                "transport": "tcp",
+                "master_ip": "127.0.0.1",
+                "auth_timeout": 1,
+                "master_port": ret_port,
+                "master_uri": "tcp://127.0.0.1:{}".format(ret_port),
+            }
         )
 
         cls.process_manager = salt.utils.process.ProcessManager(name='ReqServer_ProcessManager')
@@ -216,17 +227,17 @@ class BaseTCPPubCase(AsyncTestCase, AdaptedConfigurationTestCaseMixin):
         del cls.req_server_channel
 
     def setUp(self):
-        super(BaseTCPPubCase, self).setUp()
+        super().setUp()
         self._start_handlers = dict(self.io_loop._handlers)
 
     def tearDown(self):
-        super(BaseTCPPubCase, self).tearDown()
+        super().tearDown()
         failures = []
-        for k, v in six.iteritems(self.io_loop._handlers):
+        for k, v in self.io_loop._handlers.items():
             if self._start_handlers.get(k) != v:
                 failures.append((k, v))
         if failures:
-            raise Exception('FDs still attached to the IOLoop: {0}'.format(failures))
+            raise Exception("FDs still attached to the IOLoop: {}".format(failures))
         del self.channel
         del self._start_handlers
 
@@ -260,7 +271,7 @@ class AsyncPubChannelTest(BaseTCPPubCase, PubChannelMixin):
 
 class SaltMessageClientPoolTest(AsyncTestCase):
     def setUp(self):
-        super(SaltMessageClientPoolTest, self).setUp()
+        super().setUp()
         sock_pool_size = 5
         with patch('salt.transport.tcp.SaltMessageClient.__init__', MagicMock(return_value=None)):
             self.message_client_pool = SaltMessageClientPool({'sock_pool_size': sock_pool_size},
@@ -271,7 +282,7 @@ class SaltMessageClientPoolTest(AsyncTestCase):
     def tearDown(self):
         with patch('salt.transport.tcp.SaltMessageClient.close', MagicMock(return_value=None)):
             del self.original_message_clients
-        super(SaltMessageClientPoolTest, self).tearDown()
+        super().tearDown()
 
     def test_send(self):
         for message_client_mock in self.message_client_pool.message_clients:
@@ -384,66 +395,64 @@ class SaltMessageClientCleanupTest(TestCase, AdaptedConfigurationTestCaseMixin):
 
 
 class TCPPubServerChannelTest(TestCase, AdaptedConfigurationTestCaseMixin):
-    @patch('salt.master.SMaster.secrets')
-    @patch('salt.crypt.Crypticle')
-    @patch('salt.utils.asynchronous.SyncWrapper')
-    def test_publish_filtering(self, sync_wrapper, crypticle, secrets):
-        opts = self.get_temp_config('master')
+    @patch("salt.master.SMaster.secrets")
+    @patch("salt.crypt.Crypticle")
+    def test_publish_filtering(self, crypticle, secrets):
+        opts = self.get_temp_config("master")
         opts["sign_pub_messages"] = False
         channel = TCPPubServerChannel(opts)
 
-        wrap = MagicMock()
         crypt = MagicMock()
         crypt.dumps.return_value = {"test": "value"}
 
         secrets.return_value = {"aes": {"secret": None}}
         crypticle.return_value = crypt
-        sync_wrapper.return_value = wrap
 
         # try simple publish with glob tgt_type
-        channel.publish({"test": "value", "tgt_type": "glob", "tgt": "*"})
-        payload = wrap.send.call_args[0][0]
+        payload = channel.pack_publish(
+            {"test": "value", "tgt_type": "glob", "tgt": "*"}
+        )
 
         # verify we send it without any specific topic
         assert "topic_lst" not in payload
 
         # try simple publish with list tgt_type
-        channel.publish({"test": "value", "tgt_type": "list", "tgt": ["minion01"]})
-        payload = wrap.send.call_args[0][0]
+        payload = channel.pack_publish(
+            {"test": "value", "tgt_type": "list", "tgt": ["minion01"]}
+        )
 
         # verify we send it with correct topic
         assert "topic_lst" in payload
         self.assertEqual(payload["topic_lst"], ["minion01"])
 
         # try with syndic settings
-        opts['order_masters'] = True
-        channel.publish({"test": "value", "tgt_type": "list", "tgt": ["minion01"]})
-        payload = wrap.send.call_args[0][0]
+        opts["order_masters"] = True
+        payload = channel.pack_publish(
+            {"test": "value", "tgt_type": "list", "tgt": ["minion01"]}
+        )
 
         # verify we send it without topic for syndics
         assert "topic_lst" not in payload
 
-    @patch('salt.utils.minions.CkMinions.check_minions')
-    @patch('salt.master.SMaster.secrets')
-    @patch('salt.crypt.Crypticle')
-    @patch('salt.utils.asynchronous.SyncWrapper')
-    def test_publish_filtering_str_list(self, sync_wrapper, crypticle, secrets, check_minions):
-        opts = self.get_temp_config('master')
+    @patch("salt.utils.minions.CkMinions.check_minions")
+    @patch("salt.master.SMaster.secrets")
+    @patch("salt.crypt.Crypticle")
+    def test_publish_filtering_str_list(self, crypticle, secrets, check_minions):
+        opts = self.get_temp_config("master")
         opts["sign_pub_messages"] = False
         channel = TCPPubServerChannel(opts)
 
-        wrap = MagicMock()
         crypt = MagicMock()
         crypt.dumps.return_value = {"test": "value"}
 
         secrets.return_value = {"aes": {"secret": None}}
         crypticle.return_value = crypt
-        sync_wrapper.return_value = wrap
         check_minions.return_value = {"minions": ["minion02"]}
 
         # try simple publish with list tgt_type
-        channel.publish({"test": "value", "tgt_type": "list", "tgt": "minion02"})
-        payload = wrap.send.call_args[0][0]
+        payload = channel.pack_publish(
+            {"test": "value", "tgt_type": "list", "tgt": "minion02"}
+        )
 
         # verify we send it with correct topic
         assert "topic_lst" in payload
