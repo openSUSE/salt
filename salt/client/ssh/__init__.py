@@ -558,7 +558,6 @@ class SSH:
         """
         LOG_LOCK.release()
         salt.loader.LOAD_LOCK.release()
-        opts = copy.deepcopy(opts)
         single = Single(
             opts,
             opts["argv"],
