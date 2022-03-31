@@ -347,7 +347,7 @@ class SSH(MultiprocessingStateMixin):
         self.session_flock_file = os.path.join(
             self.opts["cachedir"], "salt-ssh.session.lock"
         )
-        self.ssh_session_grace_time = int(self.opts.get("ssh_session_grace_time", 3))
+        self.ssh_session_grace_time = int(self.opts.get("ssh_session_grace_time", 1))
 
     # __setstate__ and __getstate__ are only used on spawning platforms.
     def __setstate__(self, state):
@@ -587,7 +587,6 @@ class SSH(MultiprocessingStateMixin):
         """
         LOG_LOCK.release()
         salt.loader.LOAD_LOCK.release()
-        opts = copy.deepcopy(opts)
         single = Single(
             opts,
             opts["argv"],
@@ -643,6 +642,7 @@ class SSH(MultiprocessingStateMixin):
         Spin up the needed threads or processes and execute the subsequent
         routines
         """
+        opts = copy.deepcopy(self.opts)
         que = multiprocessing.Queue()
         running = {}
         targets_queue = deque(self.targets.keys())
@@ -653,7 +653,7 @@ class SSH(MultiprocessingStateMixin):
             if not self.targets:
                 log.error("No matching targets found in roster.")
                 break
-            if len(running) < self.opts.get("ssh_max_procs", 25) and not init:
+            if len(running) < opts.get("ssh_max_procs", 25) and not init:
                 if targets_queue:
                     host = targets_queue.popleft()
                 else:
@@ -671,7 +671,7 @@ class SSH(MultiprocessingStateMixin):
                             pid_running = (
                                 False
                                 if cached_session["pid"] == 0
-                                else psutil.pid_exists(cached_session["pid"])
+                                else cached_session.get("running", False) or psutil.pid_exists(cached_session["pid"])
                             )
                             if (
                                 pid_running and prev_session_running < self.max_pid_wait
@@ -686,9 +686,10 @@ class SSH(MultiprocessingStateMixin):
                         "salt-ssh/session",
                         host,
                         {
-                            "pid": 0,
+                            "pid": os.getpid(),
                             "master_id": self.master_id,
                             "ts": time.time(),
+                            "running": True,
                         },
                     )
                 for default in self.defaults:
@@ -716,7 +717,7 @@ class SSH(MultiprocessingStateMixin):
                     continue
                 args = (
                     que,
-                    self.opts,
+                    opts,
                     host,
                     self.targets[host],
                     mine,
@@ -752,6 +753,7 @@ class SSH(MultiprocessingStateMixin):
                             "pid": routine.pid,
                             "master_id": self.master_id,
                             "ts": time.time(),
+                            "running": True,
                         },
                     )
                 continue
@@ -804,12 +806,13 @@ class SSH(MultiprocessingStateMixin):
                                 "pid": 0,
                                 "master_id": self.master_id,
                                 "ts": time.time(),
+                                "running": False,
                             },
                         )
             if len(rets) >= len(self.targets):
                 break
             # Sleep when limit or all threads started
-            if len(running) >= self.opts.get("ssh_max_procs", 25) or len(
+            if len(running) >= opts.get("ssh_max_procs", 25) or len(
                 self.targets
             ) >= len(running):
                 time.sleep(0.1)

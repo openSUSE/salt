@@ -780,7 +780,12 @@ def roster(opts, runner=None, utils=None, whitelist=None, loaded_base_name=None,
         opts,
         tag="roster",
         whitelist=whitelist,
-        pack={"__runner__": runner, "__utils__": utils, "__context__": context},
+        pack={
+            "__runner__": runner,
+            "__utils__": utils,
+            "__context__": context,
+            "__opts__": opts,
+        },
         extra_module_dirs=utils.module_dirs if utils else None,
         loaded_base_name=loaded_base_name,
     )
