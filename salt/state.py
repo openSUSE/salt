@@ -13,7 +13,6 @@ The data sent to the state calls is as follows:
 
 from __future__ import annotations
 
-import collections
 import copy
 import datetime
 import fnmatch
@@ -30,6 +29,8 @@ from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
 from typing import Any, Optional, Union
 
 import networkx as nx
+
+from collections.abc import Mapping
 
 import salt.channel.client
 import salt.fileclient
@@ -3128,7 +3129,7 @@ class State:
         """
         for chunk in high:
             state = high[chunk]
-            if not isinstance(state, collections.Mapping):
+            if not isinstance(state, Mapping):
                 continue
             for state_ref in state:
                 needs_default = True
