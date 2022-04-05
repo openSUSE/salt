@@ -12,7 +12,6 @@ The data sent to the state calls is as follows:
 """
 
 
-import collections
 import copy
 import datetime
 import fnmatch
@@ -25,6 +24,8 @@ import site
 import sys
 import time
 import traceback
+
+from collections.abc import Mapping
 
 import salt.channel.client
 import salt.fileclient
@@ -3405,7 +3406,7 @@ class State:
         """
         for chunk in high:
             state = high[chunk]
-            if not isinstance(state, collections.Mapping):
+            if not isinstance(state, Mapping):
                 continue
             for state_ref in state:
                 needs_default = True
