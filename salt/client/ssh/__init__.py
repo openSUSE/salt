@@ -342,6 +342,8 @@ class SSH:
             self.opts["cachedir"], "salt-ssh.session.lock"
         )
         self.ssh_session_grace_time = int(self.opts.get("ssh_session_grace_time", 1))
+        self.sopts["tgt"] = copy.deepcopy(self.opts["tgt"])
+        self.sopts["ssh_cli_tgt"] = copy.deepcopy(self.opts["ssh_cli_tgt"])
         self.opts = self.sopts
 
     @property
