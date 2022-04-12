@@ -12,7 +12,6 @@ import logging
 import multiprocessing
 import os
 import pathlib
-import psutil
 import queue
 import re
 import shlex
@@ -481,6 +480,16 @@ class SSH(MultiprocessingStateMixin):
                             self.__parsed_rosters[self.ROSTER_UPDATE_FLAG] = False
                             return
 
+    def _pid_exists(self, pid):
+        """
+        Check if specified pid is alive
+        """
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+
     def _update_roster(self, hostname=None, user=None):
         """
         Update default flat roster with the passed in information.
@@ -755,7 +764,8 @@ class SSH(MultiprocessingStateMixin):
                             pid_running = (
                                 False
                                 if cached_session["pid"] == 0
-                                else cached_session.get("running", False) or psutil.pid_exists(cached_session["pid"])
+                                else cached_session.get("running", False)
+                                or self._pid_exists(cached_session["pid"])
                             )
                             if (
                                 pid_running and prev_session_running < self.max_pid_wait
