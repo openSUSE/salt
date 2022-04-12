@@ -174,7 +174,7 @@ def test_expand_target_ip_address(opts, roster):
         MagicMock(return_value=salt.utils.yaml.safe_load(roster)),
     ):
         client._expand_target()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_expand_target_no_host(opts, tmp_path):
@@ -197,7 +197,7 @@ def test_expand_target_no_host(opts, tmp_path):
     assert opts["tgt"] == user + host
     with patch("salt.roster.get_roster_file", MagicMock(return_value=roster_file)):
         client._expand_target()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_expand_target_dns(opts, roster):
@@ -218,7 +218,7 @@ def test_expand_target_dns(opts, roster):
         MagicMock(return_value=salt.utils.yaml.safe_load(roster)),
     ):
         client._expand_target()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_expand_target_no_user(opts, roster):
@@ -230,7 +230,7 @@ def test_expand_target_no_user(opts, roster):
 
     with patch("salt.utils.network.is_reachable_host", MagicMock(return_value=False)):
         client = ssh.SSH(opts)
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
     with patch(
         "salt.roster.get_roster_file", MagicMock(return_value="/etc/salt/roster")
@@ -239,7 +239,7 @@ def test_expand_target_no_user(opts, roster):
         MagicMock(return_value=salt.utils.yaml.safe_load(roster)),
     ):
         client._expand_target()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_update_targets_ip_address(opts):
@@ -254,7 +254,7 @@ def test_update_targets_ip_address(opts):
         client = ssh.SSH(opts)
     assert opts["tgt"] == user + host
     client._update_targets()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
     assert client.targets[host]["user"] == user.split("@", maxsplit=1)[0]
 
 
@@ -270,7 +270,7 @@ def test_update_targets_dns(opts):
         client = ssh.SSH(opts)
     assert opts["tgt"] == user + host
     client._update_targets()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
     assert client.targets[host]["user"] == user.split("@", maxsplit=1)[0]
 
 
@@ -285,7 +285,7 @@ def test_update_targets_no_user(opts):
         client = ssh.SSH(opts)
     assert opts["tgt"] == host
     client._update_targets()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_update_expand_target_dns(opts, roster):
@@ -307,7 +307,7 @@ def test_update_expand_target_dns(opts, roster):
     ):
         client._expand_target()
     client._update_targets()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
     assert client.targets[host]["user"] == user.split("@", maxsplit=1)[0]
 
 
@@ -325,7 +325,7 @@ def test_parse_tgt(opts):
         client = ssh.SSH(opts)
         assert client.parse_tgt["hostname"] == host
         assert client.parse_tgt["user"] == user.split("@", maxsplit=1)[0]
-        assert opts.get("ssh_cli_tgt") == user + host
+        assert client.opts.get("ssh_cli_tgt") == user + host
 
 
 def test_parse_tgt_no_user(opts):
@@ -342,7 +342,7 @@ def test_parse_tgt_no_user(opts):
         client = ssh.SSH(opts)
         assert client.parse_tgt["hostname"] == host
         assert client.parse_tgt["user"] == opts["ssh_user"]
-        assert opts.get("ssh_cli_tgt") == host
+        assert client.opts.get("ssh_cli_tgt") == host
 
 
 def test_extra_filerefs(tmp_path, opts):
