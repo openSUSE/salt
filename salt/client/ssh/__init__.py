@@ -279,15 +279,16 @@ class SSH(MultiprocessingStateMixin):
     ROSTER_UPDATE_FLAG = "#__needs_update"
 
     def __init__(self, opts, context=None):
+        self.opts = copy.deepcopy(opts)
+        self.sopts = copy.deepcopy(self.opts)
         self.__parsed_rosters = {SSH.ROSTER_UPDATE_FLAG: True}
-        pull_sock = os.path.join(opts["sock_dir"], "master_event_pull.ipc")
+        pull_sock = os.path.join(self.opts["sock_dir"], "master_event_pull.ipc")
         if os.path.exists(pull_sock) and zmq:
             self.event = salt.utils.event.get_event(
-                "master", opts["sock_dir"], opts=opts, listen=False
+                "master", self.opts["sock_dir"], opts=self.opts, listen=False
             )
         else:
             self.event = None
-        self.opts = opts
         if self.opts["regen_thin"]:
             self.opts["ssh_wipe"] = True
         if not salt.utils.path.which("ssh"):
@@ -298,7 +299,7 @@ class SSH(MultiprocessingStateMixin):
                     " to run. Exiting."
                 ),
             )
-        self.opts["_ssh_version"] = ssh_version()
+        self.sopts["_ssh_version"] = ssh_version()
         self.tgt_type = (
             self.opts["selected_target_option"]
             if self.opts["selected_target_option"]
@@ -400,6 +401,9 @@ class SSH(MultiprocessingStateMixin):
             self.opts["cachedir"], "salt-ssh.session.lock"
         )
         self.ssh_session_grace_time = int(self.opts.get("ssh_session_grace_time", 1))
+        self.sopts["tgt"] = copy.deepcopy(self.opts["tgt"])
+        self.sopts["ssh_cli_tgt"] = copy.deepcopy(self.opts["ssh_cli_tgt"])
+        self.opts = self.sopts
 
     # __setstate__ and __getstate__ are only used on spawning platforms.
     def __setstate__(self, state):
@@ -723,7 +727,6 @@ class SSH(MultiprocessingStateMixin):
         Spin up the needed threads or processes and execute the subsequent
         routines
         """
-        opts = copy.deepcopy(self.opts)
         que = multiprocessing.Queue()
         running = {}
         targets_queue = deque(self.targets.keys())
@@ -734,7 +737,7 @@ class SSH(MultiprocessingStateMixin):
             if not self.targets:
                 log.error("No matching targets found in roster.")
                 break
-            if len(running) < opts.get("ssh_max_procs", 25) and not init:
+            if len(running) < self.opts.get("ssh_max_procs", 25) and not init:
                 if targets_queue:
                     host = targets_queue.popleft()
                 else:
@@ -798,7 +801,7 @@ class SSH(MultiprocessingStateMixin):
                     continue
                 args = (
                     que,
-                    opts,
+                    self.opts,
                     host,
                     self.targets[host],
                     mine,
@@ -893,7 +896,7 @@ class SSH(MultiprocessingStateMixin):
             if len(rets) >= len(self.targets):
                 break
             # Sleep when limit or all threads started
-            if len(running) >= opts.get("ssh_max_procs", 25) or len(
+            if len(running) >= self.opts.get("ssh_max_procs", 25) or len(
                 self.targets
             ) >= len(running):
                 time.sleep(0.1)
