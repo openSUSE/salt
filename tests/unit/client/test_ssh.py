@@ -95,7 +95,7 @@ class SSHReturnEventTests(ShellCase):
             assert "localhost" in ret
             assert "fun" in ret["localhost"]
             client.run()
-        display_output.assert_called_once_with(expected, "nested", opts)
+        display_output.assert_called_once_with(expected, "nested", client.opts)
         self.assertIs(ret, handle_ssh_ret[0])
         assert len(client.event.fire_event.call_args_list) == 2
         assert "fun" in client.event.fire_event.call_args_list[0][0][0]
@@ -539,7 +539,7 @@ class SSHTests(ShellCase):
             MagicMock(return_value=salt.utils.yaml.safe_load(self.roster)),
         ):
             client._expand_target()
-        assert opts["tgt"] == host
+        assert client.opts["tgt"] == host
 
     def test_expand_target_no_host(self):
         """
@@ -564,7 +564,7 @@ class SSHTests(ShellCase):
         assert opts["tgt"] == user + host
         with patch("salt.roster.get_roster_file", MagicMock(return_value=roster_file)):
             client._expand_target()
-        assert opts["tgt"] == host
+        assert client.opts["tgt"] == host
 
     def test_expand_target_dns(self):
         """
@@ -587,7 +587,7 @@ class SSHTests(ShellCase):
             MagicMock(return_value=salt.utils.yaml.safe_load(self.roster)),
         ):
             client._expand_target()
-        assert opts["tgt"] == host
+        assert client.opts["tgt"] == host
 
     def test_expand_target_no_user(self):
         """
@@ -627,7 +627,7 @@ class SSHTests(ShellCase):
             client = ssh.SSH(opts)
         assert opts["tgt"] == user + host
         client._update_targets()
-        assert opts["tgt"] == host
+        assert client.opts["tgt"] == host
         assert client.targets[host]["user"] == user.split("@")[0]
 
     def test_update_targets_dns(self):
@@ -645,7 +645,7 @@ class SSHTests(ShellCase):
             client = ssh.SSH(opts)
         assert opts["tgt"] == user + host
         client._update_targets()
-        assert opts["tgt"] == host
+        assert client.opts["tgt"] == host
         assert client.targets[host]["user"] == user.split("@")[0]
 
     def test_update_targets_no_user(self):
@@ -686,7 +686,7 @@ class SSHTests(ShellCase):
         ):
             client._expand_target()
         client._update_targets()
-        assert opts["tgt"] == host
+        assert client.opts["tgt"] == host
         assert client.targets[host]["user"] == user.split("@")[0]
 
     def test_parse_tgt(self):
@@ -706,7 +706,7 @@ class SSHTests(ShellCase):
             client = ssh.SSH(opts)
             assert client.parse_tgt["hostname"] == host
             assert client.parse_tgt["user"] == user.split("@")[0]
-            assert self.opts.get("ssh_cli_tgt") == user + host
+            assert client.opts.get("ssh_cli_tgt") == user + host
 
     def test_parse_tgt_no_user(self):
         """
@@ -725,7 +725,7 @@ class SSHTests(ShellCase):
             client = ssh.SSH(opts)
             assert client.parse_tgt["hostname"] == host
             assert client.parse_tgt["user"] == opts["ssh_user"]
-            assert self.opts.get("ssh_cli_tgt") == host
+            assert client.opts.get("ssh_cli_tgt") == host
 
     def test_extra_filerefs(self):
         """
