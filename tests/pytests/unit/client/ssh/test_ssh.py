@@ -123,7 +123,7 @@ def test_expand_target_ip_address(opts, roster):
         MagicMock(return_value=salt.utils.yaml.safe_load(roster)),
     ):
         client._expand_target()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_expand_target_no_host(opts, tmp_path):
@@ -146,7 +146,7 @@ def test_expand_target_no_host(opts, tmp_path):
     assert opts["tgt"] == user + host
     with patch("salt.roster.get_roster_file", MagicMock(return_value=roster_file)):
         client._expand_target()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_expand_target_dns(opts, roster):
@@ -167,7 +167,7 @@ def test_expand_target_dns(opts, roster):
         MagicMock(return_value=salt.utils.yaml.safe_load(roster)),
     ):
         client._expand_target()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_expand_target_no_user(opts, roster):
@@ -180,7 +180,7 @@ def test_expand_target_no_user(opts, roster):
 
     with patch("salt.utils.network.is_reachable_host", MagicMock(return_value=False)):
         client = ssh.SSH(opts)
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
     with patch(
         "salt.roster.get_roster_file", MagicMock(return_value="/etc/salt/roster")
     ), patch(
@@ -188,7 +188,7 @@ def test_expand_target_no_user(opts, roster):
         MagicMock(return_value=salt.utils.yaml.safe_load(roster)),
     ):
         client._expand_target()
-    assert opts["tgt"] == host
+    assert client.opts["tgt"] == host
 
 
 def test_update_targets_ip_address(opts):
