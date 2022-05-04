@@ -394,7 +394,7 @@ class CPModuleTest(ModuleCase):
         self.run_function(
             'cp.get_url',
             [
-                'ftp://ftp.freebsd.org/pub/FreeBSD/releases/amd64/amd64/12.0-RELEASE/MANIFEST',
+                'ftp://ftp.freebsd.org/pub/FreeBSD/releases/amd64/amd64/13.0-RELEASE/MANIFEST',
                 tgt,
             ])
         with salt.utils.files.fopen(tgt, 'r') as instructions:
