@@ -12,6 +12,8 @@ from tests.support.mock import (
 
 # Import Salt Libs
 from salt.ext import six
+import salt.modules.pkg_resource as pkg_resource
+import salt.modules.yumpkg as yumpkg
 import salt.states.pkg as pkg
 from salt.ext.six.moves import zip
 
@@ -29,10 +31,33 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
     def setup_loader_modules(self):
         return {
             pkg: {
-                '__grains__': {
-                    'os': 'CentOS'
-                }
-            }
+                "__env__": "base",
+                "__grains__": {
+                    "os": "CentOS",
+                    "os_family": "RedHat",
+                },
+                "__opts__": {
+                    "test": False,
+                    "cachedir": "",
+                },
+                "__salt__": {},
+            },
+            pkg_resource: {
+                "__salt__": {},
+                "__grains__": {
+                    "os": "CentOS",
+                    "os_family": "RedHat",
+                },
+            },
+            yumpkg: {
+                "__salt__": {},
+                "__grains__": {
+                    "os": "CentOS",
+                    "osarch": "x86_64",
+                    "osmajorrelease": 7,
+                },
+                "__opts__": {},
+            },
         }
 
     def test_uptodate_with_changes(self):
@@ -377,3 +402,154 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
             hold_mock.assert_not_called()
             unhold_mock.assert_any_call(name="held-test", pkgs=["baz"])
             unhold_mock.assert_any_call(name="held-test", pkgs=["bar"])
+
+    def test_installed_with_single_normalize(self):
+        """
+        Test pkg.installed with preventing multiple package name normalisation
+        """
+
+        list_no_weird_installed = {
+            "pkga": "1.0.1",
+            "pkgb": "1.0.2",
+            "pkgc": "1.0.3",
+        }
+        list_no_weird_installed_ver_list = {
+            "pkga": ["1.0.1"],
+            "pkgb": ["1.0.2"],
+            "pkgc": ["1.0.3"],
+        }
+        list_with_weird_installed = {
+            "pkga": "1.0.1",
+            "pkgb": "1.0.2",
+            "pkgc": "1.0.3",
+            "weird-name-1.2.3-1234.5.6.test7tst.x86_64": "20220214-2.1",
+        }
+        list_with_weird_installed_ver_list = {
+            "pkga": ["1.0.1"],
+            "pkgb": ["1.0.2"],
+            "pkgc": ["1.0.3"],
+            "weird-name-1.2.3-1234.5.6.test7tst.x86_64": ["20220214-2.1"],
+        }
+        list_pkgs = MagicMock(
+            side_effect=[
+                list_no_weird_installed_ver_list,
+                {},
+                list_no_weird_installed,
+                list_no_weird_installed_ver_list,
+                list_with_weird_installed,
+                list_with_weird_installed,
+                list_with_weird_installed_ver_list,
+            ]
+        )
+
+        salt_dict = {
+            "pkg.install": yumpkg.install,
+            "pkg.list_pkgs": list_pkgs,
+            "pkg.normalize_name": yumpkg.normalize_name,
+            "pkg_resource.version_clean": pkg_resource.version_clean,
+            "pkg_resource.parse_targets": pkg_resource.parse_targets,
+        }
+
+        with patch("salt.modules.yumpkg.list_pkgs", list_pkgs), patch(
+            "salt.modules.yumpkg.version_cmp", MagicMock(return_value=0)
+        ), patch(
+            "salt.modules.yumpkg._call_yum", MagicMock(return_value={"retcode": 0})
+        ) as call_yum_mock, patch.dict(
+            pkg.__salt__, salt_dict
+        ), patch.dict(
+            pkg_resource.__salt__, salt_dict
+        ), patch.dict(
+            yumpkg.__salt__, salt_dict
+        ):
+
+            expected = {
+                "weird-name-1.2.3-1234.5.6.test7tst.x86_64": {
+                    "old": "",
+                    "new": "20220214-2.1",
+                }
+            }
+            ret = pkg.installed(
+                "test_install",
+                pkgs=[{"weird-name-1.2.3-1234.5.6.test7tst.x86_64.noarch": "20220214-2.1"}],
+            )
+            call_yum_mock.assert_called_once()
+            self.assertEqual(
+                call_yum_mock.mock_calls[0].args[0][2],
+                "weird-name-1.2.3-1234.5.6.test7tst.x86_64-20220214-2.1"
+            )
+            self.assertTrue(ret["result"])
+            self.assertDictEqual(ret["changes"], expected)
+
+    def test_removed_with_single_normalize(self):
+        """
+        Test pkg.removed with preventing multiple package name normalisation
+        """
+
+        list_no_weird_installed = {
+            "pkga": "1.0.1",
+            "pkgb": "1.0.2",
+            "pkgc": "1.0.3",
+        }
+        list_no_weird_installed_ver_list = {
+            "pkga": ["1.0.1"],
+            "pkgb": ["1.0.2"],
+            "pkgc": ["1.0.3"],
+        }
+        list_with_weird_installed = {
+            "pkga": "1.0.1",
+            "pkgb": "1.0.2",
+            "pkgc": "1.0.3",
+            "weird-name-1.2.3-1234.5.6.test7tst.x86_64": "20220214-2.1",
+        }
+        list_with_weird_installed_ver_list = {
+            "pkga": ["1.0.1"],
+            "pkgb": ["1.0.2"],
+            "pkgc": ["1.0.3"],
+            "weird-name-1.2.3-1234.5.6.test7tst.x86_64": ["20220214-2.1"],
+        }
+        list_pkgs = MagicMock(
+            side_effect=[
+                list_with_weird_installed_ver_list,
+                list_with_weird_installed,
+                list_no_weird_installed,
+                list_no_weird_installed_ver_list,
+            ]
+        )
+
+        salt_dict = {
+            "pkg.remove": yumpkg.remove,
+            "pkg.list_pkgs": list_pkgs,
+            "pkg.normalize_name": yumpkg.normalize_name,
+            "pkg_resource.parse_targets": pkg_resource.parse_targets,
+            "pkg_resource.version_clean": pkg_resource.version_clean,
+        }
+
+        with patch("salt.modules.yumpkg.list_pkgs", list_pkgs), patch(
+            "salt.modules.yumpkg.version_cmp", MagicMock(return_value=0)
+        ), patch(
+            "salt.modules.yumpkg._call_yum", MagicMock(return_value={"retcode": 0})
+        ) as call_yum_mock, patch.dict(
+            pkg.__salt__, salt_dict
+        ), patch.dict(
+            pkg_resource.__salt__, salt_dict
+        ), patch.dict(
+            yumpkg.__salt__, salt_dict
+        ):
+
+            expected = {
+                "weird-name-1.2.3-1234.5.6.test7tst.x86_64": {
+                    "old": "20220214-2.1",
+                    "new": "",
+                }
+            }
+            ret = pkg.removed(
+                "test_remove",
+                pkgs=[{"weird-name-1.2.3-1234.5.6.test7tst.x86_64.noarch": "20220214-2.1"}],
+            )
+            call_yum_mock.assert_called_once()
+            self.assertEqual(
+                call_yum_mock.mock_calls[0].args[0][2],
+                "weird-name-1.2.3-1234.5.6.test7tst.x86_64-20220214-2.1"
+            )
+            self.assertTrue(ret["result"])
+            self.assertDictEqual(ret["changes"], expected)
