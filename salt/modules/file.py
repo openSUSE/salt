@@ -5281,10 +5281,17 @@ def check_managed(
     serole=None,
     setype=None,
     serange=None,
+    follow_symlinks=False,
     **kwargs
 ):
     """
     Check to see what changes need to be made for a file
+
+    follow_symlinks
+        If the desired path is a symlink, follow it and check the permissions
+        of the file to which the symlink points.
+
+        .. versionadded:: 3005
 
     CLI Example:
 
@@ -5336,6 +5343,7 @@ def check_managed(
         serole=serole,
         setype=setype,
         serange=serange,
+        follow_symlinks=follow_symlinks,
     )
     # Ignore permission for files written temporary directories
     # Files in any path will still be set correctly using get_managed()
@@ -5372,6 +5380,7 @@ def check_managed_changes(
     setype=None,
     serange=None,
     verify_ssl=True,
+    follow_symlinks=False,
     **kwargs
 ):
     """
@@ -5386,6 +5395,12 @@ def check_managed_changes(
         will not attempt to validate the servers certificate. Default is True.
 
         .. versionadded:: 3002
+
+    follow_symlinks
+        If the desired path is a symlink, follow it and check the permissions
+        of the file to which the symlink points.
+
+        .. versionadded:: 3005
 
     CLI Example:
 
@@ -5456,6 +5471,7 @@ def check_managed_changes(
         serole=serole,
         setype=setype,
         serange=serange,
+        follow_symlinks=follow_symlinks,
     )
     __clean_tmp(sfn)
     return changes
@@ -5477,6 +5493,7 @@ def check_file_meta(
     setype=None,
     serange=None,
     verify_ssl=True,
+    follow_symlinks=False,
 ):
     """
     Check for the changes in the file metadata.
@@ -5553,6 +5570,12 @@ def check_file_meta(
         will not attempt to validate the servers certificate. Default is True.
 
         .. versionadded:: 3002
+
+    follow_symlinks
+        If the desired path is a symlink, follow it and check the permissions
+        of the file to which the symlink points.
+
+        .. versionadded:: 3005
     """
     changes = {}
     if not source_sum:
@@ -5560,7 +5583,9 @@ def check_file_meta(
 
     try:
         lstats = stats(
-            name, hash_type=source_sum.get("hash_type", None), follow_symlinks=False
+            name,
+            hash_type=source_sum.get("hash_type", None),
+            follow_symlinks=follow_symlinks,
         )
     except CommandExecutionError:
         lstats = {}
