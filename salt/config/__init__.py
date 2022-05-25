@@ -960,6 +960,14 @@ VALID_OPTS = immutabletypes.freeze(
         # Use Adler32 hashing algorithm for server_id (default False until Sodium, "adler32" after)
         # Possible values are: False, adler32, crc32
         "server_id_use_crc": (bool, str),
+        # pass renderer: Fetch secrets only for the template variables matching the prefix
+        "pass_variable_prefix": str,
+        # pass renderer: Whether to error out when unable to fetch a secret
+        "pass_strict_fetch": bool,
+        # pass renderer: Set GNUPGHOME env for Pass
+        "pass_gnupghome": str,
+        # pass renderer: Set PASSWORD_STORE_DIR env for Pass
+        "pass_dir": str,
     }
 )
 
@@ -1601,6 +1609,10 @@ DEFAULT_MASTER_OPTS = immutabletypes.freeze(
         "fips_mode": False,
         "detect_remote_minions": False,
         "remote_minions_port": 22,
+        "pass_variable_prefix": "",
+        "pass_strict_fetch": False,
+        "pass_gnupghome": "",
+        "pass_dir": "",
     }
 )
 
