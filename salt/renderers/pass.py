@@ -75,6 +75,18 @@ def _fetch_secret(pass_path):
     Fetch secret from pass based on pass_path. If there is
     any error, return back the original pass_path value
     """
+
+    # remove the optional path prefix
+    if "pass_variable_prefix" in __opts__:
+        pass_prefix = __opts__["pass_variable_prefix"]
+
+        # if we do not see our prefix we do not want to process this variable
+        if not pass_path.startswith(pass_prefix):
+            return pass_path
+
+        # strip the prefix from the start of the string
+        pass_path = pass_path[len(pass_prefix):]
+
     cmd = "pass show {}".format(pass_path.strip())
     log.debug("Fetching secret: %s", cmd)
 
@@ -84,9 +96,13 @@ def _fetch_secret(pass_path):
     # The version of pass used during development sent output to
     # stdout instead of stderr even though its returncode was non zero.
     if proc.returncode or not pass_data:
-        log.warning("Could not fetch secret: %s %s", pass_data, pass_error)
+        if "pass_renderer_fail_hard" in __opts__ and __opts__["pass_renderer_fail_hard"]:
+            raise SaltRenderError("Unable to retrieve secret '{}' from the password store: {}".format(pass_path, stderr))
+        else:
+            log.warning("Could not fetch secret: %s %s", pass_data, pass_error)
         pass_data = pass_path
-    return pass_data.strip()
+    # only strip trailing newlines
+    return pass_data.rstrip('\r\n')
 
 
 def _decrypt_object(obj):
