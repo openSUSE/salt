@@ -811,11 +811,6 @@ class AsyncAuth(object):
                 )
                 return "retry"
 
-        if self.opts.get("syndic_master", False):  # Is syndic
-            syndic_finger = self.opts.get(
-                "syndic_finger", self.opts.get("master_finger", False)
-            )
-            raise SaltClientError('Invalid master key')
         if self.opts.get('syndic_master', False):  # Is syndic
             syndic_finger = self.opts.get('syndic_finger', self.opts.get('master_finger', False))
             if syndic_finger:
