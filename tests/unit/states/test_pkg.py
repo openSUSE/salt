@@ -432,11 +432,18 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
         }
         list_pkgs = MagicMock(
             side_effect=[
+                # For the package with version specified
                 list_no_weird_installed_ver_list,
                 {},
                 list_no_weird_installed,
                 list_no_weird_installed_ver_list,
                 list_with_weird_installed,
+                list_with_weird_installed_ver_list,
+                # For the package with no version specified
+                list_no_weird_installed_ver_list,
+                {},
+                list_no_weird_installed,
+                list_no_weird_installed_ver_list,
                 list_with_weird_installed,
                 list_with_weird_installed_ver_list,
             ]
@@ -460,6 +467,10 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
             pkg_resource.__salt__, salt_dict
         ), patch.dict(
             yumpkg.__salt__, salt_dict
+        ), patch.dict(
+            yumpkg.__grains__, {"os": "CentOS", "osarch": "x86_64", "osmajorrelease": 7}
+        ), patch.object(
+            yumpkg, "list_holds", MagicMock()
         ):
 
             expected = {
@@ -473,9 +484,23 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
                 pkgs=[{"weird-name-1.2.3-1234.5.6.test7tst.x86_64.noarch": "20220214-2.1"}],
             )
             call_yum_mock.assert_called_once()
-            self.assertEqual(
-                call_yum_mock.mock_calls[0].args[0][2],
+            self.assertTrue(
                 "weird-name-1.2.3-1234.5.6.test7tst.x86_64-20220214-2.1"
+                in call_yum_mock.mock_calls[0].args[0]
+            )
+            self.assertTrue(ret["result"])
+            self.assertDictEqual(ret["changes"], expected)
+
+            call_yum_mock.reset_mock()
+
+            ret = pkg.installed(
+                "test_install",
+                pkgs=["weird-name-1.2.3-1234.5.6.test7tst.x86_64.noarch"],
+            )
+            call_yum_mock.assert_called_once()
+            self.assertTrue(
+                "weird-name-1.2.3-1234.5.6.test7tst.x86_64"
+                in call_yum_mock.mock_calls[0].args[0]
             )
             self.assertTrue(ret["result"])
             self.assertDictEqual(ret["changes"], expected)
@@ -509,6 +534,12 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
         }
         list_pkgs = MagicMock(
             side_effect=[
+                # For the package with version specified
+                list_with_weird_installed_ver_list,
+                list_with_weird_installed,
+                list_no_weird_installed,
+                list_no_weird_installed_ver_list,
+                # For the package with no version specified
                 list_with_weird_installed_ver_list,
                 list_with_weird_installed,
                 list_no_weird_installed,
@@ -547,9 +578,23 @@ class PkgTestCase(TestCase, LoaderModuleMockMixin):
                 pkgs=[{"weird-name-1.2.3-1234.5.6.test7tst.x86_64.noarch": "20220214-2.1"}],
             )
             call_yum_mock.assert_called_once()
-            self.assertEqual(
-                call_yum_mock.mock_calls[0].args[0][2],
+            self.assertTrue(
                 "weird-name-1.2.3-1234.5.6.test7tst.x86_64-20220214-2.1"
+                in call_yum_mock.mock_calls[0].args[0]
+            )
+            self.assertTrue(ret["result"])
+            self.assertDictEqual(ret["changes"], expected)
+
+            call_yum_mock.reset_mock()
+
+            ret = pkg.removed(
+                "test_remove",
+                pkgs=["weird-name-1.2.3-1234.5.6.test7tst.x86_64.noarch"],
+            )
+            call_yum_mock.assert_called_once()
+            self.assertTrue(
+                "weird-name-1.2.3-1234.5.6.test7tst.x86_64"
+                in call_yum_mock.mock_calls[0].args[0]
             )
             self.assertTrue(ret["result"])
             self.assertDictEqual(ret["changes"], expected)
