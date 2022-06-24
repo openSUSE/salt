@@ -591,7 +591,7 @@ def list_upgrades(refresh=True, root=None, **kwargs):
         salt '*' pkg.list_upgrades
     """
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     ret = dict()
     cmd = ["list-updates"]
@@ -705,7 +705,7 @@ def info_available(*names, **kwargs):
 
     # Refresh db before extracting the latest package
     if kwargs.get("refresh", True):
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     pkg_info = []
     batch = names[:]
@@ -1656,7 +1656,7 @@ def install(
                 'arch': '<new-arch>'}}}
     """
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     try:
         pkg_params, pkg_type = __salt__["pkg_resource.parse_targets"](
@@ -1893,7 +1893,7 @@ def upgrade(
         cmd_update.insert(0, "--no-gpg-checks")
 
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     if dryrun:
         cmd_update.append("--dry-run")
@@ -2791,7 +2791,7 @@ def search(criteria, refresh=False, **kwargs):
     root = kwargs.get("root", None)
 
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     cmd = ["search"]
     if kwargs.get("match") == "exact":
@@ -2942,7 +2942,7 @@ def download(*packages, **kwargs):
 
     refresh = kwargs.get("refresh", False)
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     pkg_ret = {}
     for dld_result in (
@@ -3094,7 +3094,7 @@ def list_patches(refresh=False, root=None, **kwargs):
         salt '*' pkg.list_patches
     """
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     return _get_patches(root=root)
 
@@ -3188,7 +3188,7 @@ def resolve_capabilities(pkgs, refresh=False, root=None, **kwargs):
         salt '*' pkg.resolve_capabilities resolve_capabilities=True w3m_ssl
     """
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     ret = list()
     for pkg in pkgs:
