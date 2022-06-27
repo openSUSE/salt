@@ -293,7 +293,30 @@ def main(argv):  # pylint: disable=W0613
             os.makedirs(OPTIONS.saltdir)
             cache_dir = os.path.join(OPTIONS.saltdir, "running_data", "var", "cache")
             os.makedirs(os.path.join(cache_dir, "salt"))
-            os.symlink("salt", os.path.relpath(os.path.join(cache_dir, "venv-salt-minion")))
+            os.symlink(
+                "salt", os.path.relpath(os.path.join(cache_dir, "venv-salt-minion"))
+            )
+        if os.path.exists(OPTIONS.saltdir) and (
+            "SUDO_UID" in os.environ or "SUDO_GID" in os.environ
+        ):
+            try:
+                sudo_uid = int(os.environ.get("SUDO_UID", -1))
+            except ValueError:
+                sudo_uid = -1
+            try:
+                sudo_gid = int(os.environ.get("SUDO_GID", -1))
+            except ValueError:
+                sudo_gid = -1
+            dstat = os.stat(OPTIONS.saltdir)
+            if (sudo_uid != -1 and dstat.st_uid != sudo_uid) or (
+                sudo_gid != -1 and dstat.st_gid != sudo_gid
+            ):
+                os.chown(OPTIONS.saltdir, sudo_uid, sudo_gid)
+                for dir_path, dir_names, file_names in os.walk(OPTIONS.saltdir):
+                    for dir_name in dir_names:
+                        os.lchown(os.path.join(dir_path, dir_name), sudo_uid, sudo_gid)
+                    for file_name in file_names:
+                        os.lchown(os.path.join(dir_path, file_name), sudo_uid, sudo_gid)
 
     if venv_salt_call is None:
         # Use Salt thin only if Salt Bundle (venv-salt-minion) is not available
