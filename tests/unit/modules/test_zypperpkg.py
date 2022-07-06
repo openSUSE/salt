@@ -771,6 +771,13 @@ class ZypperTestCase(TestCase, LoaderModuleMockMixin):
                     self.assertDictEqual(ret, {"vim": {"old": "1.1", "new": "1.2"}})
                     zypper_mock.assert_any_call('update', '--auto-agree-with-licenses')
 
+                with patch(
+                    "salt.modules.zypperpkg.list_pkgs",
+                    MagicMock(side_effect=[{"vim": "1.1"}, {"vim": "1.2"}]),
+                ) as list_pkgs_mock:
+                    ret = zypper.upgrade(diff_attr="all")
+                    list_pkgs_mock.assert_any_call(root=None, attr="all")
+
                 with patch.dict(zypper.__salt__,
                                 {'pkg_resource.parse_targets': MagicMock(return_value=({'vim': "1.1"}, 'repository'))}):
                     with patch('salt.modules.zypperpkg.list_pkgs',
