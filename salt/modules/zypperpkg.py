@@ -941,7 +941,7 @@ def list_pkgs(versions_as_list=False, root=None, includes=None, **kwargs):
         return {}
 
     attr = kwargs.get("attr")
-    if attr is not None:
+    if attr is not None and attr != "all":
         attr = salt.utils.args.split_input(attr)
 
     includes = includes if includes else []
@@ -1793,6 +1793,8 @@ def install(
 
 
 def upgrade(
+    name=None,
+    pkgs=None,
     refresh=True,
     dryrun=False,
     dist_upgrade=False,
@@ -1802,6 +1804,7 @@ def upgrade(
     skip_verify=False,
     no_recommends=False,
     root=None,
+    diff_attr=None,
     **kwargs
 ):  # pylint: disable=unused-argument
     """
@@ -1820,6 +1823,27 @@ def upgrade(
     .. _`systemd.kill(5)`: https://www.freedesktop.org/software/systemd/man/systemd.kill.html
 
     Run a full system upgrade, a zypper upgrade
+
+    name
+        The name of the package to be installed. Note that this parameter is
+        ignored if ``pkgs`` is passed or if ``dryrun`` is set to True.
+
+        CLI Example:
+
+        .. code-block:: bash
+
+            salt '*' pkg.install name=<package name>
+
+    pkgs
+        A list of packages to install from a software repository. Must be
+        passed as a python list. Note that this parameter is ignored if
+        ``dryrun`` is set to True.
+
+        CLI Examples:
+
+        .. code-block:: bash
+
+            salt '*' pkg.install pkgs='["foo", "bar"]'
 
     refresh
         force a refresh if set to True (default).
@@ -1852,6 +1876,24 @@ def upgrade(
     root
         Operate on a different root directory.
 
+    diff_attr:
+        If a list of package attributes is specified, returned value will
+        contain them, eg.::
+
+            {'<package>': {
+                'old': {
+                    'version': '<old-version>',
+                    'arch': '<old-arch>'},
+
+                'new': {
+                    'version': '<new-version>',
+                    'arch': '<new-arch>'}}}
+
+        Valid attributes are: ``epoch``, ``version``, ``release``, ``arch``,
+        ``install_date``, ``install_date_time_t``.
+
+        If ``all`` is specified, all valid attributes will be returned.
+
     Returns a dictionary containing the changes:
 
     .. code-block:: python
@@ -1859,11 +1901,27 @@ def upgrade(
         {'<package>':  {'old': '<old-version>',
                         'new': '<new-version>'}}
 
+    If an attribute list is specified in ``diff_attr``, the dict will also contain
+    any specified attribute, eg.::
+
+    .. code-block:: python
+
+        {'<package>': {
+            'old': {
+                'version': '<old-version>',
+                'arch': '<old-arch>'},
+
+            'new': {
+                'version': '<new-version>',
+                'arch': '<new-arch>'}}}
+
     CLI Example:
 
     .. code-block:: bash
 
         salt '*' pkg.upgrade
+        salt '*' pkg.upgrade name=mypackage
+        salt '*' pkg.upgrade pkgs='["package1", "package2"]'
         salt '*' pkg.upgrade dist_upgrade=True fromrepo='["MyRepoName"]' novendorchange=True
         salt '*' pkg.upgrade dist_upgrade=True dryrun=True
     """
@@ -1899,12 +1957,24 @@ def upgrade(
             allowvendorchange, novendorchange
         ).noraise.call(*cmd_update + ["--debug-solver"])
 
-    old = list_pkgs(root=root)
+    if not dist_upgrade:
+        if name or pkgs:
+            try:
+                (pkg_params, _) = __salt__["pkg_resource.parse_targets"](
+                    name=name, pkgs=pkgs, sources=None, **kwargs
+                )
+                if pkg_params:
+                    cmd_update.extend(pkg_params.keys())
+
+            except MinionError as exc:
+                raise CommandExecutionError(exc)
+
+    old = list_pkgs(root=root, attr=diff_attr)
     __zypper__(systemd_scope=_systemd_scope(), root=root).allow_vendor_change(
         allowvendorchange, novendorchange
     ).noraise.call(*cmd_update)
     _clean_cache()
-    new = list_pkgs(root=root)
+    new = list_pkgs(root=root, attr=diff_attr)
     ret = salt.utils.data.compare_dicts(old, new)
 
     if __zypper__.exit_code not in __zypper__.SUCCESS_EXIT_CODES:
