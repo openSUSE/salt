@@ -4748,9 +4748,16 @@ def check_managed(
         saltenv,
         contents=None,
         skip_verify=False,
+        follow_symlinks=False,
         **kwargs):
     '''
     Check to see what changes need to be made for a file
+
+    follow_symlinks
+        If the desired path is a symlink, follow it and check the permissions
+        of the file to which the symlink points.
+
+        .. versionadded:: 3005
 
     CLI Example:
 
@@ -4787,7 +4794,8 @@ def check_managed(
             __clean_tmp(sfn)
             return False, comments
     changes = check_file_meta(name, sfn, source, source_sum, user,
-                              group, mode, attrs, saltenv, contents)
+                              group, mode, attrs, saltenv, contents,
+                              follow_symlinks=follow_symlinks)
     # Ignore permission for files written temporary directories
     # Files in any path will still be set correctly using get_managed()
     if name.startswith(tempfile.gettempdir()):
@@ -4819,9 +4827,16 @@ def check_managed_changes(
         contents=None,
         skip_verify=False,
         keep_mode=False,
+        follow_symlinks=False,
         **kwargs):
     '''
     Return a dictionary of what changes need to be made for a file
+
+    follow_symlinks
+        If the desired path is a symlink, follow it and check the permissions
+        of the file to which the symlink points.
+
+        .. versionadded:: 3005
 
     CLI Example:
 
@@ -4870,7 +4885,8 @@ def check_managed_changes(
                 except Exception as exc:  # pylint: disable=broad-except
                     log.warning('Unable to stat %s: %s', sfn, exc)
     changes = check_file_meta(name, sfn, source, source_sum, user,
-                              group, mode, attrs, saltenv, contents)
+                              group, mode, attrs, saltenv, contents,
+                              follow_symlinks=follow_symlinks)
     __clean_tmp(sfn)
     return changes
 
@@ -4885,7 +4901,8 @@ def check_file_meta(
         mode,
         attrs,
         saltenv,
-        contents=None):
+        contents=None,
+        follow_symlinks=False):
     '''
     Check for the changes in the file metadata.
 
@@ -4935,6 +4952,12 @@ def check_file_meta(
 
     contents
         File contents
+
+    follow_symlinks
+        If the desired path is a symlink, follow it and check the permissions
+        of the file to which the symlink points.
+
+        .. versionadded:: 3005
     '''
     changes = {}
     if not source_sum:
@@ -4942,7 +4965,7 @@ def check_file_meta(
 
     try:
         lstats = stats(name, hash_type=source_sum.get('hash_type', None),
-                       follow_symlinks=False)
+                       follow_symlinks=follow_symlinks)
     except CommandExecutionError:
         lstats = {}
 

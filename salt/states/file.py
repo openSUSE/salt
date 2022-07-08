@@ -3043,6 +3043,7 @@ def managed(name,
                     contents,
                     skip_verify,
                     keep_mode,
+                    follow_symlinks=follow_symlinks,
                     **kwargs
                 )
 
