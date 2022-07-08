@@ -591,7 +591,7 @@ def list_upgrades(refresh=True, root=None, **kwargs):
         salt '*' pkg.list_upgrades
     """
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     ret = dict()
     cmd = ["list-updates"]
@@ -705,7 +705,7 @@ def info_available(*names, **kwargs):
 
     # Refresh db before extracting the latest package
     if kwargs.get("refresh", True):
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     pkg_info = []
     batch = names[:]
@@ -1395,7 +1395,6 @@ def mod_repo(repo, **kwargs):
         cmd_opt.append("--name='{}'".format(kwargs.get("humanname")))
 
     if kwargs.get("gpgautoimport") is True:
-        global_cmd_opt.append("--gpg-auto-import-keys")
         call_refresh = True
 
     if cmd_opt:
@@ -1407,8 +1406,8 @@ def mod_repo(repo, **kwargs):
         # when used with "zypper ar --refresh" or "zypper mr --refresh"
         # --gpg-auto-import-keys is not doing anything
         # so we need to specifically refresh here with --gpg-auto-import-keys
-        refresh_opts = global_cmd_opt + ["refresh"] + [repo]
-        __zypper__(root=root).xml.call(*refresh_opts)
+        kwargs.update({"repos": repo})
+        refresh_db(root=root, **kwargs)
     elif not added and not cmd_opt:
         comment = "Specified arguments did not result in modification of repo"
 
@@ -1419,7 +1418,7 @@ def mod_repo(repo, **kwargs):
     return repo
 
 
-def refresh_db(force=None, root=None):
+def refresh_db(force=None, root=None, **kwargs):
     """
     Trigger a repository refresh by calling ``zypper refresh``. Refresh will run
     with ``--force`` if the "force=True" flag is passed on the CLI or
@@ -1429,6 +1428,17 @@ def refresh_db(force=None, root=None):
     It will return a dict::
 
         {'<database name>': Bool}
+
+    gpgautoimport : False
+        If set to True, automatically trust and import public GPG key for
+        the repository.
+
+        .. versionadded:: 3005
+
+    repos
+        Refresh just the specified repos
+
+        .. versionadded:: 3005
 
     root
         operate on a different root directory.
@@ -1450,11 +1460,22 @@ def refresh_db(force=None, root=None):
     salt.utils.pkg.clear_rtag(__opts__)
     ret = {}
     refresh_opts = ["refresh"]
+    global_opts = []
     if force is None:
         force = __pillar__.get("zypper", {}).get("refreshdb_force", True)
     if force:
         refresh_opts.append("--force")
-    out = __zypper__(root=root).refreshable.call(*refresh_opts)
+    repos = kwargs.get("repos", [])
+    refresh_opts.extend([repos] if not isinstance(repos, list) else repos)
+
+    if kwargs.get("gpgautoimport", False):
+        global_opts.append("--gpg-auto-import-keys")
+
+    # We do the actual call to zypper refresh.
+    # We ignore retcode 6 which is returned when there are no repositories defined.
+    out = __zypper__(root=root).refreshable.call(
+        *global_opts, *refresh_opts, success_retcodes=[0, 6]
+    )
 
     for line in out.splitlines():
         if not line:
@@ -1639,7 +1660,7 @@ def install(
                 'arch': '<new-arch>'}}}
     """
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     try:
         pkg_params, pkg_type = __salt__["pkg_resource.parse_targets"](
@@ -1934,7 +1955,7 @@ def upgrade(
         cmd_update.insert(0, "--no-gpg-checks")
 
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     if dryrun:
         cmd_update.append("--dry-run")
@@ -2844,7 +2865,7 @@ def search(criteria, refresh=False, **kwargs):
     root = kwargs.get("root", None)
 
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     cmd = ["search"]
     if kwargs.get("match") == "exact":
@@ -2995,7 +3016,7 @@ def download(*packages, **kwargs):
 
     refresh = kwargs.get("refresh", False)
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     pkg_ret = {}
     for dld_result in (
@@ -3147,7 +3168,7 @@ def list_patches(refresh=False, root=None, **kwargs):
         salt '*' pkg.list_patches
     """
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     return _get_patches(root=root)
 
@@ -3241,7 +3262,7 @@ def resolve_capabilities(pkgs, refresh=False, root=None, **kwargs):
         salt '*' pkg.resolve_capabilities resolve_capabilities=True w3m_ssl
     """
     if refresh:
-        refresh_db(root)
+        refresh_db(root, **kwargs)
 
     ret = list()
     for pkg in pkgs:
