@@ -1,0 +1,26 @@
+name: Test Unit tests with salt-jenkins provisioning
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+jobs:
+  build-then-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Install salt-call
+        run: |
+          sudo apt-get update
+          sudo apt-get install salt-common
+      - name: Check out Salt Jenkins
+        uses: actions/checkout@v3
+        with:
+          repository: "saltstack/salt-jenkins"
+      - name: Install test dependencies
+        working-directory: ./salt-jenkins
+        run: sudo salt-call --local --file-root=state-tree state.apply golden-image-provision
+      - name: Run tests
+        working-directory: ./salt
+        run: nox --session 'pytest-3(coverage=False)' -- tests/pytests/unit/
