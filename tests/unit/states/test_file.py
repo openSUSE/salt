@@ -2266,6 +2266,111 @@ class TestFileState(TestCase, LoaderModuleMockMixin):
             self.assertDictEqual(filestate.directory(name, user=user, group=group), ret)
             self.assertDictEqual(filestate.directory(name, user=user, group=group), ret)
 
+    def test_copy_test_mode_user_group_not_present(self):
+        """
+        Test file copy in test mode with no user or group existing
+        """
+        source = "/tmp/src_copy_no_user_group_test_mode"
+        filename = "/tmp/copy_no_user_group_test_mode"
+        with patch.dict(
+            filestate.__salt__,
+            {
+                "file.group_to_gid": MagicMock(side_effect=["1234", "", ""]),
+                "file.user_to_uid": MagicMock(side_effect=["", "4321", ""]),
+                "file.get_mode": MagicMock(return_value="0644"),
+            },
+        ), patch.dict(filestate.__opts__, {"test": True}), patch.object(
+            os.path, "exists", return_value=True
+        ):
+            ret = filestate.copy_(
+                source, filename, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
+            ret = filestate.copy_(
+                source, filename, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
+            ret = filestate.copy_(
+                source, filename, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
+    def test_recurse_test_mode_user_group_not_present(self):
+        """
+        Test file recurse in test mode with no user or group existing
+        """
+        filename = "/tmp/recurse_no_user_group_test_mode"
+        source = "salt://tmp/src_recurse_no_user_group_test_mode"
+        mock_l = MagicMock(return_value=[])
+        mock_emt = MagicMock(return_value=["tmp/src_recurse_no_user_group_test_mode"])
+        with patch.dict(
+            filestate.__salt__,
+            {
+                "file.group_to_gid": MagicMock(side_effect=["1234", "", ""]),
+                "file.user_to_uid": MagicMock(side_effect=["", "4321", ""]),
+                "file.get_mode": MagicMock(return_value="0644"),
+                "file.source_list": MagicMock(return_value=[source, ""]),
+                "cp.list_master_dirs": mock_emt,
+                "cp.list_master": mock_l,
+            },
+        ), patch.dict(filestate.__opts__, {"test": True}), patch.object(
+            os.path, "exists", return_value=True
+        ), patch.object(
+            os.path, "isdir", return_value=True
+        ):
+            ret = filestate.recurse(
+                filename, source, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
+            ret = filestate.recurse(
+                filename, source, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
+            ret = filestate.recurse(
+                filename, source, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
+    def test_managed_test_mode_user_group_not_present(self):
+        """
+        Test file managed in test mode with no user or group existing
+        """
+        filename = "/tmp/managed_no_user_group_test_mode"
+        with patch.dict(
+            filestate.__salt__,
+            {
+                "file.group_to_gid": MagicMock(side_effect=["1234", "", ""]),
+                "file.user_to_uid": MagicMock(side_effect=["", "4321", ""]),
+            },
+        ), patch.dict(filestate.__opts__, {"test": True}):
+            ret = filestate.managed(
+                filename, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
+            ret = filestate.managed(
+                filename, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
+            ret = filestate.managed(
+                filename, group="nonexistinggroup", user="nonexistinguser"
+            )
+            assert ret["result"] is not False
+            assert "is not available" not in ret["comment"]
+
 
 class TestFindKeepFiles(TestCase):
 
