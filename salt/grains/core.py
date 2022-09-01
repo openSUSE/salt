@@ -1173,6 +1173,24 @@ def _virtual(osdata):
     if grains.get("virtual_subtype") and grains["virtual"] == "physical":
         grains["virtual"] = "virtual"
 
+    # Try to detect if the instance is running on Amazon EC2
+    if grains["virtual"] in ("qemu", "kvm", "xen"):
+        dmidecode = salt.utils.path.which("dmidecode")
+        if dmidecode:
+            ret = __salt__["cmd.run_all"](
+                [dmidecode, "-t", "system"], ignore_retcode=True
+            )
+            output = ret["stdout"]
+            if "Manufacturer: Amazon EC2" in output:
+                grains["virtual_subtype"] = "Amazon EC2"
+                product = re.match(
+                    r".*Product Name: ([^\r\n]*).*", output, flags=re.DOTALL
+                )
+                if product:
+                    grains["virtual_subtype"] = "Amazon EC2 ({})".format(product[1])
+            elif re.match(r".*Version: [^\r\n]+\.amazon.*", output, flags=re.DOTALL):
+                grains["virtual_subtype"] = "Amazon EC2"
+
     for command in failed_commands:
         log.info(
             "Although '%s' was found in path, the current user "
