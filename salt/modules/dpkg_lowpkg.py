@@ -347,7 +347,7 @@ def _get_pkg_info(*packages, **kwargs):
         if build_date:
             pkg_data["build_date"] = build_date
             pkg_data["build_date_time_t"] = build_date_t
-        pkg_data["description"] = pkg_descr.split(":", 1)[-1]
+        pkg_data["description"] = pkg_descr
         ret.append(pkg_data)
 
     return ret
