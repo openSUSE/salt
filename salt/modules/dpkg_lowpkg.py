@@ -309,9 +309,8 @@ def _get_pkg_info(*packages, **kwargs):
         "origin:${Origin}\\n"
         "homepage:${Homepage}\\n"
         "status:${db:Status-Abbrev}\\n"
-        "======\\n"
         "description:${Description}\\n"
-        "------\\n'"
+        "\\n*/~^\\\\*\\n'"
     )
     cmd += " {}".format(" ".join(packages))
     cmd = cmd.strip()
@@ -325,9 +324,13 @@ def _get_pkg_info(*packages, **kwargs):
         else:
             return ret
 
-    for pkg_info in [elm for elm in re.split(r"------", call["stdout"]) if elm.strip()]:
+    for pkg_info in [
+        elm
+        for elm in re.split(r"\r?\n\*/~\^\\\*(\r?\n|)", call["stdout"])
+        if elm.strip()
+    ]:
         pkg_data = {}
-        pkg_info, pkg_descr = re.split(r"======", pkg_info)
+        pkg_info, pkg_descr = pkg_info.split("\ndescription:", 1)
         for pkg_info_line in [
             el.strip() for el in pkg_info.split(os.linesep) if el.strip()
         ]:
@@ -344,7 +347,7 @@ def _get_pkg_info(*packages, **kwargs):
         if build_date:
             pkg_data["build_date"] = build_date
             pkg_data["build_date_time_t"] = build_date_t
-        pkg_data["description"] = pkg_descr.split(":", 1)[-1]
+        pkg_data["description"] = pkg_descr
         ret.append(pkg_data)
 
     return ret
