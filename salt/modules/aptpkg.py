@@ -587,6 +587,17 @@ def install(
                        'new': '<new-version>'}}
     """
     _refresh_db = False
+
+    if 'advisory_ids' in kwargs:
+        if pkgs:
+            pkgs.append(_runner_errata_packagelist(kwargs['advisory_ids']))
+        else:
+            pkgs = _runner_errata_packagelist(kwargs['advisory_ids'])
+
+        # we need to remove the advisory_ids again, after we have converted
+        # them to packages (pkgs)
+        del kwargs['advisory_ids']
+
     if salt.utils.data.is_true(refresh):
         _refresh_db = True
         if "version" in kwargs and kwargs["version"]:
@@ -3069,3 +3080,120 @@ def services_need_restart(**kwargs):
         services.add(service)
 
     return list(services)
+
+
+def _parse_args(arg):
+    '''
+    Also copied from the publish module
+
+    yamlify `arg` and ensure it's outermost datatype is a list
+    '''
+    yaml_args = salt.utils.args.yamlify_arg(arg)
+
+    if yaml_args is None:
+        return []
+    elif not isinstance(yaml_args, list):
+        return [yaml_args]
+    else:
+        return yaml_args
+
+
+def _get_packages_from_errata(advisory, timeout=5):
+    '''
+    Retrieve a list of packages from one errata
+    '''
+
+    auth = salt.crypt.SAuth(__opts__)
+    tok = auth.gen_token(b'salt')
+    load = {'cmd': 'minion_runner',
+            'fun': 'spacewalk.api',
+            'arg': [
+                '{0}={1}'.format('server', __opts__['master']),
+                '{0}={1}'.format('command', 'errata.listPackages'),
+                '{0}={1}'.format('arguments', [advisory])],
+            'tok': tok,
+            'tmo': timeout,
+            'id': __opts__['id'],
+            'no_parse': __opts__.get('no_parse', [])}
+
+    channel = salt.transport.client.ReqChannel.factory(__opts__)
+    pkglist = []
+    try:
+        pkglist = channel.send(load)
+    except SaltReqTimeoutError:
+        return []
+    finally:
+        channel.close()
+
+    return list(pkglist.values())[0]
+
+
+def _runner_errata_packagelist(advisories=None, timeout=5):
+    '''
+    More or less copied form the modules/publish.runner code
+
+    Call a runner on master server to retrieve package list
+    of advisories
+    '''
+    arg = _parse_args(advisories)
+
+    if 'master_uri' not in __opts__:
+        return 'No access to master. If using salt-call with --local, please remove.'
+    #log.info('Publishing runner \'%s\' to %s', fun, __opts__['master_uri'])
+    # the runner returns a list of data included within
+    # and object with name of the function that was called
+
+    pkglist = []
+
+    for adv in arg:
+        pkglist = pkglist + _get_packages_from_errata(adv)
+
+    cur_pkgs = list_pkgs().keys()
+
+    # return the package name and version for each package already installed on system
+    # we do not want to install 'extra' packages
+    # If 'release' only is an 'X', do not add it to the version string
+    # This is a fake 'release' if nothing is found while importing that package
+    # be beo more 'rpm' compliant. Adding it will break the exact search for
+    # the package in given version.
+    pkgs = []
+    for p in pkglist:
+        if p['name'] in cur_pkgs:
+            if p['epoch']:
+                if p['release'] == 'X':
+                    pkgs.append({p['name']: '{0}:{1}'.format(p['epoch'], p['version'])})
+                else:
+                    pkgs.append({p['name']: '{0}:{1}-{2}'.format(p['epoch'], p['version'], p['release'])})
+            else:
+                if p['release'] == 'X':
+                    pkgs.append({p['name']: '{0}'.format(p['version'])})
+                else:
+                    pkgs.append({p['name']: '{0}-{1}'.format(p['version'], p['release'])})
+
+    return pkgs
+
+
+def _get_patches(**kwargs):
+    '''
+    still to do
+    '''
+
+    return {}
+
+
+def list_patches(**kwargs):
+    '''
+    do something
+    '''
+
+    return _get_patches(**kwargs)
+
+
+def list_installed_patches(**kwargs):
+    '''
+    List the currently installed advisories
+    '''
+
+    return _get_patches(**kwargs)
+
+
