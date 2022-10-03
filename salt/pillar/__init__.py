@@ -42,6 +42,7 @@ def get_pillar(
     pillarenv=None,
     extra_minion_data=None,
     clean_cache=False,
+    context=None,
 ):
     """
     Return the correct pillar driver based on the file_client option
@@ -77,6 +78,7 @@ def get_pillar(
             pillarenv=pillarenv,
             clean_cache=clean_cache,
             extra_minion_data=extra_minion_data,
+            context=context,
         )
     return ptype(
         opts,
@@ -88,6 +90,7 @@ def get_pillar(
         pillar_override=pillar_override,
         pillarenv=pillarenv,
         extra_minion_data=extra_minion_data,
+        context=context,
     )
 
 
@@ -358,6 +361,7 @@ class RemotePillar(RemotePillarMixin):
         pillar_override=None,
         pillarenv=None,
         extra_minion_data=None,
+        context=None,
     ):
         self.opts = opts
         self.opts["saltenv"] = saltenv
@@ -382,6 +386,7 @@ class RemotePillar(RemotePillarMixin):
             merge_lists=True,
         )
         self._closing = False
+        self.context = context
 
     def compile_pillar(self):
         """
@@ -449,6 +454,7 @@ class Pillar:
         pillar_override=None,
         pillarenv=None,
         extra_minion_data=None,
+        context=None,
     ):
         self.minion_id = minion_id
         self.ext = ext
@@ -524,7 +530,7 @@ class Pillar:
             self.merge_strategy = opts["pillar_source_merging_strategy"]
 
         self.ext_pillars = salt.loader.pillars(
-            ext_pillar_opts, self.functions, pillar=self.pillar_data
+            ext_pillar_opts, self.functions, pillar=self.pillar_data, context=context
         )
         if opts.get("extension_modules"):
             for loader in (self.ext_pillars, self.matchers):

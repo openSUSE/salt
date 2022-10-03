@@ -1896,6 +1896,7 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
         self.k_mtime = 0
         self.stats = collections.defaultdict(lambda: {"mean": 0, "runs": 0})
         self.stat_clock = time.time()
+        self.context = {}
 
         # Pool-specific attributes
         self.pool_name = pool_name or "default"
@@ -1981,7 +1982,7 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
                     self.key,
                 )
                 self.clear_funcs.connect()
-                self.aes_funcs = AESFuncs(self.opts)
+                self.aes_funcs = AESFuncs(self.opts, context=self.context)
             except Exception:  # pylint: disable=broad-except
                 log.exception(
                     "%s failed to load modules, worker will be non-functional",
@@ -2350,7 +2351,7 @@ class AESFuncs(TransportMethods):
         "_master_opts",
     )
 
-    def __init__(self, opts):
+    def __init__(self, opts, context=None):
         """
         Create a new AESFuncs
 
@@ -2367,6 +2368,7 @@ class AESFuncs(TransportMethods):
         self.fs_ = None
         self.masterapi = None
         self.cache = None
+        self.context = context
         self.event = salt.utils.event.get_master_event(
             self.opts, self.opts["sock_dir"], listen=False
         )
@@ -2978,6 +2980,7 @@ class AESFuncs(TransportMethods):
             pillarenv=load.get("pillarenv"),
             extra_minion_data=load.get("extra_minion_data"),
             clean_cache=load.get("clean_cache"),
+            context=self.context,
         )
         data = await pillar.compile_pillar()
         # ``Fileserver.update_opts`` is a sync-only helper that walks every
