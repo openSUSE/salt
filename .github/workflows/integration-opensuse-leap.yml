@@ -3,10 +3,10 @@ name: integration-opensuse-leap
 on:
   push:
     branches:
-      - openSUSE-3004
+      - openSUSE/release/3004
   pull_request:
     branches:
-      - openSUSE-3004
+      - openSUSE/release/3004
   workflow_dispatch:
 
 jobs:
