@@ -1,5 +1,13 @@
 name: integration-opensuse-leap-15-1
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - openSUSE/release/3000
+  pull_request:
+    branches:
+      - openSUSE/release/3000
+  workflow_dispatch:
+
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
