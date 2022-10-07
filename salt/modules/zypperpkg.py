@@ -325,7 +325,16 @@ class _Zypper(object):
         if self._is_error():
             _error_msg = list()
             if not self._is_xml_mode():
-                msg = self.__call_result['stderr'] and self.__call_result['stderr'].strip() or ""
+                msg = (
+                    self.__call_result["stderr"]
+                    and self.__call_result["stderr"].strip()
+                    or ""
+                )
+                msg += (
+                    self.__call_result["stdout"]
+                    and self.__call_result["stdout"].strip()
+                    or ""
+                )
                 if msg:
                     _error_msg.append(msg)
             else:
