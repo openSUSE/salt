@@ -67,9 +67,11 @@ def test_mworker_pass_context():
     ), patch(
         "salt.loader.minion_mods", MagicMock()
     ), patch(
+        "salt.loader._module_dirs", MagicMock()
+    ), patch(
         "salt.loader.LazyLoader", MagicMock()
     ) as loadler_pillars_mock:
-        mworker = salt.master.MWorker(opts, {}, {}, [req_channel_mock])
+        mworker = salt.master.MWorker(opts, {}, {}, [req_channel_mock], "MWorker-Test2")
 
         with patch.object(mworker, "_MWorker__bind", mworker_bind_mock), patch.dict(
             mworker.context, test_context
@@ -91,7 +93,7 @@ def test_mworker_pass_context():
             }
         )
 
-        mworker = salt.master.MWorker(opts, {}, {}, [req_channel_mock])
+        mworker = salt.master.MWorker(opts, {}, {}, [req_channel_mock], "MWorker-Test2")
 
         with patch.object(mworker, "_MWorker__bind", mworker_bind_mock), patch.dict(
             mworker.context, test_context

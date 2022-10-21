@@ -261,7 +261,7 @@ class AsyncRemotePillar(RemotePillarMixin):
         raise salt.ext.tornado.gen.Return(ret_pillar)
 
     def destroy(self):
-        if self._closing:
+        if hasattr(self, "_closing") and self._closing:
             return
 
         self._closing = True
@@ -1315,7 +1315,7 @@ class Pillar:
         """
         This method exist in order to be API compatible with RemotePillar
         """
-        if self._closing:
+        if hasattr(self, "_closing") and self._closing:
             return
         self._closing = True
 
