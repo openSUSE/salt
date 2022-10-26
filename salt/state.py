@@ -1573,6 +1573,25 @@ class State(object):
                     else:
                         name = ids[0][0]
 
+                sls_excludes = []
+                # excluded sls are plain list items or dicts with an "sls" key
+                for exclude in high.get("__exclude__", []):
+                    if isinstance(exclude, str):
+                        sls_excludes.append(exclude)
+                    elif exclude.get("sls"):
+                        sls_excludes.append(exclude["sls"])
+
+                if body.get("__sls__") in sls_excludes:
+                    log.debug(
+                        "Cannot extend ID '%s' in '%s:%s' because '%s:%s' is excluded.",
+                        name,
+                        body.get("__env__", "base"),
+                        body.get("__sls__", "base"),
+                        body.get("__env__", "base"),
+                        body.get("__sls__", "base"),
+                    )
+                    continue
+
                 for state, run in six.iteritems(body):
                     if state.startswith('__'):
                         continue
