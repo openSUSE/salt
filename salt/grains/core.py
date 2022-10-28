@@ -860,6 +860,10 @@ def _virtual(osdata):
                 grains["virtual"] = "container"
                 grains["virtual_subtype"] = "LXC"
                 break
+            elif "amazon" in output:
+                grains["virtual"] = "Nitro"
+                grains["virtual_subtype"] = "Amazon EC2"
+                break
         elif command == "virt-what":
             for line in output.splitlines():
                 if line in ("kvm", "qemu", "uml", "xen"):
@@ -1174,7 +1178,7 @@ def _virtual(osdata):
         grains["virtual"] = "virtual"
 
     # Try to detect if the instance is running on Amazon EC2
-    if grains["virtual"] in ("qemu", "kvm", "xen"):
+    if grains["virtual"] in ("qemu", "kvm", "xen", "amazon"):
         dmidecode = salt.utils.path.which("dmidecode")
         if dmidecode:
             ret = __salt__["cmd.run_all"](
@@ -1182,6 +1186,8 @@ def _virtual(osdata):
             )
             output = ret["stdout"]
             if "Manufacturer: Amazon EC2" in output:
+                if grains["virtual"] != "xen":
+                    grains["virtual"] = "Nitro"
                 grains["virtual_subtype"] = "Amazon EC2"
                 product = re.match(
                     r".*Product Name: ([^\r\n]*).*", output, flags=re.DOTALL
