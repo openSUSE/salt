@@ -46,6 +46,7 @@ def get_pillar(
     pillarenv=None,
     extra_minion_data=None,
     clean_cache=False,
+    context=None,
 ):
     """
     Return the correct pillar driver based on the file_client option
@@ -82,6 +83,7 @@ def get_pillar(
             pillarenv=pillarenv,
             clean_cache=clean_cache,
             extra_minion_data=extra_minion_data,
+            context=context,
         )
     return ptype(
         opts,
@@ -93,6 +95,7 @@ def get_pillar(
         pillar_override=pillar_override,
         pillarenv=pillarenv,
         extra_minion_data=extra_minion_data,
+        context=context,
     )
 
 
@@ -281,7 +284,7 @@ class AsyncRemotePillar(RemotePillarMixin):
         raise salt.ext.tornado.gen.Return(ret_pillar)
 
     def destroy(self):
-        if self._closing:
+        if hasattr(self, "_closing") and self._closing:
             return
 
         self._closing = True
@@ -310,6 +313,7 @@ class RemotePillar(RemotePillarMixin):
         pillar_override=None,
         pillarenv=None,
         extra_minion_data=None,
+        context=None,
     ):
         self.opts = opts
         self.opts["saltenv"] = saltenv
@@ -334,6 +338,7 @@ class RemotePillar(RemotePillarMixin):
             merge_lists=True,
         )
         self._closing = False
+        self.context = context
 
     def compile_pillar(self):
         """
@@ -407,6 +412,7 @@ class PillarCache:
         pillarenv=None,
         extra_minion_data=None,
         clean_cache=False,
+        context=None,
     ):
         # Yes, we need all of these because we need to route to the Pillar object
         # if we have no cache. This is another refactor target.
@@ -434,6 +440,8 @@ class PillarCache:
             minion_cache_path=self._minion_cache_path(minion_id),
         )
 
+        self.context = context
+
     def _minion_cache_path(self, minion_id):
         """
         Return the path to the cache file for the minion.
@@ -458,6 +466,7 @@ class PillarCache:
             pillar_override=self.pillar_override,
             pillarenv=self.pillarenv,
             extra_minion_data=self.extra_minion_data,
+            context=self.context,
         )
         return fresh_pillar.compile_pillar()
 
@@ -533,6 +542,7 @@ class Pillar:
         pillar_override=None,
         pillarenv=None,
         extra_minion_data=None,
+        context=None,
     ):
         self.minion_id = minion_id
         self.ext = ext
@@ -571,7 +581,7 @@ class Pillar:
         if opts.get("pillar_source_merging_strategy"):
             self.merge_strategy = opts["pillar_source_merging_strategy"]
 
-        self.ext_pillars = salt.loader.pillars(ext_pillar_opts, self.functions)
+        self.ext_pillars = salt.loader.pillars(ext_pillar_opts, self.functions, context=context)
         self.ignored_pillars = {}
         self.pillar_override = pillar_override or {}
         if not isinstance(self.pillar_override, dict):
@@ -1338,7 +1348,7 @@ class Pillar:
         """
         This method exist in order to be API compatible with RemotePillar
         """
-        if self._closing:
+        if hasattr(self, "_closing") and self._closing:
             return
         self._closing = True
 
