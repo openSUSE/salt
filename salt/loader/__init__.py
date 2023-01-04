@@ -81,7 +81,7 @@ SALT_INTERNAL_LOADERS_PATHS = (
     str(SALT_BASE_PATH / "wheel"),
 )
 
-LOAD_LOCK = threading.Lock()
+LOAD_LOCK = threading.RLock()
 
 
 def LazyLoader(*args, **kwargs):
