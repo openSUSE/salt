@@ -17,6 +17,10 @@ __salt__ = {
 log = logging.getLogger(__name__)
 
 
+def __virtual__():
+    return __opts__.get("enable_lvm_grains", True)
+
+
 def lvm():
     """
     Return list of LVM devices
