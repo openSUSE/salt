@@ -2180,7 +2180,8 @@ def remove(
         salt '*' pkg.remove <package1>,<package2>,<package3>
         salt '*' pkg.remove pkgs='["foo", "bar"]'
 
-    .. versionadded:: 3007
+    .. versionchanged:: 3007
+        Can now remove also PTF packages which require a different handling in the backend.
 
     Can now remove also PTF packages which require a different handling in the backend.
     """
