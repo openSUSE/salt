@@ -1953,6 +1953,7 @@ Repository 'DUMMY' not found by its alias, number, or URI.
         # If config.get starts being used elsewhere, we'll need to write a
         # side_effect function.
         patches = {
+            "cmd.run": MagicMock(return_value="vim: vi vim\npico: pico"),
             "cmd.run_all": MagicMock(return_value=cmd_out),
             "pkg_resource.parse_targets": MagicMock(return_value=parsed_targets),
             "pkg_resource.stringify": MagicMock(),
