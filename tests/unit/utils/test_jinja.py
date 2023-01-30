@@ -22,7 +22,7 @@ import salt.utils.files
 import salt.utils.json
 import salt.utils.stringutils
 import salt.utils.yaml
-from jinja2 import DictLoader, Environment, Markup, exceptions
+from jinja2 import DictLoader, Environment, exceptions
 from salt.exceptions import SaltRenderError
 from salt.utils.decorators.jinja import JinjaFilter
 from salt.utils.jinja import (
@@ -45,6 +45,12 @@ try:
     HAS_TIMELIB = True
 except ImportError:
     HAS_TIMELIB = False
+
+try:
+    from markupsafe import Markup
+except ImportError:
+    # jinja < 3.1
+    from jinja2 import Markup
 
 BLINESEP = salt.utils.stringutils.to_bytes(os.linesep)
 

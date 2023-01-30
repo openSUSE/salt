@@ -864,6 +864,10 @@ def _virtual(osdata):
                 grains["virtual"] = "container"
                 grains["virtual_subtype"] = "LXC"
                 break
+            elif "amazon" in output:
+                grains["virtual"] = "Nitro"
+                grains["virtual_subtype"] = "Amazon EC2"
+                break
         elif command == "virt-what":
             for line in output.splitlines():
                 if line in ("kvm", "qemu", "uml", "xen"):
@@ -1093,7 +1097,9 @@ def _virtual(osdata):
         if ("virtual_subtype" not in grains) or (grains["virtual_subtype"] != "LXC"):
             if os.path.isfile("/proc/1/environ"):
                 try:
-                    with salt.utils.files.fopen("/proc/1/environ", "r") as fhr:
+                    with salt.utils.files.fopen(
+                        "/proc/1/environ", "r", errors="ignore"
+                    ) as fhr:
                         fhr_contents = fhr.read()
                     if "container=lxc" in fhr_contents:
                         grains["virtual"] = "container"
@@ -1172,6 +1178,26 @@ def _virtual(osdata):
     # figure out what specific virtual type we were?
     if grains.get("virtual_subtype") and grains["virtual"] == "physical":
         grains["virtual"] = "virtual"
+
+    # Try to detect if the instance is running on Amazon EC2
+    if grains["virtual"] in ("qemu", "kvm", "xen", "amazon"):
+        dmidecode = salt.utils.path.which("dmidecode")
+        if dmidecode:
+            ret = __salt__["cmd.run_all"](
+                [dmidecode, "-t", "system"], ignore_retcode=True
+            )
+            output = ret["stdout"]
+            if "Manufacturer: Amazon EC2" in output:
+                if grains["virtual"] != "xen":
+                    grains["virtual"] = "Nitro"
+                grains["virtual_subtype"] = "Amazon EC2"
+                product = re.match(
+                    r".*Product Name: ([^\r\n]*).*", output, flags=re.DOTALL
+                )
+                if product:
+                    grains["virtual_subtype"] = "Amazon EC2 ({})".format(product[1])
+            elif re.match(r".*Version: [^\r\n]+\.amazon.*", output, flags=re.DOTALL):
+                grains["virtual_subtype"] = "Amazon EC2"
 
     for command in failed_commands:
         log.info(
@@ -1893,7 +1919,9 @@ def os_data():
             grains["init"] = "systemd"
         except OSError:
             try:
-                with salt.utils.files.fopen("/proc/1/cmdline") as fhr:
+                with salt.utils.files.fopen(
+                    "/proc/1/cmdline", "r", errors="ignore"
+                ) as fhr:
                     init_cmdline = fhr.read().replace("\x00", " ").split()
             except OSError:
                 pass
@@ -3142,7 +3170,9 @@ def kernelparams():
         return {}
     else:
         try:
-            with salt.utils.files.fopen("/proc/cmdline", "r") as fhr:
+            with salt.utils.files.fopen(
+                "/proc/cmdline", "r", errors="surrogateescape"
+            ) as fhr:
                 cmdline = fhr.read()
                 grains = {"kernelparams": []}
                 for data in [

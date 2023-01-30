@@ -11,6 +11,7 @@ import os
 import pathlib
 import platform
 import socket
+import tempfile
 import textwrap
 from collections import namedtuple
 
@@ -2635,6 +2636,38 @@ def test_kernelparams_return_linux(cmdline, expectation):
         assert core.kernelparams() == expectation
 
 
+@pytest.mark.skip_unless_on_linux
+def test_kernelparams_return_linux_non_utf8():
+    _salt_utils_files_fopen = salt.utils.files.fopen
+
+    expected = {
+        "kernelparams": [
+            ("TEST_KEY1", "VAL1"),
+            ("TEST_KEY2", "VAL2"),
+            ("BOOTABLE_FLAG", "\udc80"),
+            ("TEST_KEY_NOVAL", None),
+            ("TEST_KEY3", "3"),
+        ]
+    }
+
+    with tempfile.TemporaryDirectory() as tempdir:
+
+        def _open_mock(file_name, *args, **kwargs):
+            return _salt_utils_files_fopen(
+                os.path.join(tempdir, "cmdline"), *args, **kwargs
+            )
+
+        with salt.utils.files.fopen(
+            os.path.join(tempdir, "cmdline"),
+            "wb",
+        ) as cmdline_fh, patch("salt.utils.files.fopen", _open_mock):
+            cmdline_fh.write(
+                b'TEST_KEY1=VAL1 TEST_KEY2=VAL2 BOOTABLE_FLAG="\x80" TEST_KEY_NOVAL TEST_KEY3=3\n'
+            )
+            cmdline_fh.close()
+            assert core.kernelparams() == expected
+
+
 def test_linux_gpus():
     """
     Test GPU detection on Linux systems
@@ -2720,3 +2753,230 @@ def test_get_server_id():
 
     with patch.dict(core.__opts__, {"id": "otherid"}):
         assert core.get_server_id() != expected
+
+
+@pytest.mark.skip_unless_on_linux
+def test_virtual_set_virtual_ec2():
+    osdata = {}
+
+    (
+        osdata["kernel"],
+        osdata["nodename"],
+        osdata["kernelrelease"],
+        osdata["kernelversion"],
+        osdata["cpuarch"],
+        _,
+    ) = platform.uname()
+
+    which_mock = MagicMock(
+        side_effect=[
+            # Check with virt-what
+            "/usr/sbin/virt-what",
+            "/usr/sbin/virt-what",
+            None,
+            "/usr/sbin/dmidecode",
+            # Check with systemd-detect-virt
+            None,
+            "/usr/bin/systemd-detect-virt",
+            None,
+            "/usr/sbin/dmidecode",
+            # Check with systemd-detect-virt when no dmidecode available
+            None,
+            "/usr/bin/systemd-detect-virt",
+            None,
+            None,
+            # Check with systemd-detect-virt returning amazon and no dmidecode available
+            None,
+            "/usr/bin/systemd-detect-virt",
+            None,
+            None,
+        ]
+    )
+    cmd_run_all_mock = MagicMock(
+        side_effect=[
+            # Check with virt-what
+            {"retcode": 0, "stderr": "", "stdout": "xen"},
+            {
+                "retcode": 0,
+                "stderr": "",
+                "stdout": "\n".join(
+                    [
+                        "dmidecode 3.2",
+                        "Getting SMBIOS data from sysfs.",
+                        "SMBIOS 2.7 present.",
+                        "",
+                        "Handle 0x0100, DMI type 1, 27 bytes",
+                        "System Information",
+                        "	Manufacturer: Xen",
+                        "	Product Name: HVM domU",
+                        "	Version: 4.11.amazon",
+                        "	Serial Number: 12345678-abcd-4321-dcba-0123456789ab",
+                        "	UUID: 01234567-dcba-1234-abcd-abcdef012345",
+                        "	Wake-up Type: Power Switch",
+                        "	SKU Number: Not Specified",
+                        "	Family: Not Specified",
+                        "",
+                        "Handle 0x2000, DMI type 32, 11 bytes",
+                        "System Boot Information",
+                        "	Status: No errors detected",
+                    ]
+                ),
+            },
+            # Check with systemd-detect-virt
+            {"retcode": 0, "stderr": "", "stdout": "kvm"},
+            {
+                "retcode": 0,
+                "stderr": "",
+                "stdout": "\n".join(
+                    [
+                        "dmidecode 3.2",
+                        "Getting SMBIOS data from sysfs.",
+                        "SMBIOS 2.7 present.",
+                        "",
+                        "Handle 0x0001, DMI type 1, 27 bytes",
+                        "System Information",
+                        "	Manufacturer: Amazon EC2",
+                        "	Product Name: m5.large",
+                        "	Version: Not Specified",
+                        "	Serial Number: 01234567-dcba-1234-abcd-abcdef012345",
+                        "	UUID: 12345678-abcd-4321-dcba-0123456789ab",
+                        "	Wake-up Type: Power Switch",
+                        "	SKU Number: Not Specified",
+                        "	Family: Not Specified",
+                    ]
+                ),
+            },
+            # Check with systemd-detect-virt when no dmidecode available
+            {"retcode": 0, "stderr": "", "stdout": "kvm"},
+            # Check with systemd-detect-virt returning amazon and no dmidecode available
+            {"retcode": 0, "stderr": "", "stdout": "amazon"},
+        ]
+    )
+
+    def _mock_is_file(filename):
+        if filename in (
+            "/proc/1/cgroup",
+            "/proc/cpuinfo",
+            "/sys/devices/virtual/dmi/id/product_name",
+            "/proc/xen/xsd_kva",
+            "/proc/xen/capabilities",
+        ):
+            return False
+        return True
+
+    with patch("salt.utils.path.which", which_mock), patch.dict(
+        core.__salt__,
+        {
+            "cmd.run": salt.modules.cmdmod.run,
+            "cmd.run_all": cmd_run_all_mock,
+            "cmd.retcode": salt.modules.cmdmod.retcode,
+            "smbios.get": salt.modules.smbios.get,
+        },
+    ), patch("os.path.isfile", _mock_is_file), patch(
+        "os.path.isdir", return_value=False
+    ):
+
+        virtual_grains = core._virtual(osdata.copy())
+
+        assert virtual_grains["virtual"] == "xen"
+        assert virtual_grains["virtual_subtype"] == "Amazon EC2"
+
+        virtual_grains = core._virtual(osdata.copy())
+
+        assert virtual_grains["virtual"] == "Nitro"
+        assert virtual_grains["virtual_subtype"] == "Amazon EC2 (m5.large)"
+
+        virtual_grains = core._virtual(osdata.copy())
+
+        assert virtual_grains["virtual"] == "kvm"
+        assert "virtual_subtype" not in virtual_grains
+
+        virtual_grains = core._virtual(osdata.copy())
+
+        assert virtual_grains["virtual"] == "Nitro"
+        assert virtual_grains["virtual_subtype"] == "Amazon EC2"
+
+
+@pytest.mark.skip_on_windows
+def test_linux_proc_files_with_non_utf8_chars():
+    _salt_utils_files_fopen = salt.utils.files.fopen
+
+    empty_mock = MagicMock(return_value={})
+
+    with tempfile.TemporaryDirectory() as tempdir:
+
+        def _mock_open(filename, *args, **kwargs):
+            return _salt_utils_files_fopen(
+                os.path.join(tempdir, "cmdline-1"), *args, **kwargs
+            )
+
+        with salt.utils.files.fopen(
+            os.path.join(tempdir, "cmdline-1"),
+            "wb",
+        ) as cmdline_fh, patch("os.path.isfile", return_value=False), patch(
+            "salt.utils.files.fopen", _mock_open
+        ), patch.dict(
+            core.__salt__,
+            {
+                "cmd.retcode": salt.modules.cmdmod.retcode,
+                "cmd.run": MagicMock(return_value=""),
+            },
+        ), patch.object(
+            core, "_linux_bin_exists", return_value=False
+        ), patch.object(
+            core, "_parse_lsb_release", return_value=empty_mock
+        ), patch.object(
+            core, "_parse_os_release", return_value=empty_mock
+        ), patch.object(
+            core, "_hw_data", return_value=empty_mock
+        ), patch.object(
+            core, "_virtual", return_value=empty_mock
+        ), patch.object(
+            core, "_bsd_cpudata", return_value=empty_mock
+        ), patch.object(
+            os, "stat", side_effect=OSError()
+        ):
+            cmdline_fh.write(
+                b"/usr/lib/systemd/systemd\x00--switched-root\x00--system\x00--deserialize\x0028\x80\x00"
+            )
+            cmdline_fh.close()
+            os_grains = core.os_data()
+            assert os_grains != {}
+
+
+@pytest.mark.skip_on_windows
+def test_virtual_linux_proc_files_with_non_utf8_chars():
+    _salt_utils_files_fopen = salt.utils.files.fopen
+
+    def _is_file_mock(filename):
+        if filename == "/proc/1/environ":
+            return True
+        return False
+
+    with tempfile.TemporaryDirectory() as tempdir:
+
+        def _mock_open(filename, *args, **kwargs):
+            return _salt_utils_files_fopen(
+                os.path.join(tempdir, "environ"), *args, **kwargs
+            )
+
+        with salt.utils.files.fopen(
+            os.path.join(tempdir, "environ"),
+            "wb",
+        ) as environ_fh, patch("os.path.isfile", _is_file_mock), patch(
+            "salt.utils.files.fopen", _mock_open
+        ), patch.object(
+            salt.utils.path, "which", MagicMock(return_value=None)
+        ), patch.dict(
+            core.__salt__,
+            {
+                "cmd.run_all": MagicMock(
+                    return_value={"retcode": 1, "stderr": "", "stdout": ""}
+                ),
+                "cmd.run": MagicMock(return_value=""),
+            },
+        ):
+            environ_fh.write(b"KEY1=VAL1 KEY2=VAL2\x80 KEY2=VAL2")
+            environ_fh.close()
+            virt_grains = core._virtual({"kernel": "Linux"})
+            assert virt_grains == {"virtual": "physical"}

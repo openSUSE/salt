@@ -255,7 +255,7 @@ class AsyncZeroMQReqChannel(salt.transport.client.ReqChannel):
         signed_msg = pcrypt.loads(ret[dictkey])
 
         # Validate the master's signature.
-        master_pubkey_path = os.path.join(self.opts["pki_dir"], "minion_master.pub")
+        master_pubkey_path = os.path.join(self.opts["pki_dir"], self.auth.mpub)
         if not salt.crypt.verify_signature(
             master_pubkey_path, signed_msg["data"], signed_msg["sig"]
         ):
@@ -898,7 +898,7 @@ class ZeroMQPubServerChannel(salt.transport.server.PubServerChannel):
         try:
             pub_sock.setsockopt(zmq.HWM, self.opts.get("pub_hwm", 1000))
         # in zmq >= 3.0, there are separate send and receive HWM settings
-        except AttributeError:
+        except (AttributeError, zmq.error.ZMQError):
             # Set the High Water Marks. For more information on HWM, see:
             # http://api.zeromq.org/4-1:zmq-setsockopt
             pub_sock.setsockopt(zmq.SNDHWM, self.opts.get("pub_hwm", 1000))

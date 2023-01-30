@@ -17,7 +17,7 @@ distro==1.5.0
 idna==2.8                 # via requests
 immutables==0.15          # via contextvars
 jaraco.functools==2.0     # via tempora
-jinja2==2.11.3
+jinja2==3.1.0
 markupsafe==1.1.1
 more-itertools==5.0.0     # via cheroot, cherrypy, jaraco.functools
 msgpack==1.0.2

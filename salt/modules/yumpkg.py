@@ -735,7 +735,7 @@ def list_pkgs(versions_as_list=False, **kwargs):
         return {}
 
     attr = kwargs.get("attr")
-    if attr is not None:
+    if attr is not None and attr != "all":
         attr = salt.utils.args.split_input(attr)
 
     contextkey = "pkg.list_pkgs"
@@ -1835,6 +1835,7 @@ def upgrade(
     normalize=True,
     minimal=False,
     obsoletes=True,
+    diff_attr=None,
     **kwargs
 ):
     """
@@ -1991,7 +1992,7 @@ def upgrade(
     if salt.utils.data.is_true(refresh):
         refresh_db(**kwargs)
 
-    old = list_pkgs()
+    old = list_pkgs(attr=diff_attr)
 
     targets = []
     if name or pkgs:
@@ -2023,7 +2024,7 @@ def upgrade(
     cmd.extend(targets)
     result = _call_yum(cmd)
     __context__.pop("pkg.list_pkgs", None)
-    new = list_pkgs()
+    new = list_pkgs(attr=diff_attr)
     ret = salt.utils.data.compare_dicts(old, new)
 
     if result["retcode"] != 0:

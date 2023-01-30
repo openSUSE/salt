@@ -443,9 +443,10 @@ isodate==0.6.0
     # via msrest
 jaraco.functools==2.0
     # via tempora
-jinja2==2.11.3
+jinja2==3.1.0
     # via
     #   -r requirements/base.txt
+    #   -r requirements/static/ci/docs.in
     #   ansible-core
     #   junos-eznc
     #   moto
