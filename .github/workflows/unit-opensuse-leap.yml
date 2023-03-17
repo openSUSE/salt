@@ -3,10 +3,10 @@ name: unit-opensuse-leap
 on:
   push:
     branches:
-      - openSUSE/release/3005.1
+      - openSUSE/release/3006.0
   pull_request:
     branches:
-      - openSUSE/release/3005.1
+      - openSUSE/release/3006.0
   workflow_dispatch:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
         with:
           repository: openSUSE/salt-toaster
           path: salt-toaster
-          ref: 3005
+          ref: 3006
       - name: Unit tests
         env:
           # The "ghcr.io/opensuse/salt-toaster-leap15.4-devel" package is currently private.
