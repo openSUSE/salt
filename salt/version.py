@@ -1,7 +1,6 @@
 """
 Set up the version of Salt
 """
-import argparse
 import operator
 import os
 import platform
@@ -78,7 +77,7 @@ class SaltVersionsInfo(type):
     ALUMINIUM     = SaltVersion("Aluminium"    , info=3003,       released=True)
     SILICON       = SaltVersion("Silicon"      , info=3004,       released=True)
     PHOSPHORUS    = SaltVersion("Phosphorus"   , info=3005,       released=True)
-    SULFUR        = SaltVersion("Sulfur"       , info=(3006, 0),  released=True)
+    SULFUR        = SaltVersion("Sulfur"       , info=(3006, 0))
     CHLORINE      = SaltVersion("Chlorine"     , info=(3007, 0))
     ARGON         = SaltVersion("Argon"        , info=(3008, 0))
     POTASSIUM     = SaltVersion("Potassium"    , info=(3009, 0))
@@ -922,20 +921,5 @@ def versions_report(include_salt_cloud=False, include_extensions=True):
     yield from info
 
 
-def _parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--next-release", help="Return the next release", action="store_true"
-    )
-    # When pip installing we pass in other args to this script.
-    # This allows us to catch those args but not use them
-    parser.add_argument("unknown", nargs=argparse.REMAINDER)
-    return parser.parse_args()
-
-
 if __name__ == "__main__":
-    args = _parser()
-    if args.next_release:
-        print(__saltstack_version__.next_release())
-    else:
-        print(__version__)
+    print(__version__)
