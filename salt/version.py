@@ -1,8 +1,6 @@
 """
 Set up the version of Salt
 """
-
-import argparse
 import operator
 import os
 import platform
@@ -931,27 +929,5 @@ def versions_report(include_salt_cloud=False, include_extensions=True):
     yield from info
 
 
-def _parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--next-release", help="Return the next release", action="store_true"
-    )
-    parser.add_argument("--parse", help="Parse the passed string as a salt version")
-    # When pip installing we pass in other args to this script.
-    # This allows us to catch those args but not use them
-    parser.add_argument("unknown", nargs=argparse.REMAINDER)
-    return parser.parse_args()
-
-
 if __name__ == "__main__":
-    args = _parser()
-    if args.next_release:
-        print(__saltstack_version__.next_release())
-    elif args.parse:
-        try:
-            print(SaltStackVersion.parse(args.parse))
-        except Exception as exc:  # pylint: disable=broad-except
-            print(f"Failed to parse '{args.parse}' as a salt version: {exc}")
-            sys.exit(1)
-    else:
-        print(__version__)
+    print(__version__)
