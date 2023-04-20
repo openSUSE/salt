@@ -34,6 +34,6 @@ jobs:
           DISTRO: "leap15.4"
           FLAVOR: "devel"
           SALT_REPO: "${{ github.workspace }}/salt"
-          PYTEST_FLAGS: "--run-slow --run-destructive --ssh-tests --run-expensive -vvvv"
+          PYTEST_FLAGS: "--run-slow --core-tests --run-destructive --ssh-tests --run-expensive -vvvv"
         working-directory: ./salt-toaster
         run: make saltstack.functional
