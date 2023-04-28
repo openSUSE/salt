@@ -9,7 +9,6 @@ import logging
 import os
 import sys
 import traceback
-import uuid
 
 import salt.channel.client
 import salt.ext.tornado.gen
@@ -1351,6 +1350,11 @@ class Pillar:
         if hasattr(self, "_closing") and self._closing:
             return
         self._closing = True
+        if self.client:
+            try:
+                self.client.destroy()
+            except AttributeError:
+                pass
 
     # pylint: disable=W1701
     def __del__(self):
