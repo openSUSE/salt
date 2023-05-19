@@ -16,7 +16,6 @@ import salt.cli.support.intfunc
 import salt.cli.support.localrunner
 import salt.defaults.exitcodes
 import salt.exceptions
-import salt.ext.six as six
 import salt.output.table_out
 import salt.runner
 import salt.utils.files
