@@ -251,8 +251,8 @@ professor: Farnsworth
         with pytest.raises(salt.exceptions.SaltInvocationError) as err:
             support.sync("group-name")
         assert (
-            ' Support archive "/mnt/storage/three-support-222-222.bz2" was not found'
-            in str(err)
+            'Support archive "/mnt/storage/three-support-222-222.bz2" was not found'
+            in str(err.value)
         )
 
     @patch("tempfile.mkstemp", MagicMock(return_value=(0, "dummy")))
@@ -274,7 +274,7 @@ professor: Farnsworth
 
         with pytest.raises(salt.exceptions.SaltInvocationError) as err:
             support.sync("group-name", name="lost.bz2")
-        assert ' Support archive "lost.bz2" was not found' in str(err)
+        assert 'Support archive "lost.bz2" was not found' in str(err.value)
 
     @patch("tempfile.mkstemp", MagicMock(return_value=(0, "dummy")))
     @patch("os.path.exists", MagicMock(return_value=False))
