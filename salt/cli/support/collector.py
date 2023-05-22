@@ -1,6 +1,5 @@
 import builtins as exceptions
 import copy
-import json
 import logging
 import os
 import sys
@@ -19,6 +18,7 @@ import salt.exceptions
 import salt.output.table_out
 import salt.runner
 import salt.utils.files
+import salt.utils.json
 import salt.utils.parsers
 import salt.utils.platform
 import salt.utils.process
@@ -168,7 +168,7 @@ class SupportDataCollector:
             content = None
 
         if content is None:
-            data = json.loads(json.dumps(data))
+            data = salt.utils.json.loads(salt.utils.json.dumps(data))
             if isinstance(data, dict) and data.get("return"):
                 data = data.get("return")
             content = yaml.safe_dump(data, default_flow_style=False, indent=4)
