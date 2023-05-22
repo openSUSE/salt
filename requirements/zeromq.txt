@@ -1,5 +1,5 @@
 -r base.txt
 -r crypto.txt
 
-pyzmq>=20.0.0
+pyzmq>=17.1.2
 pyzmq==25.0.2 ; sys_platform == "win32"
