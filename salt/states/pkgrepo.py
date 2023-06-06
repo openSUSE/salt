@@ -464,7 +464,7 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
         pre = __salt__["pkg.get_repo"](repo=repo, **kwargs)
     except CommandExecutionError as exc:
         ret["result"] = False
-        ret["comment"] = "Failed to examine repo '{}': {}".format(name, exc)
+        ret["comment"] = f"Failed to examine repo '{name}': {exc}"
         return ret
 
     # This is because of how apt-sources works. This pushes distro logic
@@ -549,7 +549,7 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
                         break
         else:
             ret["result"] = True
-            ret["comment"] = "Package repo '{}' already configured".format(name)
+            ret["comment"] = f"Package repo '{name}' already configured"
             return ret
 
     if __opts__["test"]:
@@ -584,7 +584,7 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
         # This is another way to pass information back from the mod_repo
         # function.
         ret["result"] = False
-        ret["comment"] = "Failed to configure repo '{}': {}".format(name, exc)
+        ret["comment"] = f"Failed to configure repo '{name}': {exc}"
         return ret
 
     try:
@@ -600,10 +600,10 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
             ret["changes"] = {"repo": repo}
 
         ret["result"] = True
-        ret["comment"] = "Configured package repo '{}'".format(name)
+        ret["comment"] = f"Configured package repo '{name}'"
     except Exception as exc:  # pylint: disable=broad-except
         ret["result"] = False
-        ret["comment"] = "Failed to confirm config of repo '{}': {}".format(name, exc)
+        ret["comment"] = f"Failed to confirm config of repo '{name}': {exc}"
 
     # Clear cache of available packages, if present, since changes to the
     # repositories may change the packages that are available.
@@ -703,11 +703,11 @@ def absent(name, **kwargs):
         repo = __salt__["pkg.get_repo"](stripname, **kwargs)
     except CommandExecutionError as exc:
         ret["result"] = False
-        ret["comment"] = "Failed to configure repo '{}': {}".format(name, exc)
+        ret["comment"] = f"Failed to configure repo '{name}': {exc}"
         return ret
 
     if not repo:
-        ret["comment"] = "Package repo {} is absent".format(name)
+        ret["comment"] = f"Package repo {name} is absent"
         ret["result"] = True
         return ret
 
@@ -730,7 +730,7 @@ def absent(name, **kwargs):
     repos = __salt__["pkg.list_repos"]()
     if stripname not in repos:
         ret["changes"]["repo"] = name
-        ret["comment"] = "Removed repo {}".format(name)
+        ret["comment"] = f"Removed repo {name}"
 
         if not remove_key:
             ret["result"] = True
@@ -739,14 +739,14 @@ def absent(name, **kwargs):
                 removed_keyid = __salt__["pkg.del_repo_key"](stripname, **kwargs)
             except (CommandExecutionError, SaltInvocationError) as exc:
                 ret["result"] = False
-                ret["comment"] += ", but failed to remove key: {}".format(exc)
+                ret["comment"] += f", but failed to remove key: {exc}"
             else:
                 ret["result"] = True
                 ret["changes"]["keyid"] = removed_keyid
-                ret["comment"] += ", and keyid {}".format(removed_keyid)
+                ret["comment"] += f", and keyid {removed_keyid}"
     else:
         ret["result"] = False
-        ret["comment"] = "Failed to remove repo {}".format(name)
+        ret["comment"] = f"Failed to remove repo {name}"
 
     return ret
 
