@@ -1,6 +1,5 @@
 import builtins as exceptions
 import copy
-import json
 import logging
 import os
 import sys
@@ -16,10 +15,10 @@ import salt.cli.support.intfunc
 import salt.cli.support.localrunner
 import salt.defaults.exitcodes
 import salt.exceptions
-import salt.ext.six as six
 import salt.output.table_out
 import salt.runner
 import salt.utils.files
+import salt.utils.json
 import salt.utils.parsers
 import salt.utils.platform
 import salt.utils.process
@@ -169,7 +168,7 @@ class SupportDataCollector:
             content = None
 
         if content is None:
-            data = json.loads(json.dumps(data))
+            data = salt.utils.json.loads(salt.utils.json.dumps(data))
             if isinstance(data, dict) and data.get("return"):
                 data = data.get("return")
             content = yaml.safe_dump(data, default_flow_style=False, indent=4)
@@ -506,7 +505,6 @@ class SaltSupport(salt.utils.parsers.SaltSupportOptionParser):
                 self.out.error(ex)
         else:
             if self.config["log_level"] not in ("quiet",):
-                self.setup_logfile_logger()
                 salt.utils.verify.verify_log(self.config)
                 salt.cli.support.log = log  # Pass update logger so trace is available
 
