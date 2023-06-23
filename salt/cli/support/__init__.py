@@ -6,7 +6,7 @@ import os
 
 import jinja2
 import salt.exceptions
-import yaml
+import salt.utils.yaml
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def get_profile(profile, caller, runner):
             try:
                 rendered_template = _render_profile(profile_path, caller, runner)
                 log.debug("\n{d}\n{t}\n{d}\n".format(d="-" * 80, t=rendered_template))
-                data.update(yaml.load(rendered_template))
+                data.update(salt.utils.yaml.load(rendered_template))
             except Exception as ex:
                 log.debug(ex, exc_info=True)
                 raise salt.exceptions.SaltException(
