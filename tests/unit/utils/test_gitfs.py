@@ -14,6 +14,7 @@ import salt.utils.gitfs
 import salt.utils.platform
 import tests.support.paths
 from salt.exceptions import FileserverConfigError
+from tests.support.helpers import patched_environ
 from tests.support.mixins import AdaptedConfigurationTestCaseMixin
 from tests.support.mock import MagicMock, patch
 from tests.support.unit import TestCase
@@ -335,3 +336,16 @@ class TestPygit2(TestCase):
         self.assertIn(provider.cachedir, provider.checkout())
         provider.branch = "does_not_exist"
         self.assertIsNone(provider.checkout())
+
+    def test_checkout_with_home_env_unset(self):
+        remote = os.path.join(tests.support.paths.TMP, "pygit2-repo")
+        cache = os.path.join(tests.support.paths.TMP, "pygit2-repo-cache")
+        self._prepare_remote_repository(remote)
+        provider = self._prepare_cache_repository(remote, cache)
+        provider.remotecallbacks = None
+        provider.credentials = None
+        with patched_environ(__cleanup__=["HOME"]):
+            self.assertTrue("HOME" not in os.environ)
+            provider.init_remote()
+            provider.fetch()
+            self.assertTrue("HOME" in os.environ)
