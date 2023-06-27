@@ -265,7 +265,8 @@ def test_checkout_pygit2_with_home_env_unset(_prepare_provider):
     provider.credentials = None
     with patched_environ(__cleanup__=["HOME"]):
         assert "HOME" not in os.environ
-        importlib.reload(salt.utils.gitfs)
+        provider.init_remote()
+        provider.fetch()
         assert "HOME" in os.environ
 
 
