@@ -1974,7 +1974,20 @@ class Minion(MinionBase):
                 ret["return"] = "ERROR executing '{}': {}".format(function_name, exc)
                 ret["out"] = "nested"
                 ret["retcode"] = salt.defaults.exitcodes.EX_GENERIC
+            except SaltClientError as exc:
+                log.error(
+                    "Problem executing '%s': %s",
+                    function_name,
+                    exc,
+                )
+                ret["return"] = "ERROR executing '{}': {}".format(function_name, exc)
+                ret["out"] = "nested"
+                ret["retcode"] = salt.defaults.exitcodes.EX_GENERIC
             except TypeError as exc:
+                # XXX: This can ba extreemly missleading when something outside of a
+                # execution module call raises a TypeError. Make this it's own
+                # type of exception when we start validating state and
+                # execution argument module inputs.
                 msg = "Passed invalid arguments to {}: {}\n{}".format(
                     function_name,
                     exc,
@@ -2675,6 +2688,15 @@ class Minion(MinionBase):
                 force_refresh=data.get("force_refresh", False),
                 notify=data.get("notify", False),
             )
+        elif tag.startswith("__master_req_channel_payload"):
+            try:
+                yield _minion.req_channel.send(
+                    data,
+                    timeout=_minion._return_retry_timer(),
+                    tries=_minion.opts["return_retry_tries"],
+                )
+            except salt.exceptions.SaltReqTimeoutError:
+                log.error("Timeout encountered while sending %r request", data)
         elif tag.startswith("pillar_refresh"):
             yield _minion.pillar_refresh(
                 force_refresh=data.get("force_refresh", False),
