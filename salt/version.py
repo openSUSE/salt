@@ -81,7 +81,7 @@ class SaltVersionsInfo(type):
     PHOSPHORUS    = SaltVersion("Phosphorus"   , info=3005,       released=True)
     SULFUR        = SaltVersion("Sulfur"       , info=(3006, 0),  released=True)
     CHLORINE      = SaltVersion("Chlorine"     , info=(3007, 0),  released=True)
-    ARGON         = SaltVersion("Argon"        , info=(3008, 0))
+    ARGON         = SaltVersion("Argon"        , info=(3008, 0),  released=True)
     POTASSIUM     = SaltVersion("Potassium"    , info=(3009, 0))
     CALCIUM       = SaltVersion("Calcium"      , info=(3010, 0))
     SCANDIUM      = SaltVersion("Scandium"     , info=(3011, 0))
