@@ -100,7 +100,7 @@ def _changes(
 
     change = {}
     wanted_groups = sorted(set((groups or []) + (optional_groups or [])))
-    if not remove_groups:
+    if not remove_groups or groups is None and not optional_groups:
         wanted_groups = sorted(set(wanted_groups + lusr["groups"]))
     if uid and lusr["uid"] != uid:
         change["uid"] = uid
