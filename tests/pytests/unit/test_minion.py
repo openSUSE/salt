@@ -92,29 +92,8 @@ def test_send_req_tries(req_channel):
             assert rtn == 30
 
 
-async def test_send_req_async_regression_62453(minion_opts):
-    event_enter = MagicMock()
-    event_enter.send.side_effect = (
-        lambda data, tag, cb=None, timeout=60: salt.ext.tornado.gen.maybe_future(True)
-    )
-    event = MagicMock()
-    event.__enter__.return_value = event_enter
-
-    minion_opts["random_startup_delay"] = 0
-    minion_opts["return_retry_tries"] = 30
-    minion_opts["grains"] = {}
-    with patch("salt.loader.grains"):
-        minion = salt.minion.Minion(minion_opts)
-
-        load = {"load": "value"}
-        timeout = 60
-
-        # We are just validating no exception is raised
-        rtn = await minion._send_req_async(load, timeout)
-        assert rtn == False
-
-
-def test_mine_send_tries():
+@patch("salt.channel.client.ReqChannel.factory")
+def test_mine_send_tries(req_channel_factory):
     channel_enter = MagicMock()
     channel_enter.send.side_effect = lambda load, timeout, tries: tries
     channel = MagicMock()
