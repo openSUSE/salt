@@ -145,7 +145,7 @@ def test_basic(req_channel):
         {"baz": "qux", "list": [1, 2, 3]},
     ]
     for msg in msgs:
-        ret = req_channel.send(msg, timeout=5, tries=1)
+        ret = req_channel.send(dict(msg), timeout=5, tries=1)
         assert ret["load"] == msg
 
 

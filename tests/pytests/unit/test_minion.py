@@ -67,17 +67,17 @@ def test_minion_load_grains_default():
         ),
     ],
 )
-def test_send_req_tries(req_channel):
+def test_send_req_tries(req_channel, minion_opts):
     channel_enter = MagicMock()
     channel_enter.send.side_effect = req_channel[1]
     channel = MagicMock()
     channel.__enter__.return_value = channel_enter
 
     with patch(req_channel[0], return_value=channel):
-        opts = salt.config.DEFAULT_MINION_OPTS.copy()
-        opts["random_startup_delay"] = 0
-        opts["return_retry_tries"] = 30
-        opts["grains"] = {}
+        minion_opts = salt.config.DEFAULT_MINION_OPTS.copy()
+        minion_opts["random_startup_delay"] = 0
+        minion_opts["return_retry_tries"] = 30
+        minion_opts["grains"] = {}
         with patch("salt.loader.grains"):
             minion = salt.minion.Minion(minion_opts)
 
