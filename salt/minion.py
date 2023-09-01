@@ -1640,24 +1640,13 @@ class Minion(MinionBase):
             yield salt.ext.tornado.gen.sleep(0)
             self.req_channel = None
 
-        # Consider refactoring so that eval_master does not have a subtle side-effect on the contents of the opts array
         master, self.pub_channel = yield self.eval_master(
             self.opts, self.timeout, self.safe, failed
         )
 
-        # a long-running req channel
-        self.req_channel = salt.channel.client.AsyncReqChannel.factory(
-            self.opts, io_loop=self.io_loop
-        )
         log.debug("Connecting minion's long-running req channel")
         yield self.req_channel.connect()
         yield self._post_master_init(master)
-
-    @salt.ext.tornado.gen.coroutine
-    def handle_payload(self, payload, reply_func):
-        self.payloads.append(payload)
-        yield reply_func(payload)
-        self.payload_ack.notify()
 
     # TODO: better name...
     @salt.ext.tornado.gen.coroutine
@@ -1874,50 +1863,33 @@ class Minion(MinionBase):
         return functions, returners, errors, executors
 
     def _send_req_sync(self, load, timeout):
-        with salt.utils.event.get_event("minion", opts=self.opts, listen=True) as event:
-            request_id = str(uuid.uuid4())
-            log.trace("Send request to main id=%s", request_id)
-            event.fire_event(
-                load,
-                f"__master_req_channel_payload/{request_id}/{self.opts['master']}",
-                timeout=timeout,
+
+        if self.opts["minion_sign_messages"]:
+            log.trace("Signing event to be published onto the bus.")
+            minion_privkey_path = os.path.join(self.opts["pki_dir"], "minion.pem")
+            sig = salt.crypt.sign_message(
+                minion_privkey_path, salt.serializers.msgpack.serialize(load)
             )
-            ret = event.get_event(
-                tag=f"__master_req_channel_return/{request_id}",
-                wait=timeout,
+            load["sig"] = sig
+
+        with salt.channel.client.ReqChannel.factory(self.opts) as channel:
+            return channel.send(
+                load, timeout=timeout, tries=self.opts["return_retry_tries"]
             )
-            if ret:
-                if ret.get("error"):
-                    raise salt.exceptions.SaltReqTimeoutError(
-                        f"Request timed out in main process: {ret['error']}"
-                    )
-                log.trace("Reply from main %s", request_id)
-                return ret["ret"]
-            raise salt.exceptions.SaltReqTimeoutError("Request timed out")
 
     @salt.ext.tornado.gen.coroutine
     def _send_req_async(self, load, timeout):
-        # XXX: This is only used by syndic
-        with salt.utils.event.get_event("minion", opts=self.opts, listen=True) as event:
-            request_id = str(uuid.uuid4())
-            log.trace("Send request to main id=%s", request_id)
-            yield event.fire_event_async(
-                load,
-                f"__master_req_channel_payload/{request_id}/{self.opts['master']}",
-                timeout=timeout,
+        if self.opts["minion_sign_messages"]:
+            log.trace("Signing event to be published onto the bus.")
+            minion_privkey_path = os.path.join(self.opts["pki_dir"], "minion.pem")
+            sig = salt.crypt.sign_message(
+                minion_privkey_path, salt.serializers.msgpack.serialize(load)
             )
-            start = time.time()
-            while time.time() - start < timeout:
-                ret = event.get_event(
-                    tag=f"__master_req_channel_return/{request_id}", no_block=True
-                )
-                if ret:
-                    break
-                yield salt.ext.tornado.gen.sleep(0.3)
-            else:
-                raise TimeoutError("Did not recieve return event")
-            log.trace("Reply from main %s", request_id)
-            raise salt.ext.tornado.gen.Return(ret["ret"])
+            load["sig"] = sig
+        ret = yield self.async_req_channel.send(
+            load, timeout=timeout, tries=self.opts["return_retry_tries"]
+        )
+        return ret
 
     @salt.ext.tornado.gen.coroutine
     def _send_req_async_main(self, load, timeout):
@@ -3581,7 +3553,6 @@ class Minion(MinionBase):
         """
         Send mine data to the master
         """
-        # Consider using a long-running req channel to send mine data
         with salt.channel.client.ReqChannel.factory(self.opts) as channel:
             data["tok"] = self.tok
             try:
@@ -4337,7 +4308,7 @@ class Minion(MinionBase):
                     self._handle_decoded_payload, payload["load"]
                 )
             elif self.opts["zmq_filtering"]:
-                # In the filtering enabled case, we'd like to know when minion sees something it shouldn't
+                # In the filtering enabled case, we'd like to know when minion sees something it shouldnt
                 log.trace(
                     "Broadcast message received not for this minion, Load: %s",
                     payload["load"],
