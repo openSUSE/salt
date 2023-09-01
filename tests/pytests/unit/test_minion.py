@@ -96,31 +96,26 @@ def test_minion_load_grains_default(minion_opts):
 
 
 @pytest.mark.parametrize(
-    "event",
+    "req_channel",
     [
         (
-            "fire_event",
-            lambda data, tag, cb=None, timeout=60: True,
+            "salt.channel.client.AsyncReqChannel.factory",
+            lambda load, timeout, tries: salt.ext.tornado.gen.maybe_future(tries),
         ),
         (
-            "fire_event_async",
-            lambda data, tag, cb=None, timeout=60: salt.ext.tornado.gen.maybe_future(
-                True
-            ),
+            "salt.channel.client.ReqChannel.factory",
+            lambda load, timeout, tries: tries,
         ),
     ],
 )
-def test_send_req_fires_completion_event(event, minion_opts):
-    req_id = uuid.uuid4()
-    event_enter = MagicMock()
-    event_enter.send.side_effect = event[1]
-    event_enter.get_event.return_value = {"ret": True}
-    event = MagicMock()
-    event.__enter__.return_value = event_enter
+def test_send_req_tries(req_channel, minion_opts):
+    channel_enter = MagicMock()
+    channel_enter.send.side_effect = req_channel[1]
+    channel = MagicMock()
+    channel.__enter__.return_value = channel_enter
 
-    with patch("salt.utils.event.get_event", return_value=event), patch(
-        "uuid.uuid4", return_value=req_id
-    ):
+    with patch(req_channel[0], return_value=channel):
+        minion_opts = salt.config.DEFAULT_MINION_OPTS.copy()
         minion_opts["random_startup_delay"] = 0
         minion_opts["return_retry_tries"] = 30
         minion_opts["grains"] = {}
@@ -130,64 +125,16 @@ def test_send_req_fires_completion_event(event, minion_opts):
             load = {"load": "value"}
             timeout = 60
 
-            # XXX This is buggy because "async" in event[0] will never evaluate
-            # to True and if it *did* evaluate to true the test would fail
-            # because you Mock isn't a co-routine.
-            if "async" in event[0]:
+            if "Async" in req_channel[0]:
                 rtn = minion._send_req_async(load, timeout).result()
             else:
                 rtn = minion._send_req_sync(load, timeout)
 
-            fire_event_called = False
-            # get the
-            for idx, call in enumerate(event.mock_calls, 1):
-                if "fire_event" in call[0]:
-                    condition_event_tag = (
-                        len(call.args) > 1
-                        and call.args[1]
-                        == f"__master_req_channel_payload/{req_id}/{minion_opts['master']}"
-                    )
-                    condition_event_tag_error = "{} != {}; Call(number={}): {}".format(
-                        idx, call, call.args[1], "__master_req_channel_payload"
-                    )
-                    condition_timeout = (
-                        len(call.kwargs) == 1 and call.kwargs["timeout"] == timeout
-                    )
-                    condition_timeout_error = "{} != {}; Call(number={}): {}".format(
-                        idx, call, call.kwargs["timeout"], timeout
-                    )
-
-                    fire_event_called = True
-                    assert condition_event_tag, condition_event_tag_error
-                    assert condition_timeout, condition_timeout_error
-
-            assert fire_event_called
-            assert rtn
+            assert rtn == 30
 
 
-async def test_send_req_async_regression_62453(minion_opts):
-    event_enter = MagicMock()
-    event_enter.send.side_effect = (
-        lambda data, tag, cb=None, timeout=60: salt.ext.tornado.gen.maybe_future(True)
-    )
-    event = MagicMock()
-    event.__enter__.return_value = event_enter
-
-    minion_opts["random_startup_delay"] = 0
-    minion_opts["return_retry_tries"] = 30
-    minion_opts["grains"] = {}
-    with patch("salt.loader.grains"):
-        minion = salt.minion.Minion(minion_opts)
-
-        load = {"load": "value"}
-        timeout = 1
-
-        # We are just validating no exception is raised
-        with pytest.raises(TimeoutError):
-            rtn = await minion._send_req_async(load, timeout)
-
-
-def test_mine_send_tries(minion_opts):
+@patch("salt.channel.client.ReqChannel.factory")
+def test_mine_send_tries(req_channel_factory):
     channel_enter = MagicMock()
     channel_enter.send.side_effect = lambda load, timeout, tries: tries
     channel = MagicMock()
