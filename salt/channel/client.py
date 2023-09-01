@@ -98,7 +98,6 @@ class AsyncReqChannel:
         "_crypted_transfer",
         "_uncrypted_transfer",
         "send",
-        "connect",
     ]
     close_methods = [
         "close",
@@ -128,7 +127,7 @@ class AsyncReqChannel:
         else:
             auth = None
 
-        transport = salt.transport.request_client(opts, io_loop=io_loop)
+        transport = salt.transport.request_client(opts, io_loop)
         return cls(opts, transport, auth)
 
     def __init__(self, opts, transport, auth, **kwargs):
@@ -272,10 +271,6 @@ class AsyncReqChannel:
         raise salt.ext.tornado.gen.Return(ret)
 
     @salt.ext.tornado.gen.coroutine
-    def connect(self):
-        yield self.transport.connect()
-
-    @salt.ext.tornado.gen.coroutine
     def send(self, load, tries=3, timeout=60, raw=False):
         """
         Send a request, return a future which will complete when we send the message
@@ -295,7 +290,7 @@ class AsyncReqChannel:
                     ret = yield self._crypted_transfer(load, timeout=timeout, raw=raw)
                 break
             except Exception as exc:  # pylint: disable=broad-except
-                log.trace("Failed to send msg %r", exc)
+                log.error("Failed to send msg %r", exc)
                 if _try >= tries:
                     raise
                 else:

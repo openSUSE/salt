@@ -208,10 +208,7 @@ class IPCServer:
                 log.error("Exception occurred while handling stream: %s", exc)
 
     def handle_connection(self, connection, address):
-        log.trace(
-            "IPCServer: Handling connection to address: %s",
-            address if address else connection,
-        )
+        log.trace("IPCServer: Handling connection to address: %s", address)
         try:
             with salt.utils.asynchronous.current_ioloop(self.io_loop):
                 stream = IOStream(

@@ -1361,29 +1361,10 @@ class Minion(MinionBase):
         """
         Return a future which will complete when you are connected to a master
         """
-        # Consider refactoring so that eval_master does not have a subtle side-effect on the contents of the opts array
         master, self.pub_channel = yield self.eval_master(
             self.opts, self.timeout, self.safe, failed
         )
-
-        # a long-running req channel
-        self.req_channel = salt.transport.client.AsyncReqChannel.factory(
-            self.opts, io_loop=self.io_loop
-        )
-
-        if hasattr(
-            self.req_channel, "connect"
-        ):  # TODO: consider generalizing this for all channels
-            log.debug("Connecting minion's long-running req channel")
-            yield self.req_channel.connect()
-
         yield self._post_master_init(master)
-
-    @salt.ext.tornado.gen.coroutine
-    def handle_payload(self, payload, reply_func):
-        self.payloads.append(payload)
-        yield reply_func(payload)
-        self.payload_ack.notify()
 
     # TODO: better name...
     @salt.ext.tornado.gen.coroutine
@@ -1599,6 +1580,7 @@ class Minion(MinionBase):
         return functions, returners, errors, executors
 
     def _send_req_sync(self, load, timeout):
+
         if self.opts["minion_sign_messages"]:
             log.trace("Signing event to be published onto the bus.")
             minion_privkey_path = os.path.join(self.opts["pki_dir"], "minion.pem")
@@ -1607,11 +1589,9 @@ class Minion(MinionBase):
             )
             load["sig"] = sig
 
-        with salt.utils.event.get_event(
-            "minion", opts=self.opts, listen=False
-        ) as event:
-            return event.fire_event(
-                load, "__master_req_channel_payload", timeout=timeout
+        with salt.channel.client.ReqChannel.factory(self.opts) as channel:
+            return channel.send(
+                load, timeout=timeout, tries=self.opts["return_retry_tries"]
             )
 
     @salt.ext.tornado.gen.coroutine
@@ -1624,11 +1604,9 @@ class Minion(MinionBase):
             )
             load["sig"] = sig
 
-        with salt.utils.event.get_event(
-            "minion", opts=self.opts, listen=False
-        ) as event:
-            ret = yield event.fire_event_async(
-                load, "__master_req_channel_payload", timeout=timeout
+        with salt.channel.client.AsyncReqChannel.factory(self.opts) as channel:
+            ret = yield channel.send(
+                load, timeout=timeout, tries=self.opts["return_retry_tries"]
             )
             raise salt.ext.tornado.gen.Return(ret)
 
@@ -2055,7 +2033,7 @@ class Minion(MinionBase):
             minion_instance._return_pub(ret)
 
         # Add default returners from minion config
-        # Should have been converted to comma-delimited string already
+        # Should have been coverted to comma-delimited string already
         if isinstance(opts.get("return"), str):
             if data["ret"]:
                 data["ret"] = ",".join((data["ret"], opts["return"]))
@@ -2662,7 +2640,6 @@ class Minion(MinionBase):
         """
         Send mine data to the master
         """
-        # Consider using a long-running req channel to send mine data
         with salt.channel.client.ReqChannel.factory(self.opts) as channel:
             data["tok"] = self.tok
             try:
@@ -2698,12 +2675,6 @@ class Minion(MinionBase):
             _minion.module_refresh(
                 force_refresh=data.get("force_refresh", False),
                 notify=data.get("notify", False),
-            )
-        elif tag.startswith("__master_req_channel_payload"):
-            yield _minion.req_channel.send(
-                data,
-                timeout=_minion._return_retry_timer(),
-                tries=_minion.opts["return_retry_tries"],
             )
         elif tag.startswith("pillar_refresh"):
             yield _minion.pillar_refresh(
@@ -3175,7 +3146,7 @@ class Minion(MinionBase):
             if self._target_load(payload["load"]):
                 self._handle_decoded_payload(payload["load"])
             elif self.opts["zmq_filtering"]:
-                # In the filtering enabled case, we'd like to know when minion sees something it shouldn't
+                # In the filtering enabled case, we'd like to know when minion sees something it shouldnt
                 log.trace(
                     "Broadcast message received not for this minion, Load: %s",
                     payload["load"],
