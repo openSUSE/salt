@@ -400,6 +400,7 @@ class Shell:
         ret_stdout = ""
         ret_stderr = ""
         old_stdout = ""
+        t_start = time.time()
 
         try:
             while term.has_unread_data:
@@ -463,6 +464,9 @@ class Shell:
                     term.sendline(mods_raw)
                 if stdout:
                     old_stdout = stdout
+                # self.timeout is used for ConnectTimeout. Allow the same time for command execution.
+                if time.time() - t_start > self.timeout * 2:
+                    return ("", "timeout", 255)
                 time.sleep(0.01)
             if term.exitstatus is None:
                 try:
