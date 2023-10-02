@@ -320,6 +320,20 @@ class WrapRenderTestCase(TestCase):
             slspath="foo",
         )
 
+    def test_generate_sls_context__one_level_init_implicit_with_trailing_dot(self):
+        """generate_sls_context - Basic one level with implicit init.sls with trailing dot"""
+        self._test_generated_sls_context(
+            "/tmp/foo/init.sls",
+            "foo.",
+            tplfile="foo/init.sls",
+            tpldir="foo",
+            tpldot="foo",
+            slsdotpath="foo",
+            slscolonpath="foo",
+            sls_path="foo",
+            slspath="foo",
+        )
+
     def test_generate_sls_context__one_level_init_explicit(self):
         """generate_sls_context - Basic one level with explicit init.sls"""
         self._test_generated_sls_context(
