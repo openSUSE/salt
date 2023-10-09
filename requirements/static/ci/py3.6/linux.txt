@@ -533,8 +533,6 @@ markupsafe==2.0.1
     #   moto
 mercurial==6.0.1
     # via -r requirements/static/ci/linux.in
-mock==3.0.5
-    # via -r requirements/pytest.txt
 more-itertools==5.0.0
     # via
     #   cheroot
@@ -862,7 +860,6 @@ six==1.16.0
     #   junos-eznc
     #   kazoo
     #   kubernetes
-    #   mock
     #   more-itertools
     #   ncclient
     #   paramiko
