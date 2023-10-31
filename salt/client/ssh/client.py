@@ -111,7 +111,15 @@ class SSHClient:
         return sane_kwargs
 
     def _prep_ssh(
-        self, tgt, fun, arg=(), timeout=None, tgt_type="glob", kwarg=None, context=None, **kwargs
+        self,
+        tgt,
+        fun,
+        arg=(),
+        timeout=None,
+        tgt_type="glob",
+        kwarg=None,
+        context=None,
+        **kwargs
     ):
         """
         Prepare the arguments

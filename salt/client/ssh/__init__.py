@@ -50,8 +50,8 @@ import salt.utils.thin
 import salt.utils.url
 import salt.utils.verify
 from salt._logging import LOG_LEVELS
-from salt._logging.mixins import MultiprocessingStateMixin
 from salt._logging.impl import LOG_LOCK
+from salt._logging.mixins import MultiprocessingStateMixin
 from salt.template import compile_template
 from salt.utils.process import Process
 from salt.utils.zeromq import zmq
@@ -569,7 +569,7 @@ class SSH(MultiprocessingStateMixin):
             mods=self.mods,
             fsclient=self.fsclient,
             thin=self.thin,
-            **target
+            **target,
         )
         if salt.utils.path.which("ssh-copy-id"):
             # we have ssh-copy-id, use it!
@@ -585,7 +585,7 @@ class SSH(MultiprocessingStateMixin):
                 mods=self.mods,
                 fsclient=self.fsclient,
                 thin=self.thin,
-                **target
+                **target,
             )
             stdout, stderr, retcode = single.cmd_block()
             try:
@@ -613,7 +613,7 @@ class SSH(MultiprocessingStateMixin):
             fsclient=self.fsclient,
             thin=self.thin,
             mine=mine,
-            **target
+            **target,
         )
         ret = {"id": single.id}
         stdout, stderr, retcode = single.run()
@@ -1037,7 +1037,7 @@ class Single:
         keepalive=True,
         keepalive_interval=60,
         keepalive_count_max=3,
-        **kwargs
+        **kwargs,
     ):
         # Get mine setting and mine_functions if defined in kwargs (from roster)
         self.mine = mine
@@ -1320,7 +1320,7 @@ class Single:
                 self.id,
                 fsclient=self.fsclient,
                 minion_opts=self.minion_opts,
-                **self.target
+                **self.target,
             )
 
             opts_pkg = pre_wrapper["test.opts_pkg"]()  # pylint: disable=E1102
@@ -1406,7 +1406,7 @@ class Single:
             self.id,
             fsclient=self.fsclient,
             minion_opts=self.minion_opts,
-            **self.target
+            **self.target,
         )
         wrapper.fsclient.opts["cachedir"] = opts["cachedir"]
         self.wfuncs = salt.loader.ssh_wrapper(opts, wrapper, self.context)
