@@ -857,9 +857,11 @@ def install(
         cmd.extend(["--build", build])
 
     # Use VENV_PIP_TARGET environment variable value as target
-    # if set and no target specified on the function call
+    # if set and no target specified on the function call.
+    # Do not set target if bin_env specified, use default
+    # for specified binary environment or expect explicit target specification.
     target_env = os.environ.get("VENV_PIP_TARGET", None)
-    if target is None and target_env is not None:
+    if target is None and target_env is not None and bin_env is None:
         target = target_env
 
     if target:
