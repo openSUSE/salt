@@ -56,6 +56,9 @@ class SSHClient:
             ("ssh_priv_passwd", str),
             ("ssh_identities_only", bool),
             ("ssh_remote_port_forwards", str),
+            ("ssh_keepalive", bool),
+            ("ssh_keepalive_interval", int),
+            ("ssh_keepalive_count_max", int),
             ("ssh_options", list),
             ("ssh_max_procs", int),
             ("ssh_askpass", bool),
@@ -113,7 +116,15 @@ class SSHClient:
         return sane_kwargs
 
     def _prep_ssh(
-        self, tgt, fun, arg=(), timeout=None, tgt_type="glob", kwarg=None, context=None, **kwargs
+        self,
+        tgt,
+        fun,
+        arg=(),
+        timeout=None,
+        tgt_type="glob",
+        kwarg=None,
+        context=None,
+        **kwargs
     ):
         """
         Prepare the arguments
