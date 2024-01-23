@@ -236,7 +236,7 @@ def test_update_mtime_map():
     # between Python releases.
     lines_written = sorted(mtime_map_mock.write_calls())
     expected = sorted(
-        salt.utils.stringutils.to_bytes("{key}:{val}\n".format(key=key, val=val))
+        salt.utils.stringutils.to_bytes(f"{key}:{val}\n")
         for key, val in new_mtime_map.items()
     )
     assert lines_written == expected, lines_written
