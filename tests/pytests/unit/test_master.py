@@ -1,3 +1,4 @@
+import pathlib
 import time
 
 import pytest
@@ -249,3 +250,35 @@ def test_mworker_pass_context():
                 loadler_pillars_mock.call_args_list[0][1].get("pack").get("__context__")
                 == test_context
             )
+
+
+def test_syndic_return_cache_dir_creation(encrypted_requests):
+    """master's cachedir for a syndic will be created by AESFuncs._syndic_return method"""
+    cachedir = pathlib.Path(encrypted_requests.opts["cachedir"])
+    assert not (cachedir / "syndics").exists()
+    encrypted_requests._syndic_return(
+        {
+            "id": "mamajama",
+            "jid": "",
+            "return": {},
+        }
+    )
+    assert (cachedir / "syndics").exists()
+    assert (cachedir / "syndics" / "mamajama").exists()
+
+
+def test_syndic_return_cache_dir_creation_traversal(encrypted_requests):
+    """
+    master's  AESFuncs._syndic_return method cachdir creation is not vulnerable to a directory traversal
+    """
+    cachedir = pathlib.Path(encrypted_requests.opts["cachedir"])
+    assert not (cachedir / "syndics").exists()
+    encrypted_requests._syndic_return(
+        {
+            "id": "../mamajama",
+            "jid": "",
+            "return": {},
+        }
+    )
+    assert not (cachedir / "syndics").exists()
+    assert not (cachedir / "mamajama").exists()
