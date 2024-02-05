@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: registry.opensuse.org/systemsmanagement/saltstack/products/testing/containers/leap15.5/containers/salt-testsuite-github:leap15.5
+      options: --hostname=salt-test-container
     steps:
       - name: Checkout Salt
         uses: actions/checkout@v4
