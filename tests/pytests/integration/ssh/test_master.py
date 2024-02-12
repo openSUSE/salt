@@ -2,6 +2,8 @@
 Simple Smoke Tests for Connected SSH minions
 """
 
+import os
+
 import pytest
 from saltfactories.utils.functional import StateResult
 
@@ -10,7 +12,10 @@ pytestmark = [
     pytest.mark.skip_on_windows(reason="salt-ssh not available on Windows"),
 ]
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 
+
+@pytest.mark.skip_if(INSIDE_CONTAINER, reason="No systemd in container.")
 @pytest.mark.skip_if_not_root
 def test_service(salt_ssh_cli, grains):
     service = "cron"
