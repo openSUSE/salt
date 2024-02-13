@@ -3,17 +3,14 @@ This is the default compound matcher function.
 """
 
 import logging
+import importlib.util
 
 import salt.loader
 import salt.utils.minions
 
 HAS_RANGE = False
-try:
-    import seco.range  # pylint: disable=unused-import
-
+if importlib.util.find_spec("seco"):
     HAS_RANGE = True
-except ImportError:
-    pass
 
 log = logging.getLogger(__name__)
 
