@@ -26,7 +26,7 @@ def usermod(modules):
 
 @pytest.fixture(scope="module")
 def available_python_executable():
-    yield salt.utils.path.which_bin(["python", "python2", "python2.6", "python2.7"])
+    yield salt.utils.path.which_bin(["python", "python3"])
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def running_username():
 @pytest.fixture
 def script_contents(state_tree):
     _contents = """
-    #!/usr/bin/env python
+    #!/usr/bin/env python3
     import sys
     print(" ".join(sys.argv[1:]))
     """
