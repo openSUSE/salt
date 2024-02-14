@@ -19,4 +19,4 @@ jobs:
       - name: Run unit tests
         run: |
           salt-test --skiplist https://raw.githubusercontent.com/openSUSE/salt-test-skiplist/main/skipped_tests.toml \
-            --directory . --package-flavor classic unit
+            --directory . --package-flavor classic unit -- --core-tests --slow --run-expensive --ssh-tests --run-destructive -vvv

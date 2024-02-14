@@ -19,4 +19,4 @@ jobs:
       - name: Run integration tests
         run: |
           salt-test --skiplist https://raw.githubusercontent.com/openSUSE/salt-test-skiplist/main/skipped_tests.toml \
-            --directory . --package-flavor classic integration -- --slow
+            --directory . --package-flavor classic integration -- --core-tests --slow --run-expensive --ssh-tests --run-destructive -vvv
