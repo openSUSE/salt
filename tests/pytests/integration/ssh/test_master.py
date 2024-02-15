@@ -15,7 +15,7 @@ pytestmark = [
 INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 
 
-@pytest.mark.skip_if(INSIDE_CONTAINER, reason="No systemd in container.")
+@pytest.mark.skipif(INSIDE_CONTAINER, reason="No systemd in container.")
 @pytest.mark.skip_if_not_root
 def test_service(salt_ssh_cli, grains):
     service = "cron"

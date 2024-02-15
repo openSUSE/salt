@@ -24,7 +24,7 @@ pytestmark = [
     pytest.mark.windows_whitelisted,
     pytest.mark.skip_initial_onedir_failure,
     pytest.mark.skip_if_binaries_missing(*KNOWN_BINARY_NAMES, check_all=False),
-    pytest.mark.skip_if(INSIDE_CONTAINER, reason="No gcc and python3-devel in container."),
+    pytest.mark.skipif(INSIDE_CONTAINER, reason="No gcc and python3-devel in container."),
 ]
 
 
