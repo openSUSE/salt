@@ -1,4 +1,4 @@
-name: Scenarios tests
+name: Fast unit tests
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  scenarios-tests:
+  fast-unit-tests:
     runs-on: ubuntu-latest
     container:
       image: registry.opensuse.org/systemsmanagement/saltstack/products/testing/containers/leap15.5/containers/salt-testsuite-github:leap15.5
@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Checkout Salt
         uses: actions/checkout@v4
-      - name: Run scenarios tests
+      - name: Run Fast unit tests
         run: |
           salt-test --skiplist https://raw.githubusercontent.com/openSUSE/salt-test-skiplist/main/skipped_tests.toml \
-            --directory . --package-flavor classic scenarios -- --core-tests --slow --run-expensive --ssh-tests --run-destructive -vvv
+            --directory . --package-flavor classic unit -- -vvv

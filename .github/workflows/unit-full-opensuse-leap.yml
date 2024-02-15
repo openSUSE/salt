@@ -1,0 +1,22 @@
+name: Full unit tests
+
+on:
+  push:
+    branches: [openSUSE/release/3006.0]
+  pull_request:
+    branches: [openSUSE/release/3006.0]
+  workflow_dispatch:
+
+jobs:
+  full-unit-tests:
+    runs-on: ubuntu-latest
+    container:
+      image: registry.opensuse.org/systemsmanagement/saltstack/products/testing/containers/leap15.5/containers/salt-testsuite-github:leap15.5
+      options: --hostname=salt-test-container
+    steps:
+      - name: Checkout Salt
+        uses: actions/checkout@v4
+      - name: Run Full unit tests
+        run: |
+          salt-test --skiplist https://raw.githubusercontent.com/openSUSE/salt-test-skiplist/main/skipped_tests.toml \
+            --directory . --package-flavor classic unit -- --core-tests --slow --run-expensive --ssh-tests --run-destructive -vvv

@@ -1,4 +1,4 @@
-name: Integration tests
+name: Fast scenarios tests
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  integration-tests:
+  fast-scenarios-tests:
     runs-on: ubuntu-latest
     container:
       image: registry.opensuse.org/systemsmanagement/saltstack/products/testing/containers/leap15.5/containers/salt-testsuite-github:leap15.5
@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Checkout Salt
         uses: actions/checkout@v4
-      - name: Run integration tests
+      - name: Run Fast scenarios tests
         run: |
           salt-test --skiplist https://raw.githubusercontent.com/openSUSE/salt-test-skiplist/main/skipped_tests.toml \
-            --directory . --package-flavor classic integration -- --core-tests --slow --run-expensive --ssh-tests --run-destructive -vvv
+            --directory . --package-flavor classic scenarios -- -vvv
