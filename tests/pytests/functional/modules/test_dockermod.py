@@ -17,7 +17,7 @@ INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.skip_if_binaries_missing("docker", "dockerd", check_all=False),
-    pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run inside a container")
+    pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run inside a container"),
 ]
 
 
