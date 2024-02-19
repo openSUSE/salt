@@ -119,9 +119,10 @@ def test_ansible_module_call():
             env=ANY,
             check=True,
             shell=False,
-            capture_output=True,
+            stderr=-1,
+            stdout=-1,
             timeout=1200,
-            text=True,
+            universal_newlines=True,
         )
         assert ret == {"completed": True}
 

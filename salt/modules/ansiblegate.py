@@ -101,10 +101,11 @@ def __virtual__():
 
     proc = subprocess.run(
         [ansible_doc_bin, "--list", "--json", "--type=module"],
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         check=False,
         shell=False,
-        text=True,
+        universal_newlines=True,
         env=env,
     )
     if proc.returncode != 0:
@@ -169,10 +170,11 @@ def help(module=None, *args):
 
     proc = subprocess.run(
         [ansible_doc_bin, "--json", "--type=module", module],
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         check=True,
         shell=False,
-        text=True,
+        universal_newlines=True,
         env=env,
     )
     data = salt.utils.json.loads(proc.stdout)
@@ -261,9 +263,10 @@ def call(module, *args, **kwargs):
                     "-i",
                     inventory.name,
                 ],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 timeout=__opts__.get("ansible_timeout", DEFAULT_TIMEOUT),
-                text=True,
+                universal_newlines=True,
                 check=True,
                 shell=False,
                 env=env,
