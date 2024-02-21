@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout Salt
         uses: actions/checkout@v4
+      - name: Fix the Salt version in _version.txt file
+        run: rpm -q python3-salt-testsuite --queryformat '%{VERSION}' > $GITHUB_WORKSPACE/salt/_version.txt
       - name: Run Full unit tests
         run: |
           salt-test --skiplist https://raw.githubusercontent.com/openSUSE/salt-test-skiplist/main/skipped_tests.toml \
