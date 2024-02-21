@@ -10,6 +10,8 @@ on:
 jobs:
   full-unit-tests:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_ACTIONS: 1
     container:
       image: registry.opensuse.org/systemsmanagement/saltstack/products/testing/containers/leap15.5/containers/salt-testsuite-github:leap15.5
       options: --hostname=salt-test-container
