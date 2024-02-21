@@ -152,10 +152,11 @@ def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
     if success:
         tempdir = tempfile.mkdtemp()
         proc = Popen(cmd_opts, stdout=PIPE, stderr=PIPE, cwd=tempdir)
-        (stdoutdata, error) = proc.communicate()
+        (_, error) = proc.communicate()
+        error = error.decode('ascii', errors='ignore')
         success = _OSCAP_EXIT_CODES_MAP.get(proc.returncode, False)
         if proc.returncode < 0:
-            error += "\nKilled by signal {}\n".format(proc.returncode).encode('ascii')
+            error += "\nKilled by signal {}\n".format(proc.returncode)
         returncode = proc.returncode
         if success:
             __salt__["cp.push_dir"](tempdir)
