@@ -55,6 +55,13 @@ warnings.filterwarnings(
     # never show up
 )
 
+warnings.filterwarnings(
+    "ignore",
+    r"(Use setlocale\(\)|'(cgi|pipes)' is deprecated)",
+    DeprecationWarning,
+    r"^(salt|salt\.(.*))$",
+)
+
 # Filter the backports package UserWarning about being re-imported
 warnings.filterwarnings(
     "ignore",
