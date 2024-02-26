@@ -7,6 +7,7 @@ Linux and Solaris are supported
 import subprocess
 
 import pytest
+import os
 
 import salt.utils.platform
 from tests.support.case import ModuleCase
@@ -29,7 +30,9 @@ def _check_systemctl():
     return _check_systemctl.memo
 
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 @pytest.mark.skipif(_check_systemctl(), reason="systemctl degraded")
+@pytest.mark.skipif(INSIDE_CONTAINER, reason="No hwclock in a container")
 class TimezoneLinuxModuleTest(ModuleCase):
     def setUp(self):
         """
