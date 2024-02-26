@@ -19,11 +19,16 @@ from salt.modules.virtualenv_mod import KNOWN_BINARY_NAMES
 
 log = logging.getLogger(__name__)
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
+
 pytestmark = [
     pytest.mark.core_test,
     pytest.mark.windows_whitelisted,
     pytest.mark.skip_initial_onedir_failure,
     pytest.mark.skip_if_binaries_missing(*KNOWN_BINARY_NAMES, check_all=False),
+    pytest.mark.skipif(
+        INSIDE_CONTAINER, reason="No gcc and python3-devel in container."
+    ),
 ]
 
 

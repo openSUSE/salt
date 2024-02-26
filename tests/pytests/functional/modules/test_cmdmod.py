@@ -1,6 +1,7 @@
 import os
 import random
 import sys
+from contextlib import contextmanager
 
 import pytest
 
@@ -107,6 +108,20 @@ def test_run(cmdmod, grains):
     )
     assert cmdmod.run("grep f", stdin="one\ntwo\nthree\nfour\nfive\n") == "four\nfive"
     assert cmdmod.run('echo "a=b" | sed -e s/=/:/g', python_shell=True) == "a:b"
+
+
+@contextmanager
+def _ensure_user_exists(name, usermod):
+    if name in usermod.info(name).values():
+        # User already exists; don't touch
+        yield
+    else:
+        # Need to create user for test
+        usermod.add(name)
+        try:
+            yield
+        finally:
+            usermod.delete(name, remove=True)
 
 
 @pytest.mark.slow_test
@@ -295,6 +310,8 @@ def test_tty(cmdmod):
             assert "Success" in ret
 
 
+@pytest.mark.skip_on_windows
+@pytest.mark.skip_if_binaries_missing("which")
 def test_which(cmdmod):
     """
     cmd.which
@@ -314,6 +331,9 @@ def test_which(cmdmod):
     assert cmd_which.rstrip().lower() == cmd_run.rstrip().lower()
 
 
+
+@pytest.mark.skip_on_windows
+@pytest.mark.skip_if_binaries_missing("which")
 def test_which_bin(cmdmod):
     """
     cmd.which_bin
@@ -426,7 +446,8 @@ def test_cwd_runas(cmdmod, usermod, runas_usr, tmp_path):
     cwd_normal = cmdmod.run_stdout(cmd, cwd=tmp_cwd).rstrip("\n")
     assert tmp_cwd == cwd_normal
 
-    cwd_runas = cmdmod.run_stdout(cmd, cwd=tmp_cwd, runas=runas_usr).rstrip("\n")
+    with _ensure_user_exists(runas_usr, usermod):
+        cwd_runas = cmdmod.run_stdout(cmd, cwd=tmp_cwd, runas=runas_usr).rstrip("\n")
     assert tmp_cwd == cwd_runas
 
 
@@ -439,7 +460,8 @@ def test_runas_env(cmdmod, usermod, runas_usr):
     cmd.run should be able to change working directory correctly, whether
     or not runas is in use.
     """
-    user_path = cmdmod.run_stdout('printf %s "$PATH"', runas=runas_usr)
+    with _ensure_user_exists(runas_usr, usermod):
+        user_path = cmdmod.run_stdout('printf %s "$PATH"', runas=runas_usr)
     # XXX: Not sure of a better way. Environment starts out with
     # /bin:/usr/bin and should be populated by path helper and the bash
     # profile.
@@ -462,11 +484,14 @@ def test_runas_complex_command_bad_cwd(cmdmod, usermod, runas_usr, tmp_path):
     """
     tmp_cwd = str(tmp_path)
     os.chmod(tmp_cwd, 0o700)
-    cmd_result = cmdmod.run_all(
-        'pwd; pwd; : $(echo "You have failed the test" >&2)',
-        cwd=tmp_cwd,
-        runas=runas_usr,
-    )
+
+    with _ensure_user_exists(runas_usr, usermod):
+        cmd_result = cmdmod.run_all(
+            'pwd; pwd; : $(echo "You have failed the test" >&2)',
+            cwd=tmp_cwd,
+            runas=runas_usr,
+        )
+
     assert "" == cmd_result["stdout"]
     assert "You have failed the test" not in cmd_result["stderr"]
     assert 0 != cmd_result["retcode"]
@@ -481,10 +506,12 @@ def test_runas(cmdmod, usermod, runas_usr):
     """
     Ensure that the env is the runas user's
     """
-    out = cmdmod.run("env", runas=runas_usr).splitlines()
+    with _ensure_user_exists(runas_usr, usermod):
+        out = cmdmod.run("env", runas=runas_usr).splitlines()
     assert f"USER={runas_usr}" in out
 
 
+@pytest.mark.skip_if_binaries_missing("sleep", reason="sleep cmd not installed")
 def test_timeout(cmdmod):
     """
     cmd.run trigger timeout
@@ -501,6 +528,7 @@ def test_timeout(cmdmod):
     assert "Timed out" in out
 
 
+@pytest.mark.skip_if_binaries_missing("sleep", reason="sleep cmd not installed")
 def test_timeout_success(cmdmod):
     """
     cmd.run sufficient timeout to succeed

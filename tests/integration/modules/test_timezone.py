@@ -5,6 +5,7 @@ Linux and Solaris are supported
 """
 
 import pytest
+import os
 
 from tests.support.case import ModuleCase
 
@@ -16,6 +17,8 @@ except ImportError:
     HAS_TZLOCAL = False
 
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
+@pytest.mark.skipif(INSIDE_CONTAINER, reason="No hwclock in a container")
 class TimezoneLinuxModuleTest(ModuleCase):
     def setUp(self):
         """

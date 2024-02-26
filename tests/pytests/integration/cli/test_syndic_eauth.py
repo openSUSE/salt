@@ -1,5 +1,8 @@
 import json
 import logging
+import os
+import pathlib
+import tempfile
 import time
 
 import pytest
@@ -10,9 +13,12 @@ docker = pytest.importorskip("docker")
 
 log = logging.getLogger(__name__)
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
+
 pytestmark = [
     pytest.mark.core_test,
     pytest.mark.timeout_unless_on_windows(600),
+    pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run in a container"),
 ]
 
 

@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 import time
 
 import psutil
@@ -19,6 +20,8 @@ pytestmark = [
         reason="vim package not available for this distribution",
     ),
 ]
+
+GITHUB_ACTIONS = bool(os.getenv("GITHUB_ACTIONS", False))
 
 
 @pytest.fixture
@@ -51,6 +54,9 @@ def file_add_delete_sls(tmp_path, salt_master):
 # This test is fundimentally flawed. Needs to be re-factored to test the memory
 # consuption of the minoin process not system wide memory.
 @pytest.mark.skip(reason="Flawed test")
+@pytest.mark.skip_on_darwin(reason="MacOS is a spawning platform, won't work")
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="Test is failing in GitHub Actions")
+@pytest.mark.flaky(max_runs=4)
 def test_memory_leak(salt_cli, salt_minion, file_add_delete_sls):
     max_usg = None
 

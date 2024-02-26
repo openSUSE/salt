@@ -82,22 +82,7 @@ def PKG_CAP_TARGETS(grains):
     _PKG_CAP_TARGETS = []
     if grains["os_family"] == "Suse":
         if grains["os"] == "SUSE":
-            _PKG_CAP_TARGETS = [("perl(YAML)", "perl-YAML")]
-            # sudo zypper install 'perl(YAML)'
-            # Loading repository data...
-            # Reading installed packages...
-            # 'perl(YAML)' not found in package names. Trying capabilities.
-            # Resolving package dependencies...
-            #
-            # The following NEW package is going to be installed:
-            #   perl-YAML
-            #
-            # 1 new package to install.
-            # Overall download size: 85.3 KiB. Already cached: 0 B. After the operation, additional 183.3 KiB will be used.
-            # Continue? [y/n/v/...? shows all options] (y):
-
-            # So, it just doesn't work here? skip it for now
-            _PKG_CAP_TARGETS.clear()
+            _PKG_CAP_TARGETS = [("perl(Error)", "perl-Error")]
     if not _PKG_CAP_TARGETS:
         pytest.skip("Capability not provided")
     return _PKG_CAP_TARGETS
@@ -892,8 +877,8 @@ def test_pkg_cap_003_installed_multipkg_with_version(
     This is a destructive test as it installs and then removes two packages
     """
     target, realpkg = PKG_CAP_TARGETS[0]
-    version = latest_version(target)
-    realver = latest_version(realpkg)
+    version = modules.pkg.version(target)
+    realver = modules.pkg.version(realpkg)
 
     # If this condition is False, we need to find new targets.
     # This needs to be able to test successful installation of packages.
