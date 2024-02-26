@@ -1,0 +1,26 @@
+name: Full functional tests
+
+on:
+  push:
+    branches: [openSUSE/release/3006.0]
+  pull_request:
+    branches: [openSUSE/release/3006.0]
+  workflow_dispatch:
+
+jobs:
+  full-functional-tests:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_ACTIONS: 1
+    container:
+      image: registry.opensuse.org/systemsmanagement/saltstack/products/testing/containers/leap15.5/containers/salt-testsuite-github:leap15.5
+      options: --hostname=salt-test-container
+    steps:
+      - name: Checkout Salt
+        uses: actions/checkout@v4
+      - name: Fix the Salt version in _version.txt file
+        run: rpm -q python3-salt-testsuite --queryformat '%{VERSION}' > $GITHUB_WORKSPACE/salt/_version.txt
+      - name: Run Full functional tests
+        run: |
+          salt-test --skiplist https://raw.githubusercontent.com/openSUSE/salt-test-skiplist/main/skipped_tests.toml \
+            --directory . --package-flavor classic functional -- --core-tests --slow --run-expensive --ssh-tests --run-destructive -vvv
