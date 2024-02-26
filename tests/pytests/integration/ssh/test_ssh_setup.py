@@ -18,12 +18,14 @@ from tests.support.helpers import Keys
 
 pytest.importorskip("docker")
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 
 log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.skip_if_binaries_missing("dockerd"),
+    pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run in a container"),
 ]
 
 

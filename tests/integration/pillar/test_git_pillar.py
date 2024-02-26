@@ -63,6 +63,7 @@ https://github.com/git/git/commit/6bc0cb5
 https://github.com/unbit/uwsgi/commit/ac1e354
 """
 
+import os
 import random
 import string
 import sys
@@ -100,9 +101,11 @@ try:
 except Exception:  # pylint: disable=broad-except
     HAS_PYGIT2 = False
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 pytestmark = [
     SKIP_INITIAL_PHOTONOS_FAILURES,
     pytest.mark.skip_on_platforms(windows=True, darwin=True),
+    pytest.mark.skipif(INSIDE_CONTAINER, reason="Communication problems between containers."),
 ]
 
 

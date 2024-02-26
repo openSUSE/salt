@@ -3,6 +3,7 @@ Simple Smoke Tests for Connected SSH minions
 """
 
 import subprocess
+import os
 
 import packaging.version
 import pytest
@@ -16,6 +17,7 @@ pytestmark = [
     pytest.mark.skip_on_windows(reason="salt-ssh not available on Windows"),
 ]
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 
 def _check_systemctl():
     if not hasattr(_check_systemctl, "memo"):
@@ -42,6 +44,8 @@ def _check_python():
     ) <= packaging.version.Version("3.10")
 
 
+
+@pytest.mark.skipif(INSIDE_CONTAINER, reason="No systemd in container.")
 @pytest.mark.skip_if_not_root
 @pytest.mark.skipif(_check_systemctl(), reason="systemctl degraded")
 @pytest.mark.skipif(_check_python(), reason="System python less than 3.10")
