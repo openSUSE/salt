@@ -5,6 +5,7 @@
     Test current salt master with older salt minions
 """
 import logging
+import os
 import pathlib
 
 import pytest
@@ -18,6 +19,8 @@ docker = pytest.importorskip("docker")
 
 log = logging.getLogger(__name__)
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
+
 
 pytestmark = [
     pytest.mark.slow_test,
@@ -25,6 +28,7 @@ pytestmark = [
     pytest.mark.skipif(
         salt.utils.platform.is_photonos() is True, reason="Skip on PhotonOS"
     ),
+    pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run in a container"),
 ]
 
 

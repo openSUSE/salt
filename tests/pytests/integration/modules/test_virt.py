@@ -2,6 +2,7 @@
 Validate the virt module
 """
 import logging
+import os
 from numbers import Number
 from xml.etree import ElementTree
 
@@ -14,9 +15,12 @@ docker = pytest.importorskip("docker")
 
 log = logging.getLogger(__name__)
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
+
 pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.skip_if_binaries_missing("docker"),
+    pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run in a container"),
 ]
 
 

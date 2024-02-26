@@ -9,9 +9,12 @@ import pytest
 
 import salt.utils.files
 
+INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
+
 pytestmark = [
     pytest.mark.skip_unless_on_linux,
     pytest.mark.slow_test,
+    pytest.mark.skipif(INSIDE_CONTAINER, reason="No systemd in container."),
 ]
 
 log = logging.getLogger(__name__)
