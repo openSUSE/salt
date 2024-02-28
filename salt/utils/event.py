@@ -270,6 +270,10 @@ class SaltEvent:
             # and don't read out events from the buffer on an on-going basis,
             # the buffer will grow resulting in big memory usage.
             self.connect_pub()
+        self.pusher_send_timeout = self.opts.get(
+            "pusher_send_timeout", self.opts.get("timeout")
+        )
+        self.pusher_send_tries = self.opts.get("pusher_send_tries", 3)
 
     @classmethod
     def __load_cache_regex(cls):
@@ -839,10 +843,18 @@ class SaltEvent:
             ]
         )
         msg = salt.utils.stringutils.to_bytes(event, "utf-8")
+        if timeout is None:
+            timeout_s = self.pusher_send_timeout
+        else:
+            timeout_s = float(timeout) / 1000
         if self._run_io_loop_sync:
             with salt.utils.asynchronous.current_ioloop(self.io_loop):
                 try:
-                    self.pusher.send(msg)
+                    self.pusher.send(
+                        msg,
+                        timeout=timeout_s,
+                        tries=self.pusher_send_tries,
+                    )
                 except Exception as exc:  # pylint: disable=broad-except
                     log.debug(
                         "Publisher send failed with exception: %s",
@@ -851,7 +863,12 @@ class SaltEvent:
                     )
                     raise
         else:
-            self.io_loop.spawn_callback(self.pusher.send, msg)
+            self.io_loop.spawn_callback(
+                self.pusher.send,
+                msg,
+                timeout=timeout_s,
+                tries=self.pusher_send_tries,
+            )
         return True
 
     def fire_master(self, data, tag, timeout=1000):
