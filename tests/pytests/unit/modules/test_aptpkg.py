@@ -25,42 +25,6 @@ from salt.exceptions import (
 )
 from tests.support.mock import MagicMock, Mock, call, mock_open, patch
 
-try:
-    from aptsources.sourceslist import (  # pylint: disable=unused-import
-        SourceEntry,
-        SourcesList,
-    )
-
-    HAS_APT = True
-except ImportError:
-    HAS_APT = False
-
-try:
-    from aptsources import sourceslist  # pylint: disable=unused-import
-
-    HAS_APTSOURCES = True
-except ImportError:
-    HAS_APTSOURCES = False
-
-HAS_DEB822 = False
-
-if HAS_APT:
-    try:
-        from aptsources.sourceslist import Deb822SourceEntry, _deb822 # pylint: disable=unused-import
-
-        HAS_DEB822 = True
-    except ImportError:
-        pass
-
-HAS_APT_PKG = False
-
-try:
-    import apt_pkg
-
-    HAS_APT_PKG = True
-except ImportError:
-    pass
-
 log = logging.getLogger(__name__)
 
 
@@ -424,12 +388,9 @@ def test_get_repo_keys(repo_keys_var):
     mock = MagicMock(return_value={"retcode": 0, "stdout": APT_KEY_LIST})
 
     with patch.dict(aptpkg.__salt__, {"cmd.run_all": mock}):
-        if not HAS_APT:
-            with patch("os.listdir", return_value="/tmp/keys"):
-                with patch("pathlib.Path.is_dir", return_value=True):
-                    assert aptpkg.get_repo_keys() == repo_keys_var
-        else:
-            assert aptpkg.get_repo_keys() == repo_keys_var
+        with patch("os.listdir", return_value="/tmp/keys"):
+            with patch("pathlib.Path.is_dir", return_value=True):
+                assert aptpkg.get_repo_keys() == repo_keys_var
 
 
 def test_file_dict(lowpkg_files_var):
@@ -1564,12 +1525,21 @@ def test_sourceslist_multiple_comps():
                     assert source.dist == "focal-updates"
 
 
-@pytest.mark.skipif(
-    HAS_APTSOURCES is True, reason="Only run test with python3-apt library is missing."
-)
-@pytest.mark.parametrize(
-    "repo_line",
-    [
+@pytest.mark.usefixtures("_test_sourceslist_multiple_comps_fs")
+def test_sourceslist_multiple_comps():
+    """
+    Test SourcesList when repo has multiple comps
+    """
+    sources = aptpkg.SourcesList()
+    for source in sources:
+        assert source.type == "deb"
+        assert source.uri == "http://archive.ubuntu.com/ubuntu/"
+        assert source.comps == ["main", "restricted"]
+        assert source.dist == "focal-updates"
+
+
+@pytest.fixture(
+    params=(
         "deb [ arch=amd64 ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64 ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64 test=one ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
@@ -1577,8 +1547,14 @@ def test_sourceslist_multiple_comps():
         "deb [ arch=amd64,armel test=one ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [ arch=amd64,armel test=one] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
-    ],
+    )
 )
+def repo_line(request, fs):
+    fs.create_dir("/etc/apt/sources.list.d")
+    fs.create_file("/etc/apt/sources.list", contents=request.param)
+    yield request.param
+
+
 def test_sourceslist_architectures(repo_line):
     """
     Test SourcesList when architectures is in repo
