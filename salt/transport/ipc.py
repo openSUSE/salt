@@ -2,7 +2,6 @@
 IPC transport classes
 """
 
-
 import errno
 import logging
 import socket
@@ -435,8 +434,6 @@ class IPCMessageClient(IPCClient):
         "close",
     ]
 
-    # FIXME timeout unimplemented
-    # FIXME tries unimplemented
     @salt.ext.tornado.gen.coroutine
     def send(self, msg, timeout=None, tries=None):
         """
@@ -445,12 +442,60 @@ class IPCMessageClient(IPCClient):
         If the socket is not currently connected, a connection will be established.
 
         :param dict msg: The message to be sent
-        :param int timeout: Timeout when sending message (Currently unimplemented)
+        :param int timeout: Timeout when sending message
+        :param int tries: Maximum numer of tries to send message
         """
-        if not self.connected():
-            yield self.connect()
+        if tries is None or tries < 1:
+            tries = 1
+        due_time = None
+        if timeout is not None:
+            due_time = time.time() + timeout
+        _try = 1
+        exc_count = 0
         pack = salt.transport.frame.frame_msg_ipc(msg, raw_body=True)
-        yield self.stream.write(pack)
+        while _try <= tries:
+            if not self.connected():
+                self.close()
+                self.stream = None
+                self._closing = False
+                try:
+                    yield self.connect(
+                        timeout=(
+                            None if due_time is None else max(due_time - time.time(), 1)
+                        )
+                    )
+                except StreamClosedError:
+                    log.warning(
+                        "IPCMessageClient: Unable to reconnect IPC stream on sending message with ID: 0x%016x%s",
+                        id(msg),
+                        f", retry {_try} of {tries}" if tries > 1 else "",
+                    )
+                    exc_count += 1
+            if self.connected():
+                try:
+                    yield self.stream.write(pack)
+                    return
+                except StreamClosedError:
+                    if self._closing:
+                        break
+                    log.warning(
+                        "IPCMessageClient: Stream was closed on sending message with ID: 0x%016x",
+                        id(msg),
+                    )
+                    exc_count += 1
+                    if exc_count == 1:
+                        # Give one more chance in case if stream was detected as closed
+                        # on the first write attempt
+                        continue
+            cur_time = time.time()
+            _try += 1
+            if _try > tries or (due_time is not None and cur_time > due_time):
+                return
+            yield salt.ext.tornado.gen.sleep(
+                1
+                if due_time is None
+                else (due_time - cur_time) / max(tries - _try + 1, 1)
+            )
 
 
 class IPCMessageServer(IPCServer):
