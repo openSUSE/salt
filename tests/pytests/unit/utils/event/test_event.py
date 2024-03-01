@@ -340,3 +340,46 @@ def test_master_pub_permissions(sock_dir):
         assert bool(os.lstat(p).st_mode & stat.S_IRUSR)
         assert not bool(os.lstat(p).st_mode & stat.S_IRGRP)
         assert not bool(os.lstat(p).st_mode & stat.S_IROTH)
+
+
+@pytest.mark.slow_test
+def test_event_single_timeout_tries(sock_dir):
+    """Test an event is sent with timout and tries"""
+
+    write_calls_count = 0
+    real_stream_write = None
+
+    @salt.ext.tornado.gen.coroutine
+    def write_mock(pack):
+        nonlocal write_calls_count
+        nonlocal real_stream_write
+        write_calls_count += 1
+        if write_calls_count > 3:
+            yield real_stream_write(pack)
+        else:
+            raise salt.ext.tornado.iostream.StreamClosedError()
+
+    with eventpublisher_process(str(sock_dir)), salt.utils.event.MasterEvent(
+        str(sock_dir), listen=True
+    ) as me:
+        me.fire_event({"data": "foo1"}, "evt1")
+        evt1 = me.get_event(tag="evt1")
+        _assert_got_event(evt1, {"data": "foo1"})
+        real_stream_write = me.pusher.stream.write
+        with patch.object(
+            me.pusher,
+            "connected",
+            side_effect=[True, True, False, False, True, True],
+        ), patch.object(
+            me.pusher,
+            "connect",
+            side_effect=salt.ext.tornado.iostream.StreamClosedError,
+        ), patch.object(
+            me.pusher.stream,
+            "write",
+            write_mock,
+        ):
+            me.fire_event({"data": "bar2"}, "evt2", timeout=5000)
+            evt2 = me.get_event(tag="evt2")
+            _assert_got_event(evt2, {"data": "bar2"})
+            assert write_calls_count == 4
