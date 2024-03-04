@@ -8,10 +8,13 @@ import functools
 import logging
 import re
 
+import salt.loader
+
 # Try to import range from https://github.com/ytoolshed/range
 HAS_RANGE = False
 try:
-    import seco.range
+    with salt.loader.LOAD_LOCK:
+        import seco.range
 
     HAS_RANGE = True
 except ImportError:
