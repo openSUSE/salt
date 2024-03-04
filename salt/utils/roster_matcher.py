@@ -8,14 +8,19 @@ import functools
 import logging
 import re
 
+import salt.loader
+
 # Try to import range from https://github.com/ytoolshed/range
 HAS_RANGE = False
 try:
+    salt.loader.LOAD_LOCK.acquire()
     import seco.range
 
     HAS_RANGE = True
 except ImportError:
     pass
+finally:
+    salt.loader.LOAD_LOCK.release()
 # pylint: enable=import-error
 
 

@@ -15,16 +15,21 @@ import copy
 import fnmatch
 import logging
 
+import salt.loader
+
 log = logging.getLogger(__name__)
 
 # Try to import range from https://github.com/ytoolshed/range
 HAS_RANGE = False
 try:
+    salt.loader.LOAD_LOCK.acquire()
     import seco.range
 
     HAS_RANGE = True
 except ImportError:
     log.error("Unable to load range library")
+finally:
+    salt.loader.LOAD_LOCK.release()
 # pylint: enable=import-error
 
 
