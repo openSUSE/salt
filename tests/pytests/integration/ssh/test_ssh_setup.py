@@ -13,9 +13,10 @@ import pytest
 from pytestshellutils.utils.processes import ProcessResult, terminate_process
 from saltfactories.utils import random_string
 
+from salt.utils.versions import Version
 from tests.support.helpers import Keys
 
-pytest.importorskip("docker")
+docker = pytest.importorskip("docker")
 
 INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 
@@ -25,6 +26,10 @@ pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.skip_if_binaries_missing("dockerd"),
     pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run in a container"),
+    pytest.mark.skipif(
+        Version(docker.__version__) < Version("4.0.0"),
+        reason="Test does not work in this version of docker-py",
+    ),
 ]
 
 
