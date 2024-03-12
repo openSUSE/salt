@@ -105,7 +105,7 @@ def test_run(cmdmod):
             template="jinja",
             python_shell=True,
         )
-        == "func-tests-minion"
+        == "func-tests-minion-opts"
     )
     assert cmdmod.run("grep f", stdin="one\ntwo\nthree\nfour\nfive\n") == "four\nfive"
     assert cmdmod.run('echo "a=b" | sed -e s/=/:/g', python_shell=True) == "a:b"
