@@ -31,7 +31,7 @@ def test_openscap_xccdf_eval_success(policy_file, tmp_path):
     mock_mkdtemp = Mock(return_value=str(tmp_path))
     patch_mkdtemp = patch("tempfile.mkdtemp", mock_mkdtemp)
     mock_popen = MagicMock(
-        return_value=Mock(**{"returncode": 0, "communicate.return_value": ("", "")})
+        return_value=Mock(**{"returncode": 0, "communicate.return_value": (bytes(0), bytes(0))})
     )
     patch_popen = patch.object(openscap, "Popen", mock_popen)
     with patch_popen, patch_rmtree, patch_mkdtemp:
@@ -74,7 +74,7 @@ def test_openscap_xccdf_eval_success_with_failing_rules(policy_file, tmp_path):
     patch_mkdtemp = patch("tempfile.mkdtemp", mock_mkdtemp)
     mock_popen = MagicMock(
         return_value=Mock(
-            **{"returncode": 2, "communicate.return_value": ("", "some error")}
+            **{"returncode": 2, "communicate.return_value": (bytes(0), bytes("some error", "UTF-8"))}
         )
     )
     patch_popen = patch.object(openscap, "Popen", mock_popen)
@@ -129,7 +129,7 @@ def test_openscap_xccdf_eval_success_ignore_unknown_params(tmp_path):
     patch_mkdtemp = patch("tempfile.mkdtemp", mock_mkdtemp)
     mock_popen = MagicMock(
         return_value=Mock(
-            **{"returncode": 2, "communicate.return_value": ("", "some error")}
+            **{"returncode": 2, "communicate.return_value": (bytes(0), bytes("some error", "UTF-8"))}
         )
     )
     patch_popen = patch("salt.modules.openscap.Popen", mock_popen)
@@ -168,7 +168,7 @@ def test_openscap_xccdf_eval_evaluation_error(policy_file):
         return_value=Mock(
             **{
                 "returncode": 1,
-                "communicate.return_value": ("", "evaluation error"),
+                "communicate.return_value": (bytes(0), bytes("evaluation error", "UTF-8")),
             }
         )
     )
@@ -201,7 +201,7 @@ def test_openscap_xccdf_eval_evaluation_unknown_error(policy_file):
         return_value=Mock(
             **{
                 "returncode": 255,
-                "communicate.return_value": ("", "unknown error"),
+                "communicate.return_value": (bytes(0), bytes("unknown error", "UTF-8")),
             }
         )
     )
@@ -222,7 +222,7 @@ def test_new_openscap_xccdf_eval_success(policy_file, tmp_path):
     mock_mkdtemp = Mock(return_value=str(tmp_path))
     patch_mkdtemp = patch("tempfile.mkdtemp", mock_mkdtemp)
     mock_popen = MagicMock(
-        return_value=Mock(**{"returncode": 0, "communicate.return_value": ("", "")})
+        return_value=Mock(**{"returncode": 0, "communicate.return_value": (bytes(0), bytes(0))})
     )
     patch_popen = patch.object(openscap, "Popen", mock_popen)
     with patch_popen, patch_rmtree, patch_mkdtemp:
@@ -270,7 +270,7 @@ def test_new_openscap_xccdf_eval_success_with_extra_ovalfiles(policy_file, tmp_p
     mock_mkdtemp = Mock(return_value=str(tmp_path))
     patch_mkdtemp = patch("tempfile.mkdtemp", mock_mkdtemp)
     mock_popen = MagicMock(
-        return_value=Mock(**{"returncode": 0, "communicate.return_value": ("", "")})
+        return_value=Mock(**{"returncode": 0, "communicate.return_value": (bytes(0), bytes(0))})
     )
     patch_popen = patch.object(openscap, "Popen", mock_popen)
     with patch_popen, patch_rmtree, patch_mkdtemp:
@@ -322,7 +322,7 @@ def test_new_openscap_xccdf_eval_success_with_failing_rules(policy_file, tmp_pat
     patch_mkdtemp = patch("tempfile.mkdtemp", mock_mkdtemp)
     mock_popen = MagicMock(
         return_value=Mock(
-            **{"returncode": 2, "communicate.return_value": ("", "some error")}
+            **{"returncode": 2, "communicate.return_value": (bytes(0), bytes("some error", "UTF-8"))}
         )
     )
     patch_popen = patch.object(openscap, "Popen", mock_popen)
@@ -372,7 +372,7 @@ def test_new_openscap_xccdf_eval_success_ignore_unknown_params(tmp_path):
     patch_mkdtemp = patch("tempfile.mkdtemp", mock_mkdtemp)
     mock_popen = MagicMock(
         return_value=Mock(
-            **{"returncode": 2, "communicate.return_value": ("", "some error")}
+            **{"returncode": 2, "communicate.return_value": (bytes(0), bytes("some error", "UTF-8"))}
         )
     )
     patch_popen = patch("salt.modules.openscap.Popen", mock_popen)
@@ -418,7 +418,7 @@ def test_new_openscap_xccdf_eval_evaluation_error(policy_file):
         return_value=Mock(
             **{
                 "returncode": 1,
-                "communicate.return_value": ("", "evaluation error"),
+                "communicate.return_value": (bytes(0), bytes("evaluation error", "UTF-8")),
             }
         )
     )
