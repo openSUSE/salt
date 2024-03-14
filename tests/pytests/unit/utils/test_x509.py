@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import salt.exceptions
-import salt.utils.x509 as x509
 from tests.support.mock import ANY, Mock, patch
 
 cryptography = pytest.importorskip(
@@ -14,6 +13,21 @@ cx509 = pytest.importorskip("cryptography.x509", reason="Needs cryptography libr
 cprim = pytest.importorskip(
     "cryptography.hazmat.primitives", reason="Needs cryptography library"
 )
+x509 = pytest.importorskip("salt.utils.x509")
+
+try:
+    import cryptography
+    import cryptography.x509 as cx509
+
+    HAS_LIBS = True
+except ImportError:
+    HAS_LIBS = False
+
+pytestmark = [
+    pytest.mark.skipif(HAS_LIBS is False, reason="Needs cryptography library")
+]
+
+CRYPTOGRAPHY_VERSION = tuple(int(x) for x in cryptography.__version__.split("."))
 
 
 @pytest.fixture
