@@ -14,6 +14,7 @@ from saltfactories.utils import random_string
 
 import salt.utils.x509 as x509util
 from tests.conftest import FIPS_TESTRUN
+x509util = pytest.importorskip("salt.utils.x509")
 
 try:
     import cryptography
