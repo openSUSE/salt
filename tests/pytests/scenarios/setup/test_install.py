@@ -17,10 +17,15 @@ import salt.utils.platform
 import salt.version
 from salt.modules.virtualenv_mod import KNOWN_BINARY_NAMES
 from salt.version import SaltStackVersion
+from tests.support.runtests import RUNTIME_VARS
 
 log = logging.getLogger(__name__)
 
 INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
+
+MISSING_SETUP_PY_FILE = not os.path.exists(
+    os.path.join(RUNTIME_VARS.CODE_DIR, "setup.py")
+)
 
 pytestmark = [
     pytest.mark.core_test,
@@ -29,6 +34,9 @@ pytestmark = [
     pytest.mark.skip_if_binaries_missing(*KNOWN_BINARY_NAMES, check_all=False),
     pytest.mark.skipif(
         INSIDE_CONTAINER, reason="No gcc and python3-devel in container."
+    ),
+    pytest.mark.skipif(
+        MISSING_SETUP_PY_FILE, reason="This test only work if setup.py is available"
     ),
 ]
 

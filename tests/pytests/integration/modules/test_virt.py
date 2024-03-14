@@ -10,6 +10,7 @@ from xml.etree import ElementTree
 import pytest
 
 from tests.conftest import FIPS_TESTRUN
+from salt.utils.versions import Version
 from tests.support.virt import SaltVirtMinionContainerFactory
 
 docker = pytest.importorskip("docker")
@@ -23,6 +24,10 @@ pytestmark = [
     pytest.mark.timeout_unless_on_windows(120),
     pytest.mark.skip_if_binaries_missing("docker"),
     pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run in a container"),
+    pytest.mark.skipif(
+        Version(docker.__version__) < Version("4.0.0"),
+        reason="Test does not work in this version of docker-py",
+    ),
 ]
 
 

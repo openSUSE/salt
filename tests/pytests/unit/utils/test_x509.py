@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import salt.exceptions
-import salt.utils.x509 as x509
+x509 = pytest.importorskip("salt.utils.x509")
 from tests.support.mock import ANY, Mock, patch
 
 cryptography = pytest.importorskip(
