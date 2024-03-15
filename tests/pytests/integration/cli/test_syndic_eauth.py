@@ -6,8 +6,6 @@ import time
 
 import pytest
 
-from tests.conftest import CODE_DIR
-
 docker = pytest.importorskip("docker", minversion="4.0.0")
 
 INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
