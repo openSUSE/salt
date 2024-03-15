@@ -2,11 +2,8 @@
 Helpers/utils for working with tornado asynchronous stuff
 """
 
-
 import contextlib
 import logging
-import sys
-import threading
 
 import salt.ext.tornado.concurrent
 import salt.ext.tornado.ioloop
@@ -111,29 +108,11 @@ class SyncWrapper:
 
     def _wrap(self, key):
         def wrap(*args, **kwargs):
-            results = []
-            thread = threading.Thread(
-                target=self._target,
-                args=(key, args, kwargs, results, self.io_loop),
+            return self.io_loop.run_sync(
+                lambda: getattr(self.obj, key)(*args, **kwargs)
             )
-            thread.start()
-            thread.join()
-            if results[0]:
-                return results[1]
-            else:
-                exc_info = results[1]
-                raise exc_info[1].with_traceback(exc_info[2])
 
         return wrap
-
-    def _target(self, key, args, kwargs, results, io_loop):
-        try:
-            result = io_loop.run_sync(lambda: getattr(self.obj, key)(*args, **kwargs))
-            results.append(True)
-            results.append(result)
-        except Exception:  # pylint: disable=broad-except
-            results.append(False)
-            results.append(sys.exc_info())
 
     def __enter__(self):
         return self
