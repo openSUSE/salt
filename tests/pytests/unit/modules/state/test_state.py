@@ -610,7 +610,7 @@ def test_show_states_missing_sls():
     chunks_mock = MagicMock(side_effect=[msg])
     mock = MagicMock(side_effect=["A", None])
     with patch.object(state, "_check_queue", mock), patch(
-        "salt.state.HighState.compile_low_chunks", chunks_mock
+        "salt.modules.state.salt.state.HighState.compile_low_chunks", chunks_mock
     ):
         assert state.show_low_sls("foo") == "A"
         assert state.show_states("foo") == [msg[0]]
