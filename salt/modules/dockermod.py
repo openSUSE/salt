@@ -206,8 +206,8 @@ import json
 import logging
 import os
 import pathlib
-import pipes
 import re
+import shlex
 import shutil
 import string
 import subprocess
@@ -257,7 +257,6 @@ except ImportError:
 
 HAS_NSENTER = bool(salt.utils.path.which("nsenter"))
 
-# Set up logging
 log = logging.getLogger(__name__)
 
 # Don't shadow built-in's.
@@ -397,7 +396,7 @@ def _get_client(timeout=NOTSET, **kwargs):
             )
         except Exception as exc:  # pylint: disable=broad-except
             raise CommandExecutionError(
-                "Docker machine {} failed: {}".format(docker_machine, exc)
+                f"Docker machine {docker_machine} failed: {exc}"
             )
     try:
         # docker-py 2.0 renamed this client attribute
@@ -497,7 +496,7 @@ def _change_state(name, action, expected, *args, **kwargs):
         return {
             "result": False,
             "state": {"old": expected, "new": expected},
-            "comment": "Container '{}' already {}".format(name, expected),
+            "comment": f"Container '{name}' already {expected}",
         }
     _client_wrapper(action, name, *args, **kwargs)
     _clear_context()
@@ -535,9 +534,7 @@ def _get_md5(name, path):
     """
     Get the MD5 checksum of a file from a container
     """
-    output = run_stdout(
-        name, "md5sum {}".format(pipes.quote(path)), ignore_retcode=True
-    )
+    output = run_stdout(name, f"md5sum {shlex.quote(path)}", ignore_retcode=True)
     try:
         return output.split()[0]
     except IndexError:
@@ -616,7 +613,7 @@ def _scrub_links(links, name):
     if isinstance(links, list):
         ret = []
         for l in links:
-            ret.append(l.replace("/{}/".format(name), "/", 1))
+            ret.append(l.replace(f"/{name}/", "/", 1))
     else:
         ret = links
 
@@ -639,11 +636,11 @@ def _size_fmt(num):
     try:
         num = int(num)
         if num < 1024:
-            return "{} bytes".format(num)
+            return f"{num} bytes"
         num /= 1024.0
         for unit in ("KiB", "MiB", "GiB", "TiB", "PiB"):
             if num < 1024.0:
-                return "{:3.1f} {}".format(num, unit)
+                return f"{num:3.1f} {unit}"
             num /= 1024.0
     except Exception:  # pylint: disable=broad-except
         log.error("Unable to format file size for '%s'", num)
@@ -658,7 +655,7 @@ def _client_wrapper(attr, *args, **kwargs):
     catch_api_errors = kwargs.pop("catch_api_errors", True)
     func = getattr(__context__["docker.client"], attr, None)
     if func is None or not hasattr(func, "__call__"):
-        raise SaltInvocationError("Invalid client action '{}'".format(attr))
+        raise SaltInvocationError(f"Invalid client action '{attr}'")
     if attr in ("push", "pull"):
         try:
             # Refresh auth config from config.json
@@ -678,7 +675,7 @@ def _client_wrapper(attr, *args, **kwargs):
         if catch_api_errors:
             # Generic handling of Docker API errors
             raise CommandExecutionError(
-                "Error {}: {}".format(exc.response.status_code, exc.explanation)
+                f"Error {exc.response.status_code}: {exc.explanation}"
             )
         else:
             # Allow API errors to be caught further up the stack
@@ -693,9 +690,9 @@ def _client_wrapper(attr, *args, **kwargs):
 
     # If we're here, it's because an exception was caught earlier, and the
     # API command failed.
-    msg = "Unable to perform {}".format(attr)
+    msg = f"Unable to perform {attr}"
     if err:
-        msg += ": {}".format(err)
+        msg += f": {err}"
     raise CommandExecutionError(msg)
 
 
@@ -722,7 +719,7 @@ def _import_status(data, item, repo_name, repo_tag):
             return
         elif all(x in string.hexdigits for x in status):
             # Status is an image ID
-            data["Image"] = "{}:{}".format(repo_name, repo_tag)
+            data["Image"] = f"{repo_name}:{repo_tag}"
             data["Id"] = status
     except (AttributeError, TypeError):
         pass
@@ -881,7 +878,7 @@ def _get_create_kwargs(
     ignore_collisions=False,
     validate_ip_addrs=True,
     client_args=None,
-    **kwargs
+    **kwargs,
 ):
     """
     Take input kwargs and return a kwargs dict to pass to docker-py's
@@ -899,7 +896,7 @@ def _get_create_kwargs(
         skip_translate=skip_translate,
         ignore_collisions=ignore_collisions,
         validate_ip_addrs=validate_ip_addrs,
-        **__utils__["args.clean_kwargs"](**kwargs)
+        **__utils__["args.clean_kwargs"](**kwargs),
     )
 
     if networks:
@@ -912,7 +909,7 @@ def _get_create_kwargs(
             log.error(
                 "docker.create: Error getting client args: '%s'", exc, exc_info=True
             )
-            raise CommandExecutionError("Failed to get client args: {}".format(exc))
+            raise CommandExecutionError(f"Failed to get client args: {exc}")
 
     full_host_config = {}
     host_kwargs = {}
@@ -1473,15 +1470,15 @@ def login(*registries):
     results = ret.setdefault("Results", {})
     for registry in registries:
         if registry not in registry_auth:
-            errors.append("No match found for registry '{}'".format(registry))
+            errors.append(f"No match found for registry '{registry}'")
             continue
         try:
             username = registry_auth[registry]["username"]
             password = registry_auth[registry]["password"]
         except TypeError:
-            errors.append("Invalid configuration for registry '{}'".format(registry))
+            errors.append(f"Invalid configuration for registry '{registry}'")
         except KeyError as exc:
-            errors.append("Missing {} for registry '{}'".format(exc, registry))
+            errors.append(f"Missing {exc} for registry '{registry}'")
         else:
             cmd = ["docker", "login", "-u", username, "-p", password]
             if registry.lower() != "hub":
@@ -1567,7 +1564,7 @@ def logout(*registries):
     results = ret.setdefault("Results", {})
     for registry in registries:
         if registry not in registry_auth:
-            errors.append("No match found for registry '{}'".format(registry))
+            errors.append(f"No match found for registry '{registry}'")
             continue
         else:
             cmd = ["docker", "logout"]
@@ -1689,7 +1686,7 @@ def exists(name):
 
         salt myminion docker.exists mycontainer
     """
-    contextkey = "docker.exists.{}".format(name)
+    contextkey = f"docker.exists.{name}"
     if contextkey in __context__:
         return __context__[contextkey]
     try:
@@ -1780,7 +1777,7 @@ def history(name, quiet=False):
             )
         for param in ("Size",):
             if param in step:
-                step["{}_Human".format(param)] = _size_fmt(step[param])
+                step[f"{param}_Human"] = _size_fmt(step[param])
         ret.append(copy.deepcopy(step))
     if quiet:
         return [x.get("Command") for x in ret]
@@ -1842,9 +1839,7 @@ def images(verbose=False, **kwargs):
                 )
             for param in ("Size", "VirtualSize"):
                 if param in bucket.get(img_id, {}):
-                    bucket[img_id]["{}_Human".format(param)] = _size_fmt(
-                        bucket[img_id][param]
-                    )
+                    bucket[img_id][f"{param}_Human"] = _size_fmt(bucket[img_id][param])
 
     context_data = __context__.get("docker.images", {})
     ret = copy.deepcopy(context_data.get("tagged", {}))
@@ -1927,7 +1922,7 @@ def inspect(name):
             raise
 
     raise CommandExecutionError(
-        "Error 404: No such image/container/volume/network: {}".format(name)
+        f"Error 404: No such image/container/volume/network: {name}"
     )
 
 
@@ -1983,7 +1978,7 @@ def inspect_image(name):
     ret = _client_wrapper("inspect_image", name)
     for param in ("Size", "VirtualSize"):
         if param in ret:
-            ret["{}_Human".format(param)] = _size_fmt(ret[param])
+            ret[f"{param}_Human"] = _size_fmt(ret[param])
     return ret
 
 
@@ -2277,7 +2272,7 @@ def port(name, private_port=None):
     else:
         # Sanity checks
         if isinstance(private_port, int):
-            pattern = "{}/*".format(private_port)
+            pattern = f"{private_port}/*"
         else:
             err = (
                 "Invalid private_port '{}'. Must either be a port number, "
@@ -2398,7 +2393,7 @@ def state(name):
 
         salt myminion docker.state mycontainer
     """
-    contextkey = "docker.state.{}".format(name)
+    contextkey = f"docker.state.{name}"
     if contextkey in __context__:
         return __context__[contextkey]
     __context__[contextkey] = _get_state(inspect_container(name))
@@ -2438,9 +2433,7 @@ def search(name, official=False, trusted=False):
     """
     response = _client_wrapper("search", name)
     if not response:
-        raise CommandExecutionError(
-            "No images matched the search string '{}'".format(name)
-        )
+        raise CommandExecutionError(f"No images matched the search string '{name}'")
 
     key_map = {
         "description": "Description",
@@ -2555,7 +2548,7 @@ def create(
     ignore_collisions=False,
     validate_ip_addrs=True,
     client_timeout=salt.utils.dockermod.CLIENT_TIMEOUT,
-    **kwargs
+    **kwargs,
 ):
     """
     Create a new container
@@ -3281,7 +3274,7 @@ def create(
         skip_translate=skip_translate,
         ignore_collisions=ignore_collisions,
         validate_ip_addrs=validate_ip_addrs,
-        **kwargs
+        **kwargs,
     )
 
     if unused_kwargs:
@@ -3293,7 +3286,7 @@ def create(
 
     log.debug(
         "docker.create: creating container %susing the following arguments: %s",
-        "with name '{}' ".format(name) if name is not None else "",
+        f"with name '{name}' " if name is not None else "",
         kwargs,
     )
     time_started = time.time()
@@ -3331,7 +3324,7 @@ def run_container(
     replace=False,
     force=False,
     networks=None,
-    **kwargs
+    **kwargs,
 ):
     """
     .. versionadded:: 2018.3.0
@@ -3433,7 +3426,7 @@ def run_container(
         skip_translate=skip_translate,
         ignore_collisions=ignore_collisions,
         validate_ip_addrs=validate_ip_addrs,
-        **kwargs
+        **kwargs,
     )
 
     # _get_create_kwargs() will have processed auto_remove and put it into the
@@ -3458,7 +3451,7 @@ def run_container(
 
     log.debug(
         "docker.create: creating container %susing the following arguments: %s",
-        "with name '{}' ".format(name) if name is not None else "",
+        f"with name '{name}' " if name is not None else "",
         kwargs,
     )
 
@@ -3498,7 +3491,7 @@ def run_container(
                         rm_(name)
                     except CommandExecutionError as rm_exc:
                         exc_info.setdefault("other_errors", []).append(
-                            "Failed to auto_remove container: {}".format(rm_exc)
+                            f"Failed to auto_remove container: {rm_exc}"
                         )
                 # Raise original exception with additional info
                 raise CommandExecutionError(exc.__str__(), info=exc_info)
@@ -3593,7 +3586,7 @@ def copy_from(name, source, dest, overwrite=False, makedirs=False):
     """
     c_state = state(name)
     if c_state != "running":
-        raise CommandExecutionError("Container '{}' is not running".format(name))
+        raise CommandExecutionError(f"Container '{name}' is not running")
 
     # Destination file sanity checks
     if not os.path.isabs(dest):
@@ -3619,9 +3612,7 @@ def copy_from(name, source, dest, overwrite=False, makedirs=False):
                         )
                     )
             else:
-                raise SaltInvocationError(
-                    "Directory {} does not exist".format(dest_dir)
-                )
+                raise SaltInvocationError(f"Directory {dest_dir} does not exist")
     if not overwrite and os.path.exists(dest):
         raise CommandExecutionError(
             "Destination path {} already exists. Use overwrite=True to "
@@ -3632,19 +3623,14 @@ def copy_from(name, source, dest, overwrite=False, makedirs=False):
     if not os.path.isabs(source):
         raise SaltInvocationError("Source path must be absolute")
     else:
-        if (
-            retcode(name, "test -e {}".format(pipes.quote(source)), ignore_retcode=True)
-            == 0
-        ):
+        if retcode(name, f"test -e {shlex.quote(source)}", ignore_retcode=True) == 0:
             if (
-                retcode(
-                    name, "test -f {}".format(pipes.quote(source)), ignore_retcode=True
-                )
+                retcode(name, f"test -f {shlex.quote(source)}", ignore_retcode=True)
                 != 0
             ):
                 raise SaltInvocationError("Source must be a regular file")
         else:
-            raise SaltInvocationError("Source file {} does not exist".format(source))
+            raise SaltInvocationError(f"Source file {source} does not exist")
 
     # Before we try to replace the file, compare checksums.
     source_md5 = _get_md5(name, source)
@@ -3657,7 +3643,7 @@ def copy_from(name, source, dest, overwrite=False, makedirs=False):
     try:
         src_path = ":".join((name, source))
     except TypeError:
-        src_path = "{}:{}".format(name, source)
+        src_path = f"{name}:{source}"
     cmd = ["docker", "cp", src_path, dest_dir]
     __salt__["cmd.run"](cmd, python_shell=False)
     return source_md5 == __salt__["file.get_sum"](dest, "md5")
@@ -3784,7 +3770,7 @@ def export(name, path, overwrite=False, makedirs=False, compression=None, **kwar
         salt myminion docker.export mycontainer /tmp/mycontainer.tar
         salt myminion docker.export mycontainer /tmp/mycontainer.tar.xz push=True
     """
-    err = "Path '{}' is not absolute".format(path)
+    err = f"Path '{path}' is not absolute"
     try:
         if not os.path.isabs(path):
             raise SaltInvocationError(err)
@@ -3792,7 +3778,7 @@ def export(name, path, overwrite=False, makedirs=False, compression=None, **kwar
         raise SaltInvocationError(err)
 
     if os.path.exists(path) and not overwrite:
-        raise CommandExecutionError("{} already exists".format(path))
+        raise CommandExecutionError(f"{path} already exists")
 
     if compression is None:
         if path.endswith(".tar.gz") or path.endswith(".tgz"):
@@ -3815,7 +3801,7 @@ def export(name, path, overwrite=False, makedirs=False, compression=None, **kwar
         compression = "xz"
 
     if compression and compression not in ("gzip", "bzip2", "xz"):
-        raise SaltInvocationError("Invalid compression type '{}'".format(compression))
+        raise SaltInvocationError(f"Invalid compression type '{compression}'")
 
     parent_dir = os.path.dirname(path)
     if not os.path.isdir(parent_dir):
@@ -3828,16 +3814,14 @@ def export(name, path, overwrite=False, makedirs=False, compression=None, **kwar
             os.makedirs(parent_dir)
         except OSError as exc:
             raise CommandExecutionError(
-                "Unable to make parent dir {}: {}".format(parent_dir, exc)
+                f"Unable to make parent dir {parent_dir}: {exc}"
             )
 
     if compression == "gzip":
         try:
             out = gzip.open(path, "wb")
         except OSError as exc:
-            raise CommandExecutionError(
-                "Unable to open {} for writing: {}".format(path, exc)
-            )
+            raise CommandExecutionError(f"Unable to open {path} for writing: {exc}")
     elif compression == "bzip2":
         compressor = bz2.BZ2Compressor()
     elif compression == "xz":
@@ -3875,9 +3859,7 @@ def export(name, path, overwrite=False, makedirs=False, compression=None, **kwar
             os.remove(path)
         except OSError:
             pass
-        raise CommandExecutionError(
-            "Error occurred during container export: {}".format(exc)
-        )
+        raise CommandExecutionError(f"Error occurred during container export: {exc}")
     finally:
         out.close()
     ret = {"Time_Elapsed": time.time() - time_started}
@@ -4112,7 +4094,7 @@ def build(
     # For the build function in the low-level API, the "tag" refers to the full
     # tag (e.g. myuser/myimage:mytag). This is different than in other
     # functions, where the repo and tag are passed separately.
-    image_tag = "{}:{}".format(repository, tag) if repository and tag else None
+    image_tag = f"{repository}:{tag}" if repository and tag else None
 
     time_started = time.time()
     response = _client_wrapper(
@@ -4131,7 +4113,7 @@ def build(
 
     if not response:
         raise CommandExecutionError(
-            "Build failed for {}, no response returned from Docker API".format(path)
+            f"Build failed for {path}, no response returned from Docker API"
         )
 
     stream_data = []
@@ -4168,7 +4150,7 @@ def build(
     if "Id" not in ret:
         # API returned information, but there was no confirmation of a
         # successful build.
-        msg = "Build failed for {}".format(path)
+        msg = f"Build failed for {path}"
         log.error(msg)
         log.error(stream_data)
         if errors:
@@ -4179,7 +4161,7 @@ def build(
     if resolved_tag:
         ret["Image"] = resolved_tag
     else:
-        ret["Warning"] = "Failed to tag image as {}".format(image_tag)
+        ret["Warning"] = f"Failed to tag image as {image_tag}"
 
     if api_response:
         ret["API_Response"] = stream_data
@@ -4386,7 +4368,7 @@ def import_(source, repository, tag="latest", api_response=False):
 
     if not response:
         raise CommandExecutionError(
-            "Import failed for {}, no response returned from Docker API".format(source)
+            f"Import failed for {source}, no response returned from Docker API"
         )
     elif api_response:
         ret["API_Response"] = response
@@ -4406,7 +4388,7 @@ def import_(source, repository, tag="latest", api_response=False):
     if "Id" not in ret:
         # API returned information, but there was no confirmation of a
         # successful push.
-        msg = "Import failed for {}".format(source)
+        msg = f"Import failed for {source}"
         if errors:
             msg += ". Error(s) follow:\n\n{}".format("\n\n".join(errors))
         raise CommandExecutionError(msg)
@@ -4481,7 +4463,7 @@ def load(path, repository=None, tag=None):
 
     local_path = __salt__["container_resource.cache_file"](path)
     if not os.path.isfile(local_path):
-        raise CommandExecutionError("Source file {} does not exist".format(path))
+        raise CommandExecutionError(f"Source file {path} does not exist")
 
     pre = images(all=True)
     cmd = ["docker", "load", "-i", local_path]
@@ -4491,7 +4473,7 @@ def load(path, repository=None, tag=None):
     _clear_context()
     post = images(all=True)
     if result["retcode"] != 0:
-        msg = "Failed to load image(s) from {}".format(path)
+        msg = f"Failed to load image(s) from {path}"
         if result["stderr"]:
             msg += ": {}".format(result["stderr"])
         raise CommandExecutionError(msg)
@@ -4512,7 +4494,7 @@ def load(path, repository=None, tag=None):
             # strings when passed (e.g. a numeric tag would be loaded as an int
             # or float), and because the tag_ function will stringify them if
             # need be, a str.format is the correct thing to do here.
-            tagged_image = "{}:{}".format(repository, tag)
+            tagged_image = f"{repository}:{tag}"
             try:
                 result = tag_(top_level_images[0], repository=repository, tag=tag)
                 ret["Image"] = tagged_image
@@ -4549,7 +4531,7 @@ def layers(name):
     ):
         ret.append(line)
     if not ret:
-        raise CommandExecutionError("Image '{}' not found".format(name))
+        raise CommandExecutionError(f"Image '{name}' not found")
     return ret
 
 
@@ -4620,7 +4602,7 @@ def pull(
 
     if not response:
         raise CommandExecutionError(
-            "Pull failed for {}, no response returned from Docker API".format(image)
+            f"Pull failed for {image}, no response returned from Docker API"
         )
     elif api_response:
         ret["API_Response"] = response
@@ -4633,7 +4615,7 @@ def pull(
             event = salt.utils.json.loads(event)
         except Exception as exc:  # pylint: disable=broad-except
             raise CommandExecutionError(
-                "Unable to interpret API event: '{}'".format(event),
+                f"Unable to interpret API event: '{event}'",
                 info={"Error": exc.__str__()},
             )
         try:
@@ -4715,7 +4697,7 @@ def push(
 
     if not response:
         raise CommandExecutionError(
-            "Push failed for {}, no response returned from Docker API".format(image)
+            f"Push failed for {image}, no response returned from Docker API"
         )
     elif api_response:
         ret["API_Response"] = response
@@ -4727,7 +4709,7 @@ def push(
             event = salt.utils.json.loads(event)
         except Exception as exc:  # pylint: disable=broad-except
             raise CommandExecutionError(
-                "Unable to interpret API event: '{}'".format(event),
+                f"Unable to interpret API event: '{event}'",
                 info={"Error": exc.__str__()},
             )
         try:
@@ -4807,9 +4789,7 @@ def rmi(*names, **kwargs):
                         err += "image(s): {}".format(", ".join(deps["Images"]))
                     errors.append(err)
             else:
-                errors.append(
-                    "Error {}: {}".format(exc.response.status_code, exc.explanation)
-                )
+                errors.append(f"Error {exc.response.status_code}: {exc.explanation}")
 
     _clear_context()
     ret = {
@@ -4897,7 +4877,7 @@ def save(name, path, overwrite=False, makedirs=False, compression=None, **kwargs
         salt myminion docker.save centos:7 /tmp/cent7.tar
         salt myminion docker.save 0123456789ab cdef01234567 /tmp/saved.tar
     """
-    err = "Path '{}' is not absolute".format(path)
+    err = f"Path '{path}' is not absolute"
     try:
         if not os.path.isabs(path):
             raise SaltInvocationError(err)
@@ -4905,7 +4885,7 @@ def save(name, path, overwrite=False, makedirs=False, compression=None, **kwargs
         raise SaltInvocationError(err)
 
     if os.path.exists(path) and not overwrite:
-        raise CommandExecutionError("{} already exists".format(path))
+        raise CommandExecutionError(f"{path} already exists")
 
     if compression is None:
         if path.endswith(".tar.gz") or path.endswith(".tgz"):
@@ -4928,7 +4908,7 @@ def save(name, path, overwrite=False, makedirs=False, compression=None, **kwargs
         compression = "xz"
 
     if compression and compression not in ("gzip", "bzip2", "xz"):
-        raise SaltInvocationError("Invalid compression type '{}'".format(compression))
+        raise SaltInvocationError(f"Invalid compression type '{compression}'")
 
     parent_dir = os.path.dirname(path)
     if not os.path.isdir(parent_dir):
@@ -4950,7 +4930,7 @@ def save(name, path, overwrite=False, makedirs=False, compression=None, **kwargs
     time_started = time.time()
     result = __salt__["cmd.run_all"](cmd, python_shell=False)
     if result["retcode"] != 0:
-        err = "Failed to save image(s) to {}".format(path)
+        err = f"Failed to save image(s) to {path}"
         if result["stderr"]:
             err += ": {}".format(result["stderr"])
         raise CommandExecutionError(err)
@@ -4960,9 +4940,7 @@ def save(name, path, overwrite=False, makedirs=False, compression=None, **kwargs
             try:
                 out = gzip.open(path, "wb")
             except OSError as exc:
-                raise CommandExecutionError(
-                    "Unable to open {} for writing: {}".format(path, exc)
-                )
+                raise CommandExecutionError(f"Unable to open {path} for writing: {exc}")
         elif compression == "bzip2":
             compressor = bz2.BZ2Compressor()
         elif compression == "xz":
@@ -4998,9 +4976,7 @@ def save(name, path, overwrite=False, makedirs=False, compression=None, **kwargs
                 os.remove(path)
             except OSError:
                 pass
-            raise CommandExecutionError(
-                "Error occurred during image save: {}".format(exc)
-            )
+            raise CommandExecutionError(f"Error occurred during image save: {exc}")
         finally:
             try:
                 # Clean up temp file
@@ -5120,7 +5096,7 @@ def create_network(
     ignore_collisions=False,
     validate_ip_addrs=True,
     client_timeout=salt.utils.dockermod.CLIENT_TIMEOUT,
-    **kwargs
+    **kwargs,
 ):
     """
     .. versionchanged:: 2018.3.0
@@ -5360,7 +5336,7 @@ def create_network(
         skip_translate=skip_translate,
         ignore_collisions=ignore_collisions,
         validate_ip_addrs=validate_ip_addrs,
-        **__utils__["args.clean_kwargs"](**kwargs)
+        **__utils__["args.clean_kwargs"](**kwargs),
     )
 
     if "ipam" not in kwargs:
@@ -5692,7 +5668,7 @@ def pause(name):
         return {
             "result": False,
             "state": {"old": orig_state, "new": orig_state},
-            "comment": "Container '{}' is stopped, cannot pause".format(name),
+            "comment": f"Container '{name}' is stopped, cannot pause",
         }
     return _change_state(name, "pause", "paused")
 
@@ -5791,7 +5767,7 @@ def start_(name):
         return {
             "result": False,
             "state": {"old": orig_state, "new": orig_state},
-            "comment": "Container '{}' is paused, cannot start".format(name),
+            "comment": f"Container '{name}' is paused, cannot start",
         }
 
     return _change_state(name, "start", "running")
@@ -5896,7 +5872,7 @@ def unpause(name):
         return {
             "result": False,
             "state": {"old": orig_state, "new": orig_state},
-            "comment": "Container '{}' is stopped, cannot unpause".format(name),
+            "comment": f"Container '{name}' is stopped, cannot unpause",
         }
     return _change_state(name, "unpause", "running")
 
@@ -5945,7 +5921,7 @@ def wait(name, ignore_already_stopped=False, fail_on_exit_status=False):
         # Container doesn't exist anymore
         return {
             "result": ignore_already_stopped,
-            "comment": "Container '{}' absent".format(name),
+            "comment": f"Container '{name}' absent",
         }
     already_stopped = pre == "stopped"
     response = _client_wrapper("wait", name)
@@ -5969,7 +5945,7 @@ def wait(name, ignore_already_stopped=False, fail_on_exit_status=False):
         "exit_status": response,
     }
     if already_stopped:
-        result["comment"] = "Container '{}' already stopped".format(name)
+        result["comment"] = f"Container '{name}' already stopped"
     if fail_on_exit_status and result["result"]:
         result["result"] = result["exit_status"] == 0
     return result
@@ -5982,7 +5958,7 @@ def prune(
     build=False,
     volumes=False,
     system=None,
-    **filters
+    **filters,
 ):
     """
     .. versionadded:: 2019.2.0
@@ -6668,7 +6644,7 @@ def script_retcode(
 
 
 def _generate_tmp_path():
-    return os.path.join("/tmp", "salt.docker.{}".format(uuid.uuid4().hex[:6]))
+    return os.path.join("/tmp", f"salt.docker.{uuid.uuid4().hex[:6]}")
 
 
 def _prepare_trans_tar(name, sls_opts, mods=None, pillar=None, extra_filerefs=""):
@@ -6929,7 +6905,7 @@ def call(name, function, *args, **kwargs):
             ]
             + list(args)
             + [
-                "{}={}".format(key, value)
+                f"{key}={value}"
                 for (key, value) in kwargs.items()
                 if not key.startswith("__")
             ]
