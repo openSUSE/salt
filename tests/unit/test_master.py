@@ -76,9 +76,9 @@ class TransportMethodsTest(TestCase):
             "__sizeof__",
             "__str__",
             "__subclasshook__",
+            "destroy",
             "get_method",
             "run_func",
-            "destroy",
         ]
         for name in dir(aes_funcs):
             if name in aes_funcs.expose_methods:
@@ -137,9 +137,9 @@ class TransportMethodsTest(TestCase):
             "_prep_pub",
             "_send_pub",
             "_send_ssh_pub",
-            "get_method",
-            "destroy",
             "connect",
+            "destroy",
+            "get_method",
         ]
         for name in dir(clear_funcs):
             if name in clear_funcs.expose_methods:

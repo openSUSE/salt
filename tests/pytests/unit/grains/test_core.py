@@ -7,7 +7,6 @@ tests.pytests.unit.grains.test_core
 """
 
 import errno
-import locale
 import logging
 import os
 import pathlib
@@ -28,6 +27,7 @@ import salt.modules.network
 import salt.modules.smbios
 import salt.utils.dns
 import salt.utils.files
+import salt.utils.locales
 import salt.utils.network
 import salt.utils.path
 import salt.utils.platform
@@ -2943,7 +2943,7 @@ def test_locale_getlocale_exception():
     ) as tzlocal, patch.object(
         salt.utils.platform, "is_proxy", return_value=False
     ) as is_proxy, patch.object(
-        locale, "getlocale", side_effect=Exception()
+        salt.utils.locales, "getdefaultlocale", side_effect=Exception()
     ):
         ret = core.locale_info()
 
