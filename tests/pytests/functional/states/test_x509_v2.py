@@ -15,7 +15,7 @@ try:
         pkcs12,
     )
 
-    import salt.utils.x509 as x509util
+    x509util = pytest.importorskip("salt.utils.x509")
 
     HAS_LIBS = True
 except ImportError:

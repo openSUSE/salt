@@ -6,6 +6,8 @@ import time
 
 import pytest
 
+from salt.utils.versions import Version
+
 docker = pytest.importorskip("docker")
 
 INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
@@ -13,6 +15,10 @@ INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
 pytestmark = [
     pytest.mark.core_test,
     pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run in a container"),
+    pytest.mark.skipif(
+        Version(docker.__version__) < Version("4.0.0"),
+        reason="Test does not work in this version of docker-py",
+    ),
 ]
 
 
