@@ -11,6 +11,8 @@ from tests.support.pytest.mysql import *  # pylint: disable=wildcard-import,unus
 
 docker = pytest.importorskip("docker")
 
+pytest.importorskip("MySQLdb")
+
 log = logging.getLogger(__name__)
 
 INSIDE_CONTAINER = os.getenv("HOSTNAME", "") == "salt-test-container"
