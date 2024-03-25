@@ -153,7 +153,7 @@ def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
         tempdir = tempfile.mkdtemp()
         proc = Popen(cmd_opts, stdout=PIPE, stderr=PIPE, cwd=tempdir)
         (_, error) = proc.communicate()
-        error = error.decode('ascii', errors='ignore')
+        error = error.decode('utf-8', errors='surogateescape')
         success = _OSCAP_EXIT_CODES_MAP.get(proc.returncode, False)
         if proc.returncode < 0:
             error += "\nKilled by signal {}\n".format(proc.returncode)
@@ -204,10 +204,11 @@ def xccdf(params):
         cmd = _XCCDF_MAP[action]["cmd_pattern"].format(args.profile, policy)
         tempdir = tempfile.mkdtemp()
         proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE, cwd=tempdir)
-        (stdoutdata, error) = proc.communicate()
+        (_, error) = proc.communicate()
+        error = error.decode('utf-8', errors='surogateescape')
         success = _OSCAP_EXIT_CODES_MAP.get(proc.returncode, False)
         if proc.returncode < 0:
-            error += "\nKilled by signal {}\n".format(proc.returncode).encode('ascii')
+            error += "\nKilled by signal {}\n".format(proc.returncode)
         returncode = proc.returncode
         if success:
             __salt__["cp.push_dir"](tempdir)
