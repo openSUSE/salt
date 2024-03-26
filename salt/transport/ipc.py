@@ -339,7 +339,8 @@ class IPCClient:
             try:
                 log.trace("IPCClient: Connecting to socket: %s", self.socket_path)
                 yield self.stream.connect(sock_addr)
-                self._connecting_future.set_result(True)
+                if self._connecting_future is not None:
+                    self._connecting_future.set_result(True)
                 break
             except Exception as e:  # pylint: disable=broad-except
                 if self.stream.closed():
@@ -349,7 +350,8 @@ class IPCClient:
                     if self.stream is not None:
                         self.stream.close()
                         self.stream = None
-                    self._connecting_future.set_exception(e)
+                    if self._connecting_future is not None:
+                        self._connecting_future.set_exception(e)
                     break
 
                 yield salt.ext.tornado.gen.sleep(1)
@@ -364,7 +366,13 @@ class IPCClient:
             return
 
         self._closing = True
-        self._connecting_future = None
+        if self._connecting_future is not None:
+            try:
+                self._connecting_future.set_result(True)
+                self._connecting_future.exception()  # pylint: disable=E0203
+            except Exception as e:  # pylint: disable=broad-except
+                log.warning("Unhandled connecting exception: %s", e, exc_info=True)
+            self._connecting_future = None
 
         log.debug("Closing %s instance", self.__class__.__name__)
 
