@@ -35,7 +35,7 @@ class OpenscapTestCase(TestCase):
             "salt.modules.openscap.Popen",
             MagicMock(
                 return_value=Mock(
-                    **{"returncode": 0, "communicate.return_value": ("", "")}
+                    **{"returncode": 0, "communicate.return_value": (bytes(0), bytes(0))}
                 )
             ),
         ):
@@ -82,7 +82,7 @@ class OpenscapTestCase(TestCase):
             "salt.modules.openscap.Popen",
             MagicMock(
                 return_value=Mock(
-                    **{"returncode": 2, "communicate.return_value": ("", "some error")}
+                    **{"returncode": 2, "communicate.return_value": (bytes(0), bytes("some error", "UTF-8"))}
                 )
             ),
         ):
@@ -137,7 +137,7 @@ class OpenscapTestCase(TestCase):
             "salt.modules.openscap.Popen",
             MagicMock(
                 return_value=Mock(
-                    **{"returncode": 2, "communicate.return_value": ("", "some error")}
+                    **{"returncode": 2, "communicate.return_value": (bytes(0), bytes("some error", "UTF-8"))}
                 )
             ),
         ):
@@ -180,7 +180,7 @@ class OpenscapTestCase(TestCase):
                 return_value=Mock(
                     **{
                         "returncode": 1,
-                        "communicate.return_value": ("", "evaluation error"),
+                        "communicate.return_value": (bytes(0), bytes("evaluation error", "UTF-8")),
                     }
                 )
             ),
