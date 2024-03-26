@@ -2,6 +2,7 @@
 This module contains all of the routines needed to set up a master server, this
 involves preparing the three listeners and the workers needed by the master.
 """
+
 import collections
 import copy
 import ctypes
@@ -2176,7 +2177,7 @@ class ClearFuncs(TransportMethods):
         batch_load.update(clear_load)
         batch = salt.cli.batch_async.BatchAsync(
             self.local.opts,
-            functools.partial(self._prep_jid, clear_load, {}),
+            lambda: self._prep_jid(clear_load, {}),
             batch_load,
         )
         ioloop = salt.ext.tornado.ioloop.IOLoop.current()
@@ -2332,7 +2333,17 @@ class ClearFuncs(TransportMethods):
                     },
                 }
         if extra.get("batch", None):
-            return self.publish_batch(clear_load, minions, missing)
+            batch_async_opts = self.opts.get("batch_async", {})
+            batch_async_threshold = (
+                batch_async_opts.get("threshold", 0)
+                if isinstance(batch_async_opts, dict)
+                else 0
+            )
+            tgt = clear_load.get("tgt", [])
+            if batch_async_threshold != -1 and (
+                not isinstance(tgt, list) or len(tgt) > batch_async_threshold
+            ):
+                return self.publish_batch(clear_load, minions, missing)
 
         jid = self._prep_jid(clear_load, extra)
         if jid is None:
