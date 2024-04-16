@@ -3201,6 +3201,7 @@ class SaltRunOptionParser(
 class SaltSSHOptionParser(
     OptionParser,
     ConfigDirMixIn,
+    ExecutorsMixIn,
     MergeConfigMixIn,
     LogLevelMixIn,
     TargetOptionsMixIn,
@@ -3368,6 +3369,12 @@ class SaltSSHOptionParser(
             action="store_true",
             dest="ssh_run_pre_flight",
             help="Run the defined ssh_pre_flight script in the roster",
+        )
+        self.add_option(
+            "--metadata",
+            default="",
+            metavar="METADATA",
+            help="Pass metadata into Salt, used to search jobs.",
         )
 
         ssh_group = optparse.OptionGroup(
