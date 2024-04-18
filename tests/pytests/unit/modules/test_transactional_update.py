@@ -528,7 +528,7 @@ def test_call_success_explicit_reboot():
         reboot_mock.assert_called_once()
 
 
-def test_call_success_explicit_reboot_test():
+def test_call_fail_explicit_reboot_test():
     """Test transactional_update.call does NOT execute reboot when user specifies 'reboot' in sls in test mode"""
     return_json = {
         "local": {
