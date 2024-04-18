@@ -990,14 +990,16 @@ def call(function, *args, **kwargs):
     finally:
         # Check if reboot is needed
         if (activate_transaction and pending_transaction()) or (
-            not kwargs.get("test", False) and _user_specified_reboot(local)
+            not kwargs.get("test", False) and _user_specified_reboot(local, function)
         ):
             reboot()
 
 
-def _user_specified_reboot(local):
+def _user_specified_reboot(local, function):
+    if function != "state.highstate" and function != "state.sls":
+        return False
+
     if not isinstance(local, dict):
-        # Skip if execution is not state/highstate
         return False
 
     explicit_reboot_cmds = set(["reboot", "system.reboot"])

@@ -524,7 +524,7 @@ def test_call_success_explicit_reboot():
     with patch.dict(tu.__utils__, utils_mock), patch.dict(
         tu.__salt__, salt_mock
     ), patch("salt.modules.transactional_update.reboot", reboot_mock):
-        tu.call("module.function", key="value")
+        tu.call("state.sls", key="value")
         reboot_mock.assert_called_once()
 
 
@@ -549,7 +549,7 @@ def test_call_success_explicit_reboot_test():
     with patch.dict(tu.__utils__, utils_mock), patch.dict(
         tu.__salt__, salt_mock
     ), patch("salt.modules.transactional_update.reboot", reboot_mock):
-        tu.call("module.function", test="True")
+        tu.call("state.sls", test="True")
         assert not reboot_mock.called
 
 
@@ -574,7 +574,7 @@ def test_call_fail_explicit_reboot():
     with patch.dict(tu.__utils__, utils_mock), patch.dict(
         tu.__salt__, salt_mock
     ), patch("salt.modules.transactional_update.reboot", reboot_mock):
-        tu.call("module.function", test="True")
+        tu.call("state.sls", test="True")
         assert not reboot_mock.called
 
 
