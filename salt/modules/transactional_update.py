@@ -985,11 +985,28 @@ def call(function, *args, **kwargs):
             else:
                 return local
         except ValueError:
-            return {"result": False, "retcode": 1, "comment": ret_stdout}
+            local = {"result": False, "retcode": 1, "comment": ret_stdout}
+            return local
     finally:
         # Check if reboot is needed
-        if activate_transaction and pending_transaction():
+        if (activate_transaction and pending_transaction()) or _user_specified_reboot(
+            local
+        ):
             reboot()
+
+
+def _user_specified_reboot(local):
+    if not isinstance(local, dict):
+        # Skip if execution is not state/highstate
+        return False
+
+    explicit_reboot_cmds = ["reboot", "init 6", "shutdown -r", "shutdown --reboot"]
+    names = []
+    for _, value in local.items():
+        if isinstance(value, dict) and "name" in value:
+            names.append(value["name"])
+    # Partial match reboot_cmds to names, so that e.g. "reboot" matches "system.reboot"
+    return any([cmd in name for cmd in explicit_reboot_cmds for name in names])
 
 
 def apply_(mods=None, **kwargs):
