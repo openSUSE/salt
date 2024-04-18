@@ -989,8 +989,8 @@ def call(function, *args, **kwargs):
             return local
     finally:
         # Check if reboot is needed
-        if (activate_transaction and pending_transaction()) or _user_specified_reboot(
-            local
+        if (activate_transaction and pending_transaction()) or (
+            not kwargs.get("test", False) and _user_specified_reboot(local)
         ):
             reboot()
 
@@ -1000,13 +1000,13 @@ def _user_specified_reboot(local):
         # Skip if execution is not state/highstate
         return False
 
-    explicit_reboot_cmds = ["reboot", "init 6", "shutdown -r", "shutdown --reboot"]
-    names = []
+    explicit_reboot_cmds = set(["reboot", "system.reboot"])
+    names = set()
     for _, value in local.items():
         if isinstance(value, dict) and "name" in value:
-            names.append(value["name"])
-    # Partial match reboot_cmds to names, so that e.g. "reboot" matches "system.reboot"
-    return any([cmd in name for cmd in explicit_reboot_cmds for name in names])
+            names.add(value["name"])
+
+    return bool(explicit_reboot_cmds.intersection(names))
 
 
 def apply_(mods=None, **kwargs):
