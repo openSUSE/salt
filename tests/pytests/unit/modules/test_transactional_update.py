@@ -178,9 +178,11 @@ def test_commands_with_global_params():
                     "--non-interactive",
                     "--drop-if-no-change",
                     "--no-selfupdate",
-                    cmd.replace("_", ".")
-                    if cmd.startswith("grub")
-                    else cmd.replace("_", "-"),
+                    (
+                        cmd.replace("_", ".")
+                        if cmd.startswith("grub")
+                        else cmd.replace("_", "-")
+                    ),
                 ]
             )
 
@@ -503,7 +505,15 @@ def test_call_success_parameters():
 
 def test_call_success_explicit_reboot():
     """Test transactional_update.call executes reboot when user specifies 'reboot' in sls"""
-    return_json = {'local': { 'cmd_|-reboot_test_|-reboot_|-run': {'name': 'reboot', 'changes': {}, 'result': True}}}
+    return_json = {
+        "local": {
+            "cmd_|-reboot_test_|-reboot_|-run": {
+                "name": "reboot",
+                "changes": {},
+                "result": True,
+            }
+        }
+    }
     utils_mock = {
         "json.find_json": MagicMock(return_value=return_json),
     }
@@ -511,16 +521,24 @@ def test_call_success_explicit_reboot():
         "cmd.run_all": MagicMock(return_value={"retcode": 0, "stdout": ""}),
     }
     reboot_mock = MagicMock()
-    with patch.dict(tu.__utils__, utils_mock), patch.dict(tu.__salt__, salt_mock), patch(
-        "salt.modules.transactional_update.reboot", reboot_mock
-    ):
+    with patch.dict(tu.__utils__, utils_mock), patch.dict(
+        tu.__salt__, salt_mock
+    ), patch("salt.modules.transactional_update.reboot", reboot_mock):
         tu.call("module.function", key="value")
         reboot_mock.assert_called_once()
 
 
 def test_call_success_explicit_reboot_test():
     """Test transactional_update.call does NOT execute reboot when user specifies 'reboot' in sls in test mode"""
-    return_json = {'local': { 'cmd_|-reboot_test_|-reboot_|-run': {'name': 'reboot', 'changes': {}, 'result': True}}}
+    return_json = {
+        "local": {
+            "cmd_|-reboot_test_|-reboot_|-run": {
+                "name": "reboot",
+                "changes": {},
+                "result": True,
+            }
+        }
+    }
     utils_mock = {
         "json.find_json": MagicMock(return_value=return_json),
     }
@@ -528,16 +546,24 @@ def test_call_success_explicit_reboot_test():
         "cmd.run_all": MagicMock(return_value={"retcode": 0, "stdout": ""}),
     }
     reboot_mock = MagicMock()
-    with patch.dict(tu.__utils__, utils_mock), patch.dict(tu.__salt__, salt_mock), patch(
-        "salt.modules.transactional_update.reboot", reboot_mock
-    ):
+    with patch.dict(tu.__utils__, utils_mock), patch.dict(
+        tu.__salt__, salt_mock
+    ), patch("salt.modules.transactional_update.reboot", reboot_mock):
         tu.call("module.function", test="True")
         assert not reboot_mock.called
 
 
 def test_call_fail_explicit_reboot():
     """Test transactional_update.call does NOT execute reboot when the word 'reboot' appears in sls"""
-    return_json = {'local': { 'cmd_|-reboot_test_|-reboot_|-run': {'name': 'service reboot', 'changes': {}, 'result': True}}}
+    return_json = {
+        "local": {
+            "cmd_|-reboot_test_|-reboot_|-run": {
+                "name": "service reboot",
+                "changes": {},
+                "result": True,
+            }
+        }
+    }
     utils_mock = {
         "json.find_json": MagicMock(return_value=return_json),
     }
@@ -545,9 +571,9 @@ def test_call_fail_explicit_reboot():
         "cmd.run_all": MagicMock(return_value={"retcode": 0, "stdout": ""}),
     }
     reboot_mock = MagicMock()
-    with patch.dict(tu.__utils__, utils_mock), patch.dict(tu.__salt__, salt_mock), patch(
-        "salt.modules.transactional_update.reboot", reboot_mock
-    ):
+    with patch.dict(tu.__utils__, utils_mock), patch.dict(
+        tu.__salt__, salt_mock
+    ), patch("salt.modules.transactional_update.reboot", reboot_mock):
         tu.call("module.function", test="True")
         assert not reboot_mock.called
 
