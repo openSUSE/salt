@@ -1005,16 +1005,16 @@ def _user_specified_reboot(local, function):
     explicit_reboot_cmds = set(["reboot", "system.reboot"])
     explicit_reboot_modules = ["cmd_", "module_"]
     names = set()
-    for key, value in local.items():
-        if not isinstance(key, str):
+    for full_module_name, module_result in local.items():
+        if not isinstance(full_module_name, str):
             continue
 
-        module = key.split("|")[0]
+        module = full_module_name.split("|")[0]
         if module not in explicit_reboot_modules:
             continue
 
-        if isinstance(value, dict) and "name" in value:
-            names.add(value["name"])
+        if isinstance(module_result, dict) and "name" in module_result:
+            names.add(module_result["name"])
 
     return bool(explicit_reboot_cmds.intersection(names))
 
