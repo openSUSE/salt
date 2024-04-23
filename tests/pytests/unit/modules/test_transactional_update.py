@@ -630,7 +630,7 @@ def test_call_fail_explicit_reboot_non_cmd():
     with patch.dict(tu.__utils__, utils_mock), patch.dict(
         tu.__salt__, salt_mock
     ), patch("salt.modules.transactional_update.reboot", reboot_mock):
-        tu.call("state.test")
+        tu.call("state.sls")
         assert not reboot_mock.called
 
 
