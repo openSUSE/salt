@@ -283,6 +283,7 @@ import sys
 import salt.client.ssh.state
 import salt.client.ssh.wrapper.state
 import salt.exceptions
+import salt.executors.transactional_update
 import salt.utils.args
 from salt.modules.state import _check_queue, _prior_running_states, _wait, running
 
@@ -996,14 +997,15 @@ def call(function, *args, **kwargs):
 
 
 def _user_specified_reboot(local, function):
-    if function != "state.highstate" and function != "state.sls":
+    explicit_reboot_cmds = set(["reboot", "system.reboot"])
+    explicit_reboot_modules = ["cmd", "module"]
+
+    if function not in salt.executors.transactional_update.DELEGATION_MAP.keys():
         return False
 
     if not isinstance(local, dict):
         return False
 
-    explicit_reboot_cmds = set(["reboot", "system.reboot"])
-    explicit_reboot_modules = ["cmd", "module"]
     names = set()
     for execution_id, execution_result in local.items():
         if not isinstance(execution_id, str):
