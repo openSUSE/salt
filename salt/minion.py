@@ -2970,7 +2970,7 @@ class Minion(MinionBase):
                 # Process Beacons
                 beacons = None
                 try:
-                    beacons = self.process_beacons(self.functions)
+                    beacons = [b for b in self.process_beacons(self.functions) if b["data"]]
                 except Exception:  # pylint: disable=broad-except
                     log.critical("The beacon errored: ", exc_info=True)
                 if beacons:
