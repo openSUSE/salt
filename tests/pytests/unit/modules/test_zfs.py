@@ -816,7 +816,7 @@ def test_bookmark_success(utils_patch):
     """
     Tests zfs bookmark success
     """
-    with patch("salt.utils.path.which", MagicMock(return_value="/usr/bin/man")):
+    with patch("salt.utils.path.which", MagicMock(return_value="/usr/bin/more")):
         res = OrderedDict([("bookmarked", True)])
         ret = {"pid": 20990, "retcode": 0, "stderr": "", "stdout": ""}
         mock_cmd = MagicMock(return_value=ret)
