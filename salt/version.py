@@ -717,6 +717,7 @@ def dependency_information(include_salt_cloud=False):
         ("docker-py", "docker", "__version__"),
         ("packaging", "packaging", "__version__"),
         ("looseversion", "looseversion", None),
+        ("contextvars", "contextvars", None),
         ("relenv", "relenv", "__version__"),
     ]
 
