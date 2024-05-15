@@ -58,6 +58,7 @@ import salt.utils.user
 import salt.utils.verify
 import salt.utils.zeromq
 import salt.wheel
+from salt.cli.batch_async import batch_async_required
 from salt.config import DEFAULT_INTERVAL
 from salt.defaults import DEFAULT_TARGET_DELIM
 from salt.transport import TRANSPORTS
@@ -2496,6 +2497,9 @@ class ClearFuncs(TransportMethods):
                         ),
                     },
                 }
+        if extra.get("batch", None) and batch_async_required(self.opts, minions, extra):
+            return self.publish_batch(clear_load, minions, missing)
+
         jid = self._prep_jid(clear_load, extra)
         if jid is None:
             return {"enc": "clear", "load": {"error": "Master failed to assign jid"}}
