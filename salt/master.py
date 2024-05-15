@@ -21,7 +21,6 @@ from collections import OrderedDict
 import salt.acl
 import salt.auth
 import salt.channel.server
-import salt.cli.batch_async
 import salt.client
 import salt.client.ssh.client
 import salt.crypt
@@ -57,6 +56,7 @@ import salt.utils.user
 import salt.utils.verify
 import salt.utils.zeromq
 import salt.wheel
+from salt.cli.batch_async import BatchAsync, batch_async_required
 from salt.config import DEFAULT_INTERVAL
 from salt.defaults import DEFAULT_TARGET_DELIM
 from salt.ext.tornado.stack_context import StackContext
@@ -2235,9 +2235,9 @@ class ClearFuncs(TransportMethods):
     def publish_batch(self, clear_load, minions, missing):
         batch_load = {}
         batch_load.update(clear_load)
-        batch = salt.cli.batch_async.BatchAsync(
+        batch = BatchAsync(
             self.local.opts,
-            functools.partial(self._prep_jid, clear_load, {}),
+            lambda: self._prep_jid(clear_load, {}),
             batch_load,
         )
         ioloop = salt.ext.tornado.ioloop.IOLoop.current()
@@ -2392,7 +2392,7 @@ class ClearFuncs(TransportMethods):
                         ),
                     },
                 }
-        if extra.get("batch", None):
+        if extra.get("batch", None) and batch_async_required(self.opts, minions, extra):
             return self.publish_batch(clear_load, minions, missing)
 
         jid = self._prep_jid(clear_load, extra)
