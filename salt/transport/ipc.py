@@ -2,6 +2,7 @@
 IPC transport classes
 """
 
+import asyncio
 import errno
 import logging
 import socket
@@ -332,7 +333,8 @@ class IPCClient:
             try:
                 log.trace("IPCClient: Connecting to socket: %s", self.socket_path)
                 yield self.stream.connect(sock_addr)
-                self._connecting_future.set_result(True)
+                if self._connecting_future is not None:
+                    self._connecting_future.set_result(True)
                 break
             except Exception as e:  # pylint: disable=broad-except
                 if self.stream.closed():
@@ -342,7 +344,8 @@ class IPCClient:
                     if self.stream is not None:
                         self.stream.close()
                         self.stream = None
-                    self._connecting_future.set_exception(e)
+                    if self._connecting_future is not None:
+                        self._connecting_future.set_exception(e)
                     break
 
                 yield tornado.gen.sleep(1)
@@ -357,7 +360,13 @@ class IPCClient:
             return
 
         self._closing = True
-        self._connecting_future = None
+        if self._connecting_future is not None:
+            try:
+                self._connecting_future.set_result(True)
+                self._connecting_future.exception()  # pylint: disable=E0203
+            except Exception as e:  # pylint: disable=broad-except
+                log.warning("Unhandled connecting exception: %s", e, exc_info=True)
+            self._connecting_future = None
 
         log.debug("Closing %s instance", self.__class__.__name__)
 
@@ -423,8 +432,6 @@ class IPCMessageClient(IPCClient):
         "close",
     ]
 
-    # FIXME timeout unimplemented
-    # FIXME tries unimplemented
     async def send(self, msg, timeout=None, tries=None):
         """
         Send a message to an IPC socket
@@ -432,12 +439,60 @@ class IPCMessageClient(IPCClient):
         If the socket is not currently connected, a connection will be established.
 
         :param dict msg: The message to be sent
-        :param int timeout: Timeout when sending message (Currently unimplemented)
+        :param int timeout: Timeout when sending message
+        :param int tries: Maximum numer of tries to send message
         """
-        if not self.connected():
-            await self.connect()
+        if tries is None or tries < 1:
+            tries = 1
+        due_time = None
+        if timeout is not None:
+            due_time = time.time() + timeout
+        _try = 1
+        exc_count = 0
         pack = salt.transport.frame.frame_msg_ipc(msg, raw_body=True)
-        await self.stream.write(pack)
+        while _try <= tries:
+            if not self.connected():
+                self.close()
+                self.stream = None
+                self._closing = False
+                try:
+                    await self.connect(
+                        timeout=(
+                            None if due_time is None else max(due_time - time.time(), 1)
+                        )
+                    )
+                except StreamClosedError:
+                    log.warning(
+                        "IPCMessageClient: Unable to reconnect IPC stream on sending message with ID: 0x%016x%s",
+                        id(msg),
+                        f", retry {_try} of {tries}" if tries > 1 else "",
+                    )
+                    exc_count += 1
+            if self.connected():
+                try:
+                    await self.stream.write(pack)
+                    return
+                except StreamClosedError:
+                    if self._closing:
+                        break
+                    log.warning(
+                        "IPCMessageClient: Stream was closed on sending message with ID: 0x%016x",
+                        id(msg),
+                    )
+                    exc_count += 1
+                    if exc_count == 1:
+                        # Give one more chance in case if stream was detected as closed
+                        # on the first write attempt
+                        continue
+            cur_time = time.time()
+            _try += 1
+            if _try > tries or (due_time is not None and cur_time > due_time):
+                return
+            await asyncio.sleep(
+                1
+                if due_time is None
+                else (due_time - cur_time) / max(tries - _try + 1, 1)
+            )
 
 
 class IPCMessageServer(IPCServer):
