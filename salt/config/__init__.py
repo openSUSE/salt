@@ -1000,6 +1000,12 @@ VALID_OPTS = immutabletypes.freeze(
         "server_id_use_crc": (bool, str),
         "request_channel_timeout": int,
         "request_channel_tries": int,
+        # RSA encryption for minion
+        "encryption_algorithm": str,
+        # RSA signing for minion
+        "signing_algorithm": str,
+        # Master publish channel signing
+        "publish_signing_algorithm": str,
     }
 )
 
@@ -1308,6 +1314,9 @@ DEFAULT_MINION_OPTS = immutabletypes.freeze(
         "reactor_niceness": None,
         "fips_mode": False,
         "server_id_use_crc": False,
+        "features": {},
+        "encryption_algorithm": "OAEP-SHA1",
+        "signing_algorithm": "PKCS1v15-SHA1",
     }
 )
 
@@ -1656,6 +1665,8 @@ DEFAULT_MASTER_OPTS = immutabletypes.freeze(
         "netapi_enable_clients": [],
         "maintenance_interval": 3600,
         "fileserver_interval": 3600,
+        "features": {},
+        "publish_signing_algorithm": "PKCS1v15-SHA224",
     }
 )
 
