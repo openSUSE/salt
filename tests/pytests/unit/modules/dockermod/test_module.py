@@ -357,7 +357,7 @@ def test_update_mine():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_list_networks():
@@ -381,7 +381,7 @@ def test_list_networks():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_create_network():
@@ -425,7 +425,7 @@ def test_create_network():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_remove_network():
@@ -447,7 +447,7 @@ def test_remove_network():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_inspect_network():
@@ -469,7 +469,7 @@ def test_inspect_network():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_connect_container_to_network():
@@ -494,7 +494,7 @@ def test_connect_container_to_network():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_disconnect_container_from_network():
@@ -516,7 +516,7 @@ def test_disconnect_container_from_network():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_list_volumes():
@@ -542,7 +542,7 @@ def test_list_volumes():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_create_volume():
@@ -572,7 +572,7 @@ def test_create_volume():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_remove_volume():
@@ -594,7 +594,7 @@ def test_remove_volume():
 
 
 @pytest.mark.skipif(
-    docker_mod.docker.version_info < (1, 5, 0),
+    docker_mod._get_docker_py_versioninfo() < (1, 5, 0),
     reason="docker module must be installed to run this test or is too old. >=1.5.0",
 )
 def test_inspect_volume():
