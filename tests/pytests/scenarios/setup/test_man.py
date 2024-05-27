@@ -9,12 +9,9 @@ import pytest
 
 import salt.utils.platform
 from salt.modules.virtualenv_mod import KNOWN_BINARY_NAMES
+from tests.conftest import CODE_DIR
 
-from tests.support.runtests import RUNTIME_VARS
-
-MISSING_SETUP_PY_FILE = not os.path.exists(
-    os.path.join(RUNTIME_VARS.CODE_DIR, "setup.py")
-)
+MISSING_SETUP_PY_FILE = not CODE_DIR.joinpath("setup.py").exists()
 
 pytestmark = [
     pytest.mark.core_test,
@@ -24,7 +21,7 @@ pytestmark = [
     pytest.mark.skip_if_binaries_missing(*KNOWN_BINARY_NAMES, check_all=False),
     pytest.mark.skipif(
         MISSING_SETUP_PY_FILE, reason="This test only work if setup.py is available"
-    )
+    ),
 ]
 
 

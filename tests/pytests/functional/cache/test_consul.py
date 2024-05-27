@@ -11,13 +11,10 @@ import salt.loader
 from salt.utils.versions import Version
 from tests.pytests.functional.cache.helpers import run_common_cache_tests
 
-try:
-    import consul  # pylint: disable=unused-import
-
-    HAS_CONSUL = True
-except ImportError:
-    HAS_CONSUL = False
-
+pytest.importorskip(
+    "consul",
+    reason="Please install python-consul package to use consul data cache driver",
+)
 docker = pytest.importorskip("docker")
 
 log = logging.getLogger(__name__)
@@ -31,10 +28,6 @@ pytestmark = [
     pytest.mark.skipif(
         Version(docker.__version__) < Version("4.0.0"),
         reason="Test does not work in this version of docker-py",
-    ),
-    pytest.mark.skipif(
-        not HAS_CONSUL,
-        reason="Please install python-consul package to use consul data cache driver",
     ),
 ]
 
