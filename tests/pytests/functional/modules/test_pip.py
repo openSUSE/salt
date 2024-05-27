@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 import pytest
 
+import salt.utils.path
 import salt.utils.platform
 from salt.exceptions import CommandNotFoundError
 from salt.modules.virtualenv_mod import KNOWN_BINARY_NAMES
@@ -78,6 +79,7 @@ def _pip_successful_install(
         "pip>=21.0",
     ),
 )
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_list_available_packages(pip, pip_version, tmp_path):
     with VirtualEnv(venv_dir=tmp_path, pip_requirement=pip_version) as virtualenv:
         virtualenv.install("-U", pip_version)
@@ -327,6 +329,10 @@ def test_pip_non_existent_log_file(venv, pip, tmp_path, touch):
 )
 @pytest.mark.destructive_test
 @pytest.mark.skip_on_windows(reason="test specific for linux usage of /bin/python")
+@pytest.mark.skipif(
+    bool(salt.utils.path.which("transactional-update")),
+    reason="Skipping on transactional systems",
+)
 @pytest.mark.skip_initial_gh_actions_failure(
     reason="This was skipped on older golden images and is failing on newer."
 )
