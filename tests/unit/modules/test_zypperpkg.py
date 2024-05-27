@@ -2602,6 +2602,7 @@ pattern() = package-c"""
             zypp_mock.assert_called_with(root=None, ignore_not_found=True)
             xml_mock.nolock.noraise.xml.call.assert_called_with("search", "emacs")
 
+    @patch("salt.utils.files.is_fcntl_available", MagicMock(return_value=False))
     def test_search_not_found(self):
         """Test zypperpkg.search()"""
         ret = {
