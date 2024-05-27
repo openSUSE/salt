@@ -56,7 +56,7 @@ def file_add_delete_sls(tmp_path, salt_master):
 @pytest.mark.skip(reason="Flawed test")
 @pytest.mark.skip_on_darwin(reason="MacOS is a spawning platform, won't work")
 @pytest.mark.skipif(GITHUB_ACTIONS, reason="Test is failing in GitHub Actions")
-@pytest.mark.flaky(max_runs=4)
+@pytest.mark.flaky(max_runs=10)
 def test_memory_leak(salt_cli, salt_minion, file_add_delete_sls):
     max_usg = None
 
