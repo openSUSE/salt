@@ -20,6 +20,10 @@ pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.skip_if_not_root,
     pytest.mark.destructive_test,
+    pytest.mark.skipif(
+        bool(salt.utils.path.which("transactional-update")),
+        reason="Skipping on transactional systems",
+    ),
     pytest.mark.windows_whitelisted,
     pytest.mark.timeout_unless_on_windows(240),
 ]
