@@ -1,0 +1,7 @@
+[Unit]
+Description=Clean old environment for venv-salt-minion
+
+[Service]
+ExecStart=/bin/sh -c '/usr/lib/venv-salt-minion/bin/post_start_cleanup.sh || :'
+Type=oneshot
+
