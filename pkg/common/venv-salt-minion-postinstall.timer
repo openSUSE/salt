@@ -1,0 +1,9 @@
+[Unit]
+Description=Clean old venv-salt-minion environment in 60 seconds
+
+[Timer]
+OnActiveSec=60
+
+[Install]
+WantedBy=timers.target
+
