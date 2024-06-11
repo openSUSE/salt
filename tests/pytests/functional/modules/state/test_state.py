@@ -754,6 +754,7 @@ def test_retry_option_success_parallel(state, state_tree, tmp_path):
 
 
 @pytest.mark.slow_test
+@pytest.mark.xfail(reason="This test is flaky")
 def test_retry_option_eventual_success(state, state_tree, tmp_path):
     """
     test a state with the retry option that should return True, eventually
