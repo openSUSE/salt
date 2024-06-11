@@ -1,5 +1,7 @@
 import pytest
 
+import salt.utils.path
+
 pytestmark = [
     pytest.mark.destructive_test,
     pytest.mark.skip_if_not_root,
@@ -80,6 +82,10 @@ def suse_state_tree(grains, pkgrepo, state_tree):
 
 
 @pytest.mark.requires_salt_states("pkgrepo.managed", "pkgrepo.absent")
+@pytest.mark.skipif(
+    bool(salt.utils.path.which("transactional-update")),
+    reason="Skipping on transactional systems",
+)
 def test_pkgrepo_managed_absent(grains, modules, subtests, suse_state_tree):
     """
     Test adding and removing a repository
@@ -134,6 +140,10 @@ def test_pkgrepo_managed_absent(grains, modules, subtests, suse_state_tree):
 
 
 @pytest.mark.requires_salt_states("pkgrepo.managed")
+@pytest.mark.skipif(
+    bool(salt.utils.path.which("transactional-update")),
+    reason="Skipping on transactional systems",
+)
 def test_pkgrepo_managed_modify(grains, modules, subtests, suse_state_tree):
     """
     Test adding and modifying a repository

@@ -80,6 +80,10 @@ def create_virtualenv(modules):
 
 
 @pytest.mark.slow_test
+@pytest.mark.skipif(
+    bool(salt.utils.path.which("transactional-update")),
+    reason="Skipping on transactional systems",
+)
 def test_pip_installed_removed(modules, states):
     """
     Tests installed and removed states
