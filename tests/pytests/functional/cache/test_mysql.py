@@ -5,11 +5,12 @@ import pytest
 
 import salt.cache
 import salt.loader
+import salt.modules.mysql
 from salt.utils.versions import Version
 from tests.pytests.functional.cache.helpers import run_common_cache_tests
 from tests.support.pytest.mysql import *  # pylint: disable=wildcard-import,unused-wildcard-import
 
-docker = pytest.importorskip("docker")
+pytest.importorskip("docker", minversion="4.0.0")
 
 log = logging.getLogger(__name__)
 
@@ -20,8 +21,7 @@ pytestmark = [
     pytest.mark.skip_if_binaries_missing("dockerd"),
     pytest.mark.skipif(INSIDE_CONTAINER, reason="Cannot run in a container"),
     pytest.mark.skipif(
-        Version(docker.__version__) < Version("4.0.0"),
-        reason="Test does not work in this version of docker-py",
+        not salt.modules.mysql.MySQLdb, reason="Missing python MySQLdb library"
     ),
 ]
 
