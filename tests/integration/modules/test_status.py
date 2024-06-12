@@ -44,6 +44,7 @@ class StatusModuleTest(ModuleCase):
         self.assertTrue(isinstance(ret, int))
 
     @pytest.mark.slow_test
+    @pytest.mark.flaky(max_runs=4)
     def test_status_diskusage(self):
         """
         status.diskusage

@@ -26,6 +26,7 @@ pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.skip_on_freebsd(reason="No Docker on FreeBSD available"),
     pytest.mark.skip_if_binaries_missing("busybox", reason="Busybox not installed"),
+    pytest.mark.skip_if_binaries_missing("ldd", reason="ldd is missing"),
     pytest.mark.skip_if_binaries_missing(
         "docker", "dockerd", reason="Docker not installed"
     ),
@@ -172,6 +173,12 @@ def image(tmp_path_factory):
         # Somehow the above skip_if_binaries_missing marker for docker
         # only get's evaluated after this fixture?!?
         pytest.skip("The `docker` binary is not available")
+    if not salt.modules.cmdmod.retcode(
+        "ldd {}".format(salt.utils.path.which("busybox"))
+    ):
+        pytest.skip(
+            "`busybox` appears to be a dynamic executable, please use busybox-static"
+        )
     container_build_dir = tmp_path_factory.mktemp("busybox")
     image_name = random_string("salt-busybox-", uppercase=False)
 
