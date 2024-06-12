@@ -3,6 +3,7 @@ import shutil
 
 import pytest
 
+import salt.utils.path
 from salt.exceptions import CommandExecutionError
 from salt.utils.versions import Version
 
@@ -10,6 +11,10 @@ pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.destructive_test,
     pytest.mark.requires_network,
+    pytest.mark.skipif(
+        bool(salt.utils.path.which("transactional-update")),
+        reason="Skipping on transactional systems",
+    ),
 ]
 
 MAX_NPM_VERSION = "5.0.0"
