@@ -117,6 +117,10 @@ def _skip_if_pep8_installed(modules, pkg_name):
 @pytest.mark.slow_test
 @pytest.mark.usefixtures("_skip_if_pep8_installed")
 @pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
+@pytest.mark.skipif(
     bool(salt.utils.path.which("transactional-update")),
     reason="Skipping on transactional systems",
 )

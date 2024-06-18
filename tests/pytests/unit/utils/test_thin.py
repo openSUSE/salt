@@ -1435,6 +1435,10 @@ def test_pack_alternatives_empty_dependencies(thin_ctx):
 
 
 @pytest.mark.slow_test
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
 @pytest.mark.skip_on_windows(reason="salt-ssh does not deploy to/from windows")
 def test_thin_dir(thin_ctx):
     """
