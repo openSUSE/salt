@@ -110,6 +110,10 @@ def _skip_if_pep8_installed(modules, pkg_name):
     bool(salt.utils.path.which("transactional-update")),
     reason="Skipping on transactional systems",
 )
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
 def test_pip_installed_removed(states, pkg_name):
     """
     Tests installed and removed states

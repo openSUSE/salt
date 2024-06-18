@@ -1,4 +1,5 @@
 import logging
+import sys
 
 import pytest
 
@@ -19,6 +20,10 @@ pytestmark = [
         # backports.ssl-match-hostname which is not installed on the system.
     ),
     pytest.mark.timeout_unless_on_windows(120),
+    pytest.mark.skipif(
+        "venv-salt-minion" in sys.executable,
+        reason="Skipping for Salt Bundle (tests are not compatible)",
+    ),
 ]
 
 log = logging.getLogger(__name__)
