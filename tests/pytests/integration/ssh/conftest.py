@@ -1,6 +1,13 @@
 import pytest
+import sys
 
 from tests.support.pytest.helpers import reap_stray_processes
+
+
+@pytest.fixture(scope="package", autouse=True)
+def _auto_skip_on_salt_bundle():
+    if "venv-salt-minion" in sys.executable:
+        pytest.skip("Skipping for Salt Bundle (tests are not compatible)")
 
 
 @pytest.fixture(scope="package", autouse=True)

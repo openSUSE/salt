@@ -1,4 +1,5 @@
 import logging
+import sys
 
 import pytest
 
@@ -10,6 +11,10 @@ from tests.support.mock import patch
 pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.requires_sshd_server,
+    pytest.mark.skipif(
+            "venv-salt-minion" in sys.executable,
+            reason="Skipping for Salt Bundle (tests are not compatible)",
+    ),
     pytest.mark.skipif(
         'grains["osfinger"].startswith(("Fedora Linux-40", "Ubuntu-24.04", "Arch Linux"))',
         reason="System ships with a version of python that is too recent for salt-ssh tests",
