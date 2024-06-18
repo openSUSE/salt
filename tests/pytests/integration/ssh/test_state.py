@@ -10,6 +10,10 @@ from tests.support.runtests import RUNTIME_VARS
 pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.skip_on_windows(reason="salt-ssh not available on Windows"),
+    pytest.mark.skipif(
+        "venv-salt-minion" in sys.executable,
+        reason="Skipping for Salt Bundle (tests are not compatible)",
+    )
 ]
 
 SSH_SLS = "ssh_state_tests"

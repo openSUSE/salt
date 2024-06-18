@@ -1,4 +1,5 @@
 import shutil
+import sys
 
 import pytest
 
@@ -67,6 +68,10 @@ def test_clear(virtualenv, venv_dir, modules):
 @pytest.mark.skipif(
     bool(salt.utils.path.which("transactional-update")),
     reason="Skipping on transactional systems",
+)
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
 )
 def test_virtualenv_ver(virtualenv, venv_dir):
     ret = virtualenv.create(str(venv_dir))

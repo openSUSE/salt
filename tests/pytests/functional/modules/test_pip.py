@@ -18,6 +18,10 @@ pytestmark = [
     pytest.mark.requires_network,
     pytest.mark.windows_whitelisted,
     pytest.mark.skip_if_binaries_missing(*KNOWN_BINARY_NAMES, check_all=False),
+    pytest.mark.skipif(
+        "venv-salt-minion" in sys.executable,
+        reason="Skipping for Salt Bundle (tests are not compatible)",
+    )
 ]
 
 
