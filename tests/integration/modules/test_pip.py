@@ -2,6 +2,7 @@ import os
 import pprint
 import re
 import shutil
+import sys
 import tempfile
 
 import pytest
@@ -16,6 +17,10 @@ from tests.support.runtests import RUNTIME_VARS
 
 
 @pytest.mark.skip_if_binaries_missing(*KNOWN_BINARY_NAMES, check_all=False)
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
 @pytest.mark.windows_whitelisted
 class PipModuleTest(ModuleCase):
     def setUp(self):

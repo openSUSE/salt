@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 import salt.netapi
@@ -8,6 +10,10 @@ from tests.support.mock import patch
 pytestmark = [
     pytest.mark.slow_test,
     pytest.mark.requires_sshd_server,
+    pytest.mark.skipif(
+        "venv-salt-minion" in sys.executable,
+        reason="Skipping for Salt Bundle (tests are not compatible)",
+    ),
 ]
 
 
