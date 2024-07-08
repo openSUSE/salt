@@ -29,6 +29,8 @@
         olleh
 """
 
+import sys
+
 import pytest
 
 from tests.support.case import SSHCase
@@ -52,6 +54,11 @@ pytestmark = [
 ]
 
 
+@pytest.mark.skip_on_windows
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
 class SSHCustomModuleTest(SSHCase):
     """
     Test sls with custom module functionality using ssh

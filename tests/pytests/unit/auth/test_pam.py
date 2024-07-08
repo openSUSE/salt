@@ -1,4 +1,5 @@
 import ctypes
+import tempfile
 
 import pytest
 
@@ -276,3 +277,20 @@ def test_diagnostic_not_emitted_when_running_as_root(caplog, tmp_path):
         "shadow-inaccessibility diagnostic must not fire when the master "
         "runs as root and can read /etc/shadow"
     )
+
+
+def test_if_sys_executable_is_used_to_call_pam_auth(mock_pam):
+    class Ret:
+        returncode = 0
+
+    with patch(
+        "salt.auth.pam.subprocess.run", return_value=Ret
+    ) as run_mock, tempfile.NamedTemporaryFile() as f, patch(
+        "salt.auth.pam.sys.executable", f.name
+    ), patch(
+        "os.path.exists", return_value=False
+    ):
+        assert salt.auth.pam.auth(
+            username="fnord", password="fnord", service="login", encoding="utf-8"
+        )
+        assert f.name in run_mock.call_args_list[0][0][0]
