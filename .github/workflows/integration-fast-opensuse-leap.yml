@@ -23,4 +23,4 @@ jobs:
       - name: Run Fast integration tests
         run: |
           salt-test --skiplist https://raw.githubusercontent.com/openSUSE/salt-test-skiplist/main/skipped_tests.toml \
-            --directory . --package-flavor classic integration -- -vvv
+            --directory . --package-flavor classic integration -- -vvv --color=yes
