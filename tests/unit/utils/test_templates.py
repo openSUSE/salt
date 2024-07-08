@@ -1,6 +1,7 @@
 """
 Unit tests for salt.utils.templates.py
 """
+
 import logging
 import os
 import sys
@@ -21,6 +22,20 @@ try:
     HAS_CHEETAH = True
 except ImportError:
     HAS_CHEETAH = False
+
+try:
+    import genshi as _
+
+    HAS_GENSHI = True
+except ImportError:
+    HAS_GENSHI = False
+
+try:
+    import mako as _
+
+    HAS_MAKO = True
+except ImportError:
+    HAS_MAKO = False
 
 log = logging.getLogger(__name__)
 
@@ -83,16 +98,19 @@ class RenderTestCase(TestCase):
         assert res == expected
 
     ### Tests for mako template
+    @pytest.mark.skipif(not HAS_MAKO, reason="Mako module not available for testing")
     def test_render_mako_sanity(self):
         tmpl = """OK"""
         res = salt.utils.templates.render_mako_tmpl(tmpl, dict(self.context))
         self.assertEqual(res, "OK")
 
+    @pytest.mark.skipif(not HAS_MAKO, reason="Mako module not available for testing")
     def test_render_mako_evaluate(self):
         tmpl = """${ "OK" }"""
         res = salt.utils.templates.render_mako_tmpl(tmpl, dict(self.context))
         self.assertEqual(res, "OK")
 
+    @pytest.mark.skipif(not HAS_MAKO, reason="Mako module not available for testing")
     def test_render_mako_evaluate_multi(self):
         tmpl = """
         % if 1:
@@ -103,6 +121,7 @@ class RenderTestCase(TestCase):
         stripped = res.strip()
         self.assertEqual(stripped, "OK")
 
+    @pytest.mark.skipif(not HAS_MAKO, reason="Mako module not available for testing")
     def test_render_mako_variable(self):
         tmpl = """${ var }"""
 
@@ -152,21 +171,33 @@ class RenderTestCase(TestCase):
         self.assertEqual(res, "OK")
 
     ### Tests for genshi template (xml-based)
+    @pytest.mark.skipif(
+        not HAS_GENSHI, reason="Genshi module not available for testing"
+    )
     def test_render_genshi_sanity(self):
         tmpl = """<RU>OK</RU>"""
         res = salt.utils.templates.render_genshi_tmpl(tmpl, dict(self.context))
         self.assertEqual(res, "<RU>OK</RU>")
 
+    @pytest.mark.skipif(
+        not HAS_GENSHI, reason="Genshi module not available for testing"
+    )
     def test_render_genshi_evaluate(self):
         tmpl = """<RU>${ "OK" }</RU>"""
         res = salt.utils.templates.render_genshi_tmpl(tmpl, dict(self.context))
         self.assertEqual(res, "<RU>OK</RU>")
 
+    @pytest.mark.skipif(
+        not HAS_GENSHI, reason="Genshi module not available for testing"
+    )
     def test_render_genshi_evaluate_condition(self):
         tmpl = """<RU xmlns:py="http://genshi.edgewall.org/" py:if="1">OK</RU>"""
         res = salt.utils.templates.render_genshi_tmpl(tmpl, dict(self.context))
         self.assertEqual(res, "<RU>OK</RU>")
 
+    @pytest.mark.skipif(
+        not HAS_GENSHI, reason="Genshi module not available for testing"
+    )
     def test_render_genshi_variable(self):
         tmpl = """<RU>$var</RU>"""
 
@@ -175,6 +206,9 @@ class RenderTestCase(TestCase):
         res = salt.utils.templates.render_genshi_tmpl(tmpl, ctx)
         self.assertEqual(res, "<RU>OK</RU>")
 
+    @pytest.mark.skipif(
+        not HAS_GENSHI, reason="Genshi module not available for testing"
+    )
     def test_render_genshi_variable_replace(self):
         tmpl = """<RU xmlns:py="http://genshi.edgewall.org/" py:content="var">not ok</RU>"""
 
