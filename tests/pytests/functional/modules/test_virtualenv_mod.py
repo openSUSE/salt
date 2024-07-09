@@ -1,7 +1,9 @@
 import shutil
+import sys
 
 import pytest
 
+import salt.utils.path
 from salt.modules.virtualenv_mod import KNOWN_BINARY_NAMES
 
 pytestmark = [
@@ -63,6 +65,14 @@ def test_clear(virtualenv, venv_dir, modules):
     assert "pep8" not in packages
 
 
+@pytest.mark.skipif(
+    bool(salt.utils.path.which("transactional-update")),
+    reason="Skipping on transactional systems",
+)
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
 def test_virtualenv_ver(virtualenv, venv_dir):
     ret = virtualenv.create(str(venv_dir))
     assert ret

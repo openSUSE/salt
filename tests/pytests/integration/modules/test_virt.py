@@ -26,6 +26,10 @@ pytestmark = [
         Version(docker.__version__) < Version("4.0.0"),
         reason="Test does not work in this version of docker-py",
     ),
+    pytest.mark.skipif(
+        salt.version.__saltstack_version__.major <= 3006,
+        reason="CI containers are not compatible with this Salt version",
+    ),
 ]
 
 

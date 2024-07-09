@@ -1383,6 +1383,10 @@ class SSHThinTestCase(TestCase):
         "virtualenv", reason="Needs virtualenv binary"
     )
     @pytest.mark.skip_on_windows(reason="salt-ssh does not deploy to/from windows")
+    @pytest.mark.skipif(
+        "venv-salt-minion" in sys.executable,
+        reason="Skipping for Salt Bundle (tests are not compatible)",
+    )
     def test_thin_dir(self):
         """
         Test the thin dir to make sure salt-call can run

@@ -19,7 +19,7 @@ class VultrTest(CloudTest):
         """
         image_list = self.run_cloud("--list-images {}".format(self.PROVIDER))
 
-        self.assertIn("Debian 10 x64 (buster)", [i.strip() for i in image_list])
+        self.assertIn("Debian 12 x64 (bookworm)", [i.strip() for i in image_list])
 
     def test_list_locations(self):
         """

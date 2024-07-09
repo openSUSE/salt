@@ -2,6 +2,7 @@ import os
 import pprint
 import re
 import shutil
+import sys
 import tempfile
 
 import pytest
@@ -16,6 +17,10 @@ from tests.support.runtests import RUNTIME_VARS
 
 
 @pytest.mark.skip_if_binaries_missing(*KNOWN_BINARY_NAMES, check_all=False)
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
 @pytest.mark.windows_whitelisted
 class PipModuleTest(ModuleCase):
     def setUp(self):
@@ -556,6 +561,10 @@ class PipModuleTest(ModuleCase):
     @pytest.mark.skip_on_windows(reason="test specific for linux usage of /bin/python")
     @pytest.mark.skip_initial_gh_actions_failure(
         reason="This was skipped on older golden images and is failing on newer."
+    )
+    @pytest.mark.skipif(
+        bool(salt.utils.path.which("transactional-update")),
+        reason="Skipping on transactional systems",
     )
     def test_system_pip3(self):
 

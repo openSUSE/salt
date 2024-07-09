@@ -232,6 +232,10 @@ def test_which(modules):
 @pytest.mark.requires_salt_modules("pkg.version", "pkg.install", "pkg.remove")
 @pytest.mark.slow_test
 @pytest.mark.requires_network
+@pytest.mark.skipif(
+    bool(salt.utils.path.which("transactional-update")),
+    reason="Skipping on transactional systems",
+)
 def test_install_remove(modules, test_pkg, refresh_db):
     """
     successfully install and uninstall a package
@@ -272,6 +276,10 @@ def test_install_remove(modules, test_pkg, refresh_db):
 @pytest.mark.slow_test
 @pytest.mark.requires_network
 @pytest.mark.requires_salt_states("pkg.installed")
+@pytest.mark.skipif(
+    bool(salt.utils.path.which("transactional-update")),
+    reason="Skipping on transactional systems",
+)
 def test_hold_unhold(grains, modules, states, test_pkg, refresh_db):
     """
     test holding and unholding a package

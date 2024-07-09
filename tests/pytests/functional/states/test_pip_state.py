@@ -80,6 +80,14 @@ def create_virtualenv(modules):
 
 
 @pytest.mark.slow_test
+@pytest.mark.skipif(
+    bool(salt.utils.path.which("transactional-update")),
+    reason="Skipping on transactional systems",
+)
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
 def test_pip_installed_removed(modules, states):
     """
     Tests installed and removed states
@@ -94,6 +102,7 @@ def test_pip_installed_removed(modules, states):
 
 
 @pytest.mark.slow_test
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_pip_installed_removed_venv(tmp_path, create_virtualenv, states):
     venv_dir = tmp_path / "pip_installed_removed"
     create_virtualenv(str(venv_dir))
@@ -105,6 +114,7 @@ def test_pip_installed_removed_venv(tmp_path, create_virtualenv, states):
 
 
 @pytest.mark.slow_test
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_pip_installed_errors(tmp_path, modules, state_tree):
     venv_dir = tmp_path / "pip-installed-errors"
     # Since we don't have the virtualenv created, pip.installed will
@@ -141,6 +151,7 @@ pep8-pip:
                 assert state_return.result is True
 
 
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_pip_installed_name_test_mode(tmp_path, create_virtualenv, states):
     """
     Test pip.installed state while test=true
@@ -154,6 +165,7 @@ def test_pip_installed_name_test_mode(tmp_path, create_virtualenv, states):
     assert name in ret.comment
 
 
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_pip_installed_pkgs_test_mode(tmp_path, create_virtualenv, states):
     """
     Test pip.installed state while test=true
@@ -168,6 +180,7 @@ def test_pip_installed_pkgs_test_mode(tmp_path, create_virtualenv, states):
 
 
 @pytest.mark.slow_test
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_issue_2028_pip_installed_state(
     tmp_path, modules, state_tree, get_python_executable
 ):
@@ -226,6 +239,7 @@ pep8-pip:
 
 
 @pytest.mark.slow_test
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_issue_2087_missing_pip(tmp_path, create_virtualenv, modules):
     venv_dir = tmp_path / "issue-2087-missing-pip"
 
@@ -271,6 +285,7 @@ pip.installed:
 @pytest.mark.destructive_test
 @pytest.mark.slow_test
 @pytest.mark.skip_if_not_root
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_issue_6912_wrong_owner(tmp_path, create_virtualenv, modules, states):
     # Setup virtual environment directory to be used throughout the test
     venv_dir = tmp_path / "6912-wrong-owner"
@@ -338,6 +353,7 @@ def test_issue_6912_wrong_owner(tmp_path, create_virtualenv, modules, states):
 @pytest.mark.skip_on_darwin(reason="Test is flaky on macosx")
 @pytest.mark.slow_test
 @pytest.mark.skip_if_not_root
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_issue_6912_wrong_owner_requirements_file(
     tmp_path, create_virtualenv, state_tree, modules, states
 ):
@@ -409,6 +425,7 @@ def test_issue_6912_wrong_owner_requirements_file(
 
 @pytest.mark.destructive_test
 @pytest.mark.slow_test
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_issue_6833_pip_upgrade_pip(tmp_path, create_virtualenv, modules, states):
     # Create the testing virtualenv
     if sys.platform == "win32":
@@ -465,6 +482,7 @@ def test_issue_6833_pip_upgrade_pip(tmp_path, create_virtualenv, modules, states
 
 
 @pytest.mark.slow_test
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_pip_installed_specific_env(
     tmp_path, state_tree_prod, states, create_virtualenv
 ):
@@ -514,6 +532,7 @@ def test_pip_installed_specific_env(
 
 
 @pytest.mark.slow_test
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
 def test_22359_pip_installed_unless_does_not_trigger_warnings(
     create_virtualenv, tmp_path, states
 ):

@@ -22,6 +22,11 @@ from tests.support.helpers import VirtualEnv
 )
 @pytest.mark.requires_network
 @pytest.mark.slow_test
+@pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
+@pytest.mark.skipif(
+    "venv-salt-minion" in sys.executable,
+    reason="Skipping for Salt Bundle (tests are not compatible)",
+)
 def test_list_available_packages(modules, pip_version, tmp_path):
     with VirtualEnv(venv_dir=tmp_path, pip_requirement=pip_version) as virtualenv:
         virtualenv.install("-U", pip_version)

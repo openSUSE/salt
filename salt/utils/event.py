@@ -75,6 +75,7 @@ import salt.utils.platform
 import salt.utils.process
 import salt.utils.stringutils
 import salt.utils.zeromq
+from salt.exceptions import SaltDeserializationError
 
 log = logging.getLogger(__name__)
 
@@ -269,6 +270,10 @@ class SaltEvent:
             # and don't read out events from the buffer on an on-going basis,
             # the buffer will grow resulting in big memory usage.
             self.connect_pub()
+        self.pusher_send_timeout = self.opts.get(
+            "pusher_send_timeout", self.opts.get("timeout")
+        )
+        self.pusher_send_tries = self.opts.get("pusher_send_tries", 3)
 
     @classmethod
     def __load_cache_regex(cls):
@@ -461,7 +466,13 @@ class SaltEvent:
             salt.utils.stringutils.to_bytes(TAGEND)
         )  # split tag from data
         mtag = salt.utils.stringutils.to_str(mtag)
-        data = salt.payload.loads(mdata, encoding="utf-8")
+        try:
+            data = salt.payload.loads(mdata, encoding="utf-8")
+        except SaltDeserializationError:
+            log.warning(
+                "SaltDeserializationError on unpacking data, the payload could be incomplete"
+            )
+            raise
         return mtag, data
 
     def _get_match_func(self, match_type=None):
@@ -583,6 +594,9 @@ class SaltEvent:
                     raise
                 else:
                     return None
+            except SaltDeserializationError:
+                log.error("Unable to deserialize received event")
+                return None
             except RuntimeError:
                 return None
 
@@ -829,10 +843,18 @@ class SaltEvent:
             ]
         )
         msg = salt.utils.stringutils.to_bytes(event, "utf-8")
+        if timeout is None:
+            timeout_s = self.pusher_send_timeout
+        else:
+            timeout_s = float(timeout) / 1000
         if self._run_io_loop_sync:
             with salt.utils.asynchronous.current_ioloop(self.io_loop):
                 try:
-                    self.pusher.send(msg)
+                    self.pusher.send(
+                        msg,
+                        timeout=timeout_s,
+                        tries=self.pusher_send_tries,
+                    )
                 except Exception as exc:  # pylint: disable=broad-except
                     log.debug(
                         "Publisher send failed with exception: %s",
@@ -841,7 +863,12 @@ class SaltEvent:
                     )
                     raise
         else:
-            self.io_loop.spawn_callback(self.pusher.send, msg)
+            self.io_loop.spawn_callback(
+                self.pusher.send,
+                msg,
+                timeout=timeout_s,
+                tries=self.pusher_send_tries,
+            )
         return True
 
     def fire_master(self, data, tag, timeout=1000):
@@ -889,6 +916,14 @@ class SaltEvent:
             ret = load.get("return", {})
             retcode = load["retcode"]
 
+        if not isinstance(ret, dict):
+            log.error(
+                "Event with bad payload received from '%s': %s",
+                load.get("id", "UNKNOWN"),
+                "".join(ret) if isinstance(ret, list) else ret,
+            )
+            return
+
         try:
             for tag, data in ret.items():
                 data["retcode"] = retcode
@@ -910,7 +945,8 @@ class SaltEvent:
                     )
         except Exception as exc:  # pylint: disable=broad-except
             log.error(
-                "Event iteration failed with exception: %s",
+                "Event from '%s' iteration failed with exception: %s",
+                load.get("id", "UNKNOWN"),
                 exc,
                 exc_info_on_loglevel=logging.DEBUG,
             )
