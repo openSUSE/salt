@@ -2063,13 +2063,13 @@ def upgrade(
     return ret
 
 
-def _uninstall(inclusion_detection, name=None, pkgs=None, root=None):
+def _uninstall(inclusion_detection, name=None, pkgs=None, version=None, root=None):
     """
     Remove and purge do identical things but with different Zypper commands,
     this function performs the common logic.
     """
     try:
-        pkg_params = __salt__["pkg_resource.parse_targets"](name, pkgs)[0]
+        pkg_params = __salt__["pkg_resource.parse_targets"](name, pkgs, version=version)[0]
     except MinionError as exc:
         raise CommandExecutionError(exc)
 
@@ -2147,7 +2147,7 @@ def normalize_name(name):
 
 
 def remove(
-    name=None, pkgs=None, root=None, inclusion_detection=False, **kwargs
+    name=None, pkgs=None, version=None, root=None, inclusion_detection=False, **kwargs
 ):  # pylint: disable=unused-argument
     """
     .. versionchanged:: 2015.8.12,2016.3.3,2016.11.0
@@ -2200,7 +2200,7 @@ def remove(
 
     Can now remove also PTF packages which require a different handling in the backend.
     """
-    return _uninstall(inclusion_detection, name=name, pkgs=pkgs, root=root)
+    return _uninstall(inclusion_detection, name=name, pkgs=pkgs, version=version, root=root)
 
 
 def purge(
