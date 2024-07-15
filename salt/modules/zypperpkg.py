@@ -2204,7 +2204,7 @@ def remove(
 
 
 def purge(
-    name=None, pkgs=None, root=None, inclusion_detection=False, **kwargs
+    name=None, pkgs=None, version=None, root=None, inclusion_detection=False, **kwargs
 ):  # pylint: disable=unused-argument
     """
     .. versionchanged:: 2015.8.12,2016.3.3,2016.11.0
@@ -2254,7 +2254,7 @@ def purge(
         salt '*' pkg.purge <package1>,<package2>,<package3>
         salt '*' pkg.purge pkgs='["foo", "bar"]'
     """
-    return _uninstall(inclusion_detection, name=name, pkgs=pkgs, root=root)
+    return _uninstall(inclusion_detection, name=name, pkgs=pkgs, version=version, root=root)
 
 
 def list_holds(pattern=None, full=True, root=None, **kwargs):
