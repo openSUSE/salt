@@ -8,6 +8,7 @@ log = logging.getLogger(__name__)
 
 
 @pytest.mark.skip_unless_on_linux
+@pytest.mark.skip_if_not_root
 def test_multimaster_dns(
     salt_mm_master_1,
     salt_mm_minion_1,
