@@ -884,6 +884,8 @@ async def test_master_type_failover(minion_opts):
         assert opts["master"] == "master2"
         return MockPubChannel()
 
+    minion_opts["master_tries"] = 1
+
     with patch("salt.minion.resolve_dns", mock_resolve_dns), patch(
         "salt.channel.client.AsyncPubChannel.factory", mock_channel_factory
     ), patch("salt.loader.grains", MagicMock(return_value=[])):
