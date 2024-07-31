@@ -22,6 +22,9 @@ def test_multimaster_dns(
     dns change if it's been disconnected.
     """
 
+    if not salt_mm_master_1.ip_addr_set:
+        pytest.skip("Unable to set additional IP address for master1")
+
     etc_hosts.write_text(
         f"{etc_hosts.orig_text}\n172.16.0.1    master1.local master2.local"
     )

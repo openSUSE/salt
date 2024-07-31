@@ -11,7 +11,11 @@ log = logging.getLogger(__name__)
 @pytest.fixture(scope="package")
 def salt_mm_master_1(request, salt_factories):
 
-    subprocess.check_output(["ip", "addr", "add", "172.16.0.1/32", "dev", "lo"])
+    try:
+        subprocess.check_output(["ip", "addr", "add", "172.16.0.1/32", "dev", "lo"])
+        ip_addr_set = True
+    except subprocess.CalledProcessError:
+        ip_addr_set = False
 
     config_defaults = {
         "open_mode": True,
@@ -27,6 +31,7 @@ def salt_mm_master_1(request, salt_factories):
         overrides=config_overrides,
         extra_cli_arguments_after_first_start_failure=["--log-level=info"],
     )
+    factory.ip_addr_set = ip_addr_set
     try:
         with factory.started(start_timeout=180):
             yield factory
