@@ -6,6 +6,7 @@ import pytest
 try:
     import cryptography
     import cryptography.x509 as cx509
+    from cryptography.exceptions import UnsupportedAlgorithm
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
     from cryptography.hazmat.primitives.serialization import (
@@ -2139,7 +2140,10 @@ def test_private_key_managed(x509, pk_args, algo, encoding, passphrase):
     pk_args["algo"] = algo
     pk_args["encoding"] = encoding
     pk_args["passphrase"] = passphrase
-    ret = x509.private_key_managed(**pk_args)
+    try:
+        ret = x509.private_key_managed(**pk_args)
+    except UnsupportedAlgorithm:
+        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     _assert_pk_basic(ret, algo, encoding, passphrase)
 
 
@@ -2166,7 +2170,10 @@ def test_private_key_managed_keysize(x509, pk_args, algo, keysize):
     indirect=True,
 )
 def test_private_key_managed_existing(x509, pk_args):
-    ret = x509.private_key_managed(**pk_args)
+    try:
+        ret = x509.private_key_managed(**pk_args)
+    except UnsupportedAlgorithm:
+        pytest.skip(f"Algorithm '{pk_args['algo']}' is not supported on this OpenSSL version")
     _assert_not_changed(ret)
 
 
@@ -2193,7 +2200,10 @@ def test_private_key_managed_existing_new_with_passphrase_change(x509, pk_args):
 @pytest.mark.usefixtures("existing_pk")
 def test_private_key_managed_algo_change(x509, pk_args):
     pk_args["algo"] = "ed25519"
-    ret = x509.private_key_managed(**pk_args)
+    try:
+        ret = x509.private_key_managed(**pk_args)
+    except UnsupportedAlgorithm:
+        pytest.skip("Algorithm ed25519 is not supported on this OpenSSL version")
     _assert_pk_basic(ret, "ed25519")
 
 
