@@ -85,10 +85,13 @@ class SampleConfTest(DefaultConfigsBase, TestCase):
         """
         master_config = SAMPLE_CONF_DIR + "master"
         ret = salt.config._read_conf_file(master_config)
+        # openSUSE modified the default config in
+        # https://github.com/opensuse/salt/commit/6ffbf7fcc178f32c670b177b25ed64658c59f1bf
+        expected_config = {"user": "salt", "syndic_user": "salt"}
         self.assertEqual(
             ret,
-            {},
-            f"Sample config file '{master_config}' must be commented out.",
+            expected_config,
+            "Sample config file '{}' must be commented out.".format(master_config),
         )
 
     def test_conf_minion_sample_is_commented(self):
@@ -343,7 +346,10 @@ class ConfigTestCase(TestCase, AdaptedConfigurationTestCaseMixin):
 
         with patched_environ(SALT_MINION_CONFIG=env_fpath):
             # Should load from env variable, not the default configuration file
-            config = salt.config.minion_config(f"{CONFIG_DIR}/minion")
+            # Override defaults from venv-minion conf
+            defaults = salt.config.DEFAULT_MINION_OPTS.copy()
+            defaults["default_include"] = ""
+            config = salt.config.minion_config("{}/minion".format(CONFIG_DIR), defaults=defaults)
             self.assertEqual(config["log_file"], env_fpath)
 
         root_dir = os.path.join(tempdir, "foo", "bar")
@@ -1945,6 +1951,11 @@ class APIConfigTestCase(DefaultConfigsBase, TestCase):
             if salt.utils.platform.is_windows():
                 expected = f"{RUNTIME_VARS.TMP_ROOT_DIR}\\var\\log\\salt\\api"
 
+            if os.environ.get("VIRTUAL_ENV"):
+                # venv bundle configures --salt-logs-dir=%{_localstatedir}/log
+                # in the RPM spec file
+                expected = expected.replace("/salt/api", "/api")
+
             ret = salt.config.api_config("/some/fake/path")
             self.assertEqual(ret["log_file"], expected)
 
@@ -2015,6 +2026,11 @@ class APIConfigTestCase(DefaultConfigsBase, TestCase):
             mock_log = "c:\\mock\\root\\var\\log\\salt\\api"
             mock_pid = "c:\\mock\\root\\var\\run\\salt-api.pid"
             mock_master_config["root_dir"] = "c:\\mock\\root"
+
+        if os.environ.get("VIRTUAL_ENV"):
+            # venv bundle configures --salt-logs-dir=%{_localstatedir}/log
+            # in the RPM spec file
+            mock_log = mock_log.replace("/salt", "")
 
         with patch(
             "salt.config.client_config", MagicMock(return_value=mock_master_config)
