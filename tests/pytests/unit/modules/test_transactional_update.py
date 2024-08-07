@@ -1,3 +1,4 @@
+import os
 import pytest
 
 import salt.loader.context
@@ -9,6 +10,10 @@ from tests.support.mock import MagicMock, mock_open, patch
 pytestmark = [
     pytest.mark.skip_on_windows(reason="Not supported on Windows"),
 ]
+
+SALT_CALL_BINARY = "salt-call"
+if os.environ.get('VIRTUAL_ENV'):
+    SALT_CALL_BINARY = f"{os.environ.get('VIRTUAL_ENV')}/bin/salt-call"
 
 
 @pytest.fixture
@@ -386,7 +391,7 @@ def test_call_fails_function():
                 "--continue",
                 "--quiet",
                 "run",
-                "salt-call",
+                SALT_CALL_BINARY,
                 "--out",
                 "json",
                 "-l",
@@ -418,7 +423,7 @@ def test_call_success_no_reboot():
                 "--continue",
                 "--quiet",
                 "run",
-                "salt-call",
+                SALT_CALL_BINARY,
                 "--out",
                 "json",
                 "-l",
@@ -461,7 +466,7 @@ def test_call_success_reboot():
                 "--continue",
                 "--quiet",
                 "run",
-                "salt-call",
+                SALT_CALL_BINARY,
                 "--out",
                 "json",
                 "-l",
@@ -495,7 +500,7 @@ def test_call_success_parameters():
                 "--continue",
                 "--quiet",
                 "run",
-                "salt-call",
+                SALT_CALL_BINARY,
                 "--out",
                 "json",
                 "-l",
