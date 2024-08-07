@@ -6,6 +6,7 @@ import pytest
 try:
     import cryptography
     import cryptography.x509 as cx509
+    from cryptography.exceptions import UnsupportedAlgorithm
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
     from cryptography.hazmat.primitives.serialization import (
@@ -691,6 +692,8 @@ def existing_csr_exts(x509, csr_args, csr_args_exts, ca_key, rsa_privkey, reques
 def existing_pk(x509, pk_args, request):
     pk_args.update(request.param)
     ret = x509.private_key_managed(**pk_args)
+    if ret.result == False and "UnsupportedAlgorithm" in ret.comment:
+        pytest.skip(f"Algorithm '{pk_args['algo']}' is not supported on this OpenSSL version")
     _assert_pk_basic(
         ret,
         pk_args.get("algo", "rsa"),
@@ -2140,6 +2143,8 @@ def test_private_key_managed(x509, pk_args, algo, encoding, passphrase):
     pk_args["encoding"] = encoding
     pk_args["passphrase"] = passphrase
     ret = x509.private_key_managed(**pk_args)
+    if ret.result == False and "UnsupportedAlgorithm" in ret.comment:
+        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     _assert_pk_basic(ret, algo, encoding, passphrase)
 
 
@@ -2167,6 +2172,8 @@ def test_private_key_managed_keysize(x509, pk_args, algo, keysize):
 )
 def test_private_key_managed_existing(x509, pk_args):
     ret = x509.private_key_managed(**pk_args)
+    if ret.result == False and "UnsupportedAlgorithm" in ret.comment:
+        pytest.skip(f"Algorithm '{pk_args['algo']}' is not supported on this OpenSSL version")
     _assert_not_changed(ret)
 
 
@@ -2194,6 +2201,8 @@ def test_private_key_managed_existing_new_with_passphrase_change(x509, pk_args):
 def test_private_key_managed_algo_change(x509, pk_args):
     pk_args["algo"] = "ed25519"
     ret = x509.private_key_managed(**pk_args)
+    if ret.result == False and "UnsupportedAlgorithm" in ret.comment:
+        pytest.skip("Algorithm 'ed25519' is not supported on this OpenSSL version")
     _assert_pk_basic(ret, "ed25519")
 
 
