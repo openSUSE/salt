@@ -1406,7 +1406,10 @@ def test_create_csr_raw(x509, rsa_privkey):
 @pytest.mark.slow_test
 @pytest.mark.parametrize("algo", ["rsa", "ec", "ed25519", "ed448"])
 def test_create_private_key(x509, algo):
-    res = x509.create_private_key(algo=algo)
+    try:
+        res = x509.create_private_key(algo=algo)
+    except UnsupportedAlgorithm:
+        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     assert res.startswith("-----BEGIN PRIVATE KEY-----")
 
 
@@ -1414,7 +1417,10 @@ def test_create_private_key(x509, algo):
 @pytest.mark.parametrize("algo", ["rsa", "ec", "ed25519", "ed448"])
 def test_create_private_key_with_passphrase(x509, algo):
     passphrase = "hunter2"
-    res = x509.create_private_key(algo=algo, passphrase=passphrase)
+    try:
+        res = x509.create_private_key(algo=algo, passphrase=passphrase)
+    except UnsupportedAlgorithm:
+        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     assert res.startswith("-----BEGIN ENCRYPTED PRIVATE KEY-----")
     # ensure it can be loaded
     x509.get_private_key_size(res, passphrase=passphrase)
