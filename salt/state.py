@@ -175,11 +175,9 @@ def _calculate_fake_duration():
     Generate a NULL duration for when states do not run
     but we want the results to be consistent.
     """
-    utc_start_time = datetime.datetime.utcnow()
-    local_start_time = utc_start_time - (
-        datetime.datetime.utcnow() - datetime.datetime.now()
-    )
-    utc_finish_time = datetime.datetime.utcnow()
+    utc_start_time = datetime.datetime.now(tz=datetime.timezone.utc)
+    local_start_time = utc_start_time.astimezone()
+    utc_finish_time = datetime.datetime.now(tz=datetime.timezone.utc)
     start_time = local_start_time.time().isoformat()
     delta = utc_finish_time - utc_start_time
     # duration in milliseconds.microseconds
@@ -2116,7 +2114,7 @@ class State:
             instance = cls(**init_kwargs)
         # we need to re-record start/end duration here because it is impossible to
         # correctly calculate further down the chain
-        utc_start_time = datetime.datetime.utcnow()
+        utc_start_time = datetime.datetime.now(tz=datetime.timezone.utc)
 
         instance.format_slots(cdata)
         tag = _gen_tag(low)
@@ -2136,10 +2134,9 @@ class State:
                 "comment": "An exception occurred in this state: {}".format(trb),
             }
 
-        utc_finish_time = datetime.datetime.utcnow()
-        timezone_delta = datetime.datetime.utcnow() - datetime.datetime.now()
-        local_finish_time = utc_finish_time - timezone_delta
-        local_start_time = utc_start_time - timezone_delta
+        utc_finish_time = datetime.datetime.now(tz=datetime.timezone.utc)
+        local_finish_time = utc_finish_time.astimezone()
+        local_start_time = utc_start_time.astimezone()
         ret["start_time"] = local_start_time.time().isoformat()
         delta = utc_finish_time - utc_start_time
         # duration in milliseconds.microseconds
@@ -2171,8 +2168,8 @@ class State:
                         *cdata["args"], **cdata["kwargs"]
                     )
 
-                    utc_start_time = datetime.datetime.utcnow()
-                    utc_finish_time = datetime.datetime.utcnow()
+                    utc_start_time = datetime.datetime.now(tz=datetime.timezone.utc)
+                    utc_finish_time = datetime.datetime.now(tz=datetime.timezone.utc)
                     delta = utc_finish_time - utc_start_time
                     duration = (delta.seconds * 1000000 + delta.microseconds) / 1000.0
                     retry_ret["duration"] = duration
@@ -2263,6 +2260,8 @@ class State:
         local_start_time = utc_start_time - (
             datetime.datetime.utcnow() - datetime.datetime.now()
         )
+        low_name = low.get("name")
+        log_low_name = low_name.strip() if isinstance(low_name, str) else low_name
         log.info(
             "Running state [%s] at time %s",
             low["name"].strip() if isinstance(low["name"], str) else low["name"],
@@ -2461,10 +2460,9 @@ class State:
         self.__run_num += 1
         format_log(ret)
         self.check_refresh(low, ret)
-        utc_finish_time = datetime.datetime.utcnow()
-        timezone_delta = datetime.datetime.utcnow() - datetime.datetime.now()
-        local_finish_time = utc_finish_time - timezone_delta
-        local_start_time = utc_start_time - timezone_delta
+        utc_finish_time = datetime.datetime.now(tz=datetime.timezone.utc)
+        local_finish_time = utc_finish_time.astimezone()
+        local_start_time = utc_start_time.astimezone()
         ret["start_time"] = local_start_time.time().isoformat()
         delta = utc_finish_time - utc_start_time
         # duration in milliseconds.microseconds
