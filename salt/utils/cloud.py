@@ -1202,6 +1202,16 @@ def wait_for_passwd(
             time.sleep(trysleep)
 
 
+def _format_master_param(master):
+    """
+    If the master is a list, we need to convert it to a comma delimited string
+    Otherwise, we just return master
+    """
+    if isinstance(master, list):
+        return ",".join(master)
+    return master
+
+
 def deploy_windows(
     host,
     port=445,
