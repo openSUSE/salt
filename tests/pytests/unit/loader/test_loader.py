@@ -70,7 +70,8 @@ def test_named_loader_context_name_not_packed(tmp_path):
         "optimization_order": [0],
     }
     contents = """
-    from salt.loader.dunder import loader_context
+    from salt.loader.context import LoaderContext
+    loader_context = LoaderContext()
     __not_packed__ = loader_context.named_context("__not_packed__")
     def foobar():
         return __not_packed__["not.packed"]()
