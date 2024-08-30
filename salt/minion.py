@@ -39,6 +39,7 @@ import salt.transport
 import salt.utils.args
 import salt.utils.context
 import salt.utils.crypt
+import salt.utils.ctx
 import salt.utils.data
 import salt.utils.dictdiffer
 import salt.utils.dictupdate
@@ -70,7 +71,6 @@ from salt.exceptions import (
     SaltSystemExit,
 )
 from salt.template import SLS_ENCODING
-from salt.utils.ctx import RequestContext
 from salt.utils.debug import enable_sigusr1_handler
 from salt.utils.event import tagify
 from salt.utils.network import parse_host_port
@@ -1805,17 +1805,11 @@ class Minion(MinionBase):
                 uid = salt.utils.user.get_uid(user=opts.get("user", None))
                 minion_instance.proc_dir = get_proc_dir(opts["cachedir"], uid=uid)
 
-        def run_func(minion_instance, opts, data):
+        with salt.utils.ctx.request_context({"data": data, "opts": opts}):
             if isinstance(data["fun"], tuple) or isinstance(data["fun"], list):
                 return Minion._thread_multi_return(minion_instance, opts, data)
             else:
                 return Minion._thread_return(minion_instance, opts, data)
-
-        with salt.ext.tornado.stack_context.StackContext(
-            functools.partial(RequestContext, {"data": data, "opts": opts})
-        ):
-            with salt.ext.tornado.stack_context.StackContext(minion_instance.ctx):
-                run_func(minion_instance, opts, data)
 
     def _execute_job_function(
         self, function_name, function_args, executors, opts, data
