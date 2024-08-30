@@ -780,7 +780,11 @@ def load_privkey(pk, passphrase=None, get_encoding=False):
             return pk
         except (ValueError, TypeError) as err:
             err_str = str(err)
-            if "Bad decrypt" in err_str or "Incorrect password" in err_str:
+            if (
+                "Bad decrypt" in err_str
+                or "Incorrect password" in err_str
+                or "Could not deserialize key data" in err_str
+            ):
                 raise InvalidPassword() from err
             if "private key is encrypted" in err_str:
                 raise MissingPassword() from err
