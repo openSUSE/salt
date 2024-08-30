@@ -272,6 +272,13 @@ Certificate:
     """
     with x509_salt_master.state_tree.base.temp_file("manage_cert.sls", state):
         ret = x509_salt_call_cli.run("state.apply", "manage_cert")
+        if (
+            ret.returncode == 1
+            and "NotImplementedError: ECDSA keys with unnamed curves" in ret.stdout
+        ):
+            pytest.skip(
+                "The version of OpenSSL doesn't support ECDSA keys with unnamed curves"
+            )
         assert ret.returncode == 0
         assert ret.data[next(iter(ret.data))]["changes"]
         assert (tmp_path / "priv.key").exists()
