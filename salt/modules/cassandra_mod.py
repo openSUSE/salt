@@ -45,7 +45,7 @@ def __virtual__():
         )
 
     warn_until_date(
-        "20240101",
+        "20260101",
         "The cassandra returner is broken and deprecated, and will be removed"
         " after {date}. Use the cassandra_cql returner instead",
     )

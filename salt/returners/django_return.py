@@ -57,7 +57,7 @@ __virtualname__ = "django"
 
 def __virtual__():
     warn_until_date(
-        "20240101",
+        "20260101",
         "The django returner is broken and deprecated, and will be removed"
         " after {date}.",
     )
