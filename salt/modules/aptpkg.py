@@ -2746,7 +2746,7 @@ def expand_repo_def(**kwargs):
         NOT USABLE IN THE CLI
     """
     warn_until_date(
-        "20250101",
+        "20260101",
         "The pkg.expand_repo_def function is deprecated and set for removal "
         "after {date}. This is only unsed internally by the apt pkg state "
         "module. If that's not the case, please file an new issue requesting "
