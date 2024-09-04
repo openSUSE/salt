@@ -36,7 +36,7 @@ class TemporaryLoggingHandler(logging.NullHandler):
 
     def __init__(self, level=logging.NOTSET, max_queue_size=10000):
         warn_until_date(
-            "20240101",
+            "20260101",
             "Please stop using '{name}.TemporaryLoggingHandler'. "
             "'{name}.TemporaryLoggingHandler' will go away after "
             "{{date}}.".format(name=__name__),
@@ -225,7 +225,7 @@ if sys.version_info < (3, 7):
         def __init__(self, queue):  # pylint: disable=useless-super-delegation
             super().__init__(queue)
             warn_until_date(
-                "20240101",
+                "20260101",
                 "Please stop using '{name}.QueueHandler' and instead "
                 "use 'logging.handlers.QueueHandler'. "
                 "'{name}.QueueHandler' will go away after "
@@ -283,7 +283,7 @@ else:
         def __init__(self, queue):  # pylint: disable=useless-super-delegation
             super().__init__(queue)
             warn_until_date(
-                "20240101",
+                "20260101",
                 "Please stop using '{name}.QueueHandler' and instead "
                 "use 'logging.handlers.QueueHandler'. "
                 "'{name}.QueueHandler' will go away after "
