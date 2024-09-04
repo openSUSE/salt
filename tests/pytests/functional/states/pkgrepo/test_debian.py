@@ -194,7 +194,7 @@ def ubuntu_state_tree(system_aptsources, state_tree, grains):
         - dist: {{ codename }}
         - file: /etc/apt/sources.list.d/firefox-beta.list
         - keyid: CE49EC21
-        - keyserver: keyserver.ubuntu.com
+        - keyserver: hkp://keyserver.ubuntu.com:80
     {%- endif %}
 
     {%- if backports %}{%- do ubuntu_repos.append('kubuntu-ppa') %}
