@@ -11,7 +11,7 @@ from salt.utils.versions import warn_until_date
 # pylint: enable=unused-import
 
 warn_until_date(
-    "20240101",
+    "20260101",
     "Please stop using '{name}' and instead use 'salt._logging.mixins'. "
     "'{name}' will go away after {{date}}.".format(name=__name__),
 )

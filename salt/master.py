@@ -38,6 +38,7 @@ import salt.state
 import salt.utils.args
 import salt.utils.atomicfile
 import salt.utils.crypt
+import salt.utils.ctx
 import salt.utils.event
 import salt.utils.files
 import salt.utils.gitfs
@@ -58,10 +59,8 @@ import salt.wheel
 from salt.cli.batch_async import BatchAsync, batch_async_required
 from salt.config import DEFAULT_INTERVAL
 from salt.defaults import DEFAULT_TARGET_DELIM
-from salt.ext.tornado.stack_context import StackContext
 from salt.transport import TRANSPORTS
 from salt.utils.channel import iter_transport_opts
-from salt.utils.ctx import RequestContext
 from salt.utils.debug import (
     enable_sigusr1_handler,
     enable_sigusr2_handler,
@@ -1108,13 +1107,8 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
             start = time.time()
             self.stats[cmd]["runs"] += 1
 
-        def run_func(data):
-            return self.aes_funcs.run_func(data["cmd"], data)
-
-        with StackContext(
-            functools.partial(RequestContext, {"data": data, "opts": self.opts})
-        ):
-            ret = run_func(data)
+        with salt.utils.ctx.request_context({"data": data, "opts": self.opts}):
+            ret = self.aes_funcs.run_func(data["cmd"], data)
 
         if self.opts["master_stats"]:
             self._post_stats(start, cmd)
