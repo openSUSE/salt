@@ -2891,7 +2891,7 @@ def _uninstall(
 
     try:
         pkg_params = __salt__["pkg_resource.parse_targets"](
-            name, pkgs, normalize=normalize
+            name, pkgs, normalize=normalize, version=version
         )[0]
     except MinionError as exc:
         return {
