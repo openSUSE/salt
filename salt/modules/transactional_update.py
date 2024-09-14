@@ -283,6 +283,7 @@ import sys
 import salt.client.ssh.state
 import salt.client.ssh.wrapper.state
 import salt.exceptions
+import salt.executors.transactional_update
 import salt.utils.args
 from salt.modules.state import _check_queue, _prior_running_states, _wait, running
 
@@ -985,11 +986,39 @@ def call(function, *args, **kwargs):
             else:
                 return local
         except ValueError:
-            return {"result": False, "retcode": 1, "comment": ret_stdout}
+            local = {"result": False, "retcode": 1, "comment": ret_stdout}
+            return local
     finally:
         # Check if reboot is needed
-        if activate_transaction and pending_transaction():
+        if (activate_transaction and pending_transaction()) or (
+            not kwargs.get("test", False) and _user_specified_reboot(local, function)
+        ):
             reboot()
+
+
+def _user_specified_reboot(local, function):
+    explicit_reboot_cmds = set(["reboot", "system.reboot"])
+    explicit_reboot_modules = ["cmd", "module"]
+
+    if function not in salt.executors.transactional_update.DELEGATION_MAP.keys():
+        return False
+
+    if not isinstance(local, dict):
+        return False
+
+    names = set()
+    for execution_id, execution_result in local.items():
+        if not isinstance(execution_id, str):
+            continue
+
+        module = execution_id.split("_|-")[0]
+        if module not in explicit_reboot_modules:
+            continue
+
+        if isinstance(execution_result, dict) and "name" in execution_result:
+            names.add(execution_result["name"])
+
+    return bool(explicit_reboot_cmds.intersection(names))
 
 
 def apply_(mods=None, **kwargs):
