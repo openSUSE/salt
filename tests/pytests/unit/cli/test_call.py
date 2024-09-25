@@ -33,6 +33,7 @@ def test_check_user_called_even_with_sudo_user():
         salt_call.options.file_root = None
         salt_call.options.pillar_root = None
         salt_call.options.states_dir = None
+        salt_call.options.cachedir = None
 
         salt_call.run()
 
@@ -71,6 +72,7 @@ def test_check_user_called_without_sudo_user():
         salt_call.options.file_root = None
         salt_call.options.pillar_root = None
         salt_call.options.states_dir = None
+        salt_call.options.cachedir = None
 
         salt_call.run()
 
@@ -108,6 +110,7 @@ def test_check_user_skipped_when_already_correct_user():
         salt_call.options.file_root = None
         salt_call.options.pillar_root = None
         salt_call.options.states_dir = None
+        salt_call.options.cachedir = None
 
         salt_call.run()
 
@@ -146,6 +149,7 @@ def test_check_user_called_with_cli_override():
         salt_call.options.file_root = None
         salt_call.options.pillar_root = None
         salt_call.options.states_dir = None
+        salt_call.options.cachedir = None
 
         salt_call.run()
 
