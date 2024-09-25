@@ -62,3 +62,16 @@ def test_raw_mod_functions():
     ret = salt.loader.raw_mod(opts, "grains", "get")
     for k, v in ret.items():
         assert isinstance(v, salt.loader.lazy.LoadedFunc)
+
+
+def test_return_named_context_from_loaded_func(tmp_path):
+    opts = {
+        "optimization_order": [0],
+    }
+    contents = """
+    def foobar():
+        return __test__
+    """
+    with pytest.helpers.temp_file("mymod.py", contents, directory=tmp_path):
+        loader = salt.loader.LazyLoader([tmp_path], opts, pack={"__test__": "meh"})
+        assert loader["mymod.foobar"]() == "meh"
