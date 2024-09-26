@@ -1,6 +1,7 @@
 """
 Zeromq transport classes
 """
+
 import errno
 import hashlib
 import logging
@@ -211,6 +212,12 @@ class PublishClient(salt.transport.base.PublishClient):
             self.master_pub,
         )
         log.debug("%r connecting to %s", self, self.master_pub)
+        if (
+            hasattr(self, "_monitor")
+            and self._monitor is not None
+            and disconnect_callback is not None
+        ):
+            self._monitor.disconnect_callback = disconnect_callback
         self._socket.connect(self.master_pub)
         connect_callback(True)
 
@@ -680,13 +687,21 @@ class ZeroMQSocketMonitor:
         log.debug("ZeroMQ event: %s", evt)
         if evt["event"] == zmq.EVENT_MONITOR_STOPPED:
             self.stop()
+        elif evt["event"] == zmq.EVENT_DISCONNECTED:
+            if (
+                hasattr(self, "disconnect_callback")
+                and self.disconnect_callback is not None
+            ):
+                self.disconnect_callback()
 
     def stop(self):
         if self._socket is None:
             return
         self._socket.disable_monitor()
         self._socket = None
-        self._monitor_socket = None
+        if self._monitor_socket is not None:
+            self._monitor_socket.close()
+            self._monitor_socket = None
         if self._monitor_stream is not None:
             self._monitor_stream.close()
             self._monitor_stream = None
