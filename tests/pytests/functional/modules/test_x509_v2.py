@@ -1,6 +1,5 @@
 import base64
 import datetime
-import ssl
 
 import pytest
 
@@ -679,13 +678,16 @@ def crl_revoked():
 
 @pytest.mark.parametrize("algo", ["rsa", "ec", "ed25519", "ed448"])
 def test_create_certificate_self_signed(x509, algo, request):
-    if algo in ["ed25519", "ed448"] and ssl.OPENSSL_VERSION_INFO < (1, 1):
-        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     privkey = request.getfixturevalue(f"{algo}_privkey")
     try:
         res = x509.create_certificate(signing_private_key=privkey, CN="success")
     except (UnsupportedAlgorithm, NotImplementedError):
         pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+    except salt.exceptions.CommandExecutionError as e:
+        if "Could not load PEM-encoded" in e.error:
+            pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+        else:
+            raise e
     assert res.startswith("-----BEGIN CERTIFICATE-----")
     cert = _get_cert(res)
     assert cert.subject.rfc4514_string() == "CN=success"
@@ -749,8 +751,6 @@ def test_create_certificate_raw(x509, rsa_privkey):
 
 @pytest.mark.parametrize("algo", ["rsa", "ec", "ed25519", "ed448"])
 def test_create_certificate_from_privkey(x509, ca_key, ca_cert, algo, request):
-    if algo in ["ed25519", "ed448"] and ssl.OPENSSL_VERSION_INFO < (1, 1):
-        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     privkey = request.getfixturevalue(f"{algo}_privkey")
     try:
         res = x509.create_certificate(
@@ -761,6 +761,11 @@ def test_create_certificate_from_privkey(x509, ca_key, ca_cert, algo, request):
         )
     except (UnsupportedAlgorithm, NotImplementedError):
         pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+    except salt.exceptions.CommandExecutionError as e:
+        if "Could not load PEM-encoded" in e.error:
+            pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+        else:
+            raise e
     assert res.startswith("-----BEGIN CERTIFICATE-----")
     cert = _get_cert(res)
     assert cert.subject.rfc4514_string() == "CN=success"
@@ -799,8 +804,6 @@ def test_create_certificate_from_encrypted_privkey_with_encrypted_privkey(
 
 @pytest.mark.parametrize("algo", ["rsa", "ec", "ed25519", "ed448"])
 def test_create_certificate_from_pubkey(x509, ca_key, ca_cert, algo, request):
-    if algo in ["ed25519", "ed448"] and ssl.OPENSSL_VERSION_INFO < (1, 1):
-        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     pubkey = request.getfixturevalue(f"{algo}_pubkey")
     try:
         res = x509.create_certificate(
@@ -811,6 +814,11 @@ def test_create_certificate_from_pubkey(x509, ca_key, ca_cert, algo, request):
         )
     except (UnsupportedAlgorithm, NotImplementedError):
         pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+    except salt.exceptions.CommandExecutionError as e:
+        if "Could not load PEM-encoded" in e.error:
+            pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+        else:
+            raise e
     assert res.startswith("-----BEGIN CERTIFICATE-----")
     cert = _get_cert(res)
     assert cert.subject.rfc4514_string() == "CN=success"
@@ -1345,13 +1353,16 @@ def test_create_crl_raw(x509, crl_args):
 
 @pytest.mark.parametrize("algo", ["rsa", "ec", "ed25519", "ed448"])
 def test_create_csr(x509, algo, request):
-    if algo in ["ed25519", "ed448"] and ssl.OPENSSL_VERSION_INFO < (1, 1):
-        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     privkey = request.getfixturevalue(f"{algo}_privkey")
     try:
         res = x509.create_csr(private_key=privkey)
     except (UnsupportedAlgorithm, NotImplementedError):
         pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+    except salt.exceptions.CommandExecutionError as e:
+        if "Could not load PEM-encoded" in e.error:
+            pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+        else:
+            raise e
     assert res.startswith("-----BEGIN CERTIFICATE REQUEST-----")
 
 
@@ -1471,13 +1482,16 @@ def test_create_private_key_raw(x509):
     "algo,expected", [("rsa", 2048), ("ec", 256), ("ed25519", None), ("ed448", None)]
 )
 def test_get_private_key_size(x509, algo, expected, request):
-    if algo in ["ed25519", "ed448"] and ssl.OPENSSL_VERSION_INFO < (1, 1):
-        pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     privkey = request.getfixturevalue(f"{algo}_privkey")
     try:
         res = x509.get_private_key_size(privkey)
     except (UnsupportedAlgorithm, NotImplementedError):
         pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+    except salt.exceptions.CommandExecutionError as e:
+        if "Could not load PEM-encoded" in e.error:
+            pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
+        else:
+            raise e
     assert res == expected
 
 
