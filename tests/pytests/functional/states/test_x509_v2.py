@@ -719,8 +719,12 @@ def existing_csr_exts(x509, csr_args, csr_args_exts, ca_key, rsa_privkey, reques
 def existing_pk(x509, pk_args, request):
     pk_args.update(request.param)
     ret = x509.private_key_managed(**pk_args)
-    if ret.result == False and "UnsupportedAlgorithm" in ret.comment:
-        pytest.skip(f"Algorithm '{pk_args['algo']}' is not supported on this OpenSSL version")
+    if ret.result == False and (
+        "UnsupportedAlgorithm" in ret.comment or "NotImplementedError" in ret.comment
+    ):
+        pytest.skip(
+            f"Algorithm '{pk_args['algo']}' is not supported on this OpenSSL version"
+        )
     _assert_pk_basic(
         ret,
         pk_args.get("algo", "rsa"),
@@ -1112,6 +1116,8 @@ def test_certificate_managed_days_valid_does_not_override_days_remaining(
 def test_certificate_managed_privkey_change(x509, cert_args, ec_privkey, ca_key):
     cert_args["private_key"] = ec_privkey
     ret = x509.certificate_managed(**cert_args)
+    if ret.result == False and "NotImplementedError" in ret.comment:
+        pytest.skip("Current OpenSSL does not support 'ec' algorithm")
     _assert_cert_basic(ret, cert_args["name"], ec_privkey, ca_key)
     assert ret.changes["private_key"]
 
@@ -1295,6 +1301,8 @@ def test_certificate_managed_wrong_ca_key(
     cert_args["private_key"] = ec_privkey
     cert_args["signing_private_key"] = rsa_privkey
     ret = x509.certificate_managed(**cert_args)
+    if ret.result == False and "NotImplementedError" in ret.comment:
+        pytest.skip("Current OpenSSL does not support 'ec' algorithm")
     assert ret.result is False
     assert not ret.changes
     assert "Signing private key does not match the certificate" in ret.comment
@@ -1975,6 +1983,8 @@ def test_csr_managed_existing_invalid_version(x509, csr_args, rsa_privkey):
 def test_csr_managed_privkey_change(x509, csr_args, ec_privkey):
     csr_args["private_key"] = ec_privkey
     ret = x509.csr_managed(**csr_args)
+    if ret.result == False and "NotImplementedError" in ret.comment:
+        pytest.skip("Current OpenSSL does not support 'ec' algorithm")
     _assert_csr_basic(ret, ec_privkey)
     assert ret.changes["private_key"]
 
@@ -2199,11 +2209,14 @@ def test_private_key_managed(x509, pk_args, algo, encoding, passphrase):
         pytest.skip(
             "PKCS12 serialization of Edwards-curve keys requires cryptography v37"
         )
+
     pk_args["algo"] = algo
     pk_args["encoding"] = encoding
     pk_args["passphrase"] = passphrase
     ret = x509.private_key_managed(**pk_args)
-    if ret.result == False and "UnsupportedAlgorithm" in ret.comment:
+    if ret.result == False and (
+        "UnsupportedAlgorithm" in ret.comment or "NotImplementedError" in ret.comment
+    ):
         pytest.skip(f"Algorithm '{algo}' is not supported on this OpenSSL version")
     _assert_pk_basic(ret, algo, encoding, passphrase)
 
@@ -2213,6 +2226,8 @@ def test_private_key_managed_keysize(x509, pk_args, algo, keysize):
     pk_args["algo"] = algo
     pk_args["keysize"] = keysize
     ret = x509.private_key_managed(**pk_args)
+    if ret.result == False and "NotImplementedError" in ret.comment:
+        pytest.skip("Current OpenSSL does not support 'ec' algorithm")
     pk = _assert_pk_basic(ret, algo)
     assert pk.key_size == keysize
 
@@ -2232,8 +2247,12 @@ def test_private_key_managed_keysize(x509, pk_args, algo, keysize):
 )
 def test_private_key_managed_existing(x509, pk_args):
     ret = x509.private_key_managed(**pk_args)
-    if ret.result == False and "UnsupportedAlgorithm" in ret.comment:
-        pytest.skip(f"Algorithm '{pk_args['algo']}' is not supported on this OpenSSL version")
+    if ret.result == False and (
+        "UnsupportedAlgorithm" in ret.comment or "NotImplementedError" in ret.comment
+    ):
+        pytest.skip(
+            f"Algorithm '{pk_args['algo']}' is not supported on this OpenSSL version"
+        )
     _assert_not_changed(ret)
 
 
@@ -2455,6 +2474,8 @@ def test_private_key_managed_follow_symlinks_changes(
     pk_args["encoding"] = encoding
     pk_args["algo"] = "ec"
     ret = x509.private_key_managed(**pk_args)
+    if ret.result == False and "NotImplementedError" in ret.comment:
+        pytest.skip("Current OpenSSL does not support 'ec' algorithm")
     assert ret.changes
     assert pathlib.Path(ret.name).is_symlink() == follow
 
@@ -2795,7 +2816,12 @@ def _get_cert(cert, encoding="pem", passphrase=None):
 def _belongs_to(cert_or_pubkey, privkey):
     if isinstance(cert_or_pubkey, cx509.Certificate):
         cert_or_pubkey = cert_or_pubkey.public_key()
-    return x509util.is_pair(cert_or_pubkey, x509util.load_privkey(privkey))
+    try:
+        return x509util.is_pair(cert_or_pubkey, x509util.load_privkey(privkey))
+    except NotImplementedError:
+        pytest.skip(
+            "This OpenSSL version does not support current cryptographic algorithm"
+        )
 
 
 def _signed_by(cert, privkey):
