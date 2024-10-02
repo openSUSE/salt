@@ -10,7 +10,13 @@ from saltfactories.utils import random_string
 
 from salt.version import SaltVersionsInfo, __version__
 
-pytestmark = [pytest.mark.skip_if_binaries_missing("docker")]
+pytestmark = [
+    pytest.mark.skip_if_binaries_missing("docker"),
+    pytest.mark.skipif(
+        os.environ.get("GITHUB_ACTIONS", "") == "true",
+        reason="Cannot spawn containers in GH actions run",
+    ),
+]
 
 
 class ContainerMaster(SaltDaemon, master.SaltMaster):
