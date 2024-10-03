@@ -1442,14 +1442,22 @@ def test_create_private_key_with_passphrase(x509, algo):
 
 @pytest.mark.slow_test
 def test_create_private_key_der(x509):
-    res = x509.create_private_key(algo="ec", encoding="der")
+    try:
+        res = x509.create_private_key(algo="ec", encoding="der")
+    except NotImplementedError:
+        pytest.skip("Algorithm 'ec' is not supported on this OpenSSL version")
     assert base64.b64decode(res)
 
 
 @pytest.mark.slow_test
 @pytest.mark.parametrize("passphrase", [None, "hunter2"])
 def test_create_private_key_pkcs12(x509, passphrase):
-    res = x509.create_private_key(algo="ec", encoding="pkcs12", passphrase=passphrase)
+    try:
+        res = x509.create_private_key(
+            algo="ec", encoding="pkcs12", passphrase=passphrase
+        )
+    except NotImplementedError:
+        pytest.skip("Algorithm 'ec' is not supported on this OpenSSL version")
     assert base64.b64decode(res)
 
 
