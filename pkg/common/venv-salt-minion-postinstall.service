@@ -2,6 +2,6 @@
 Description=Clean old environment for venv-salt-minion
 
 [Service]
-ExecStart=/bin/sh -c '/usr/lib/venv-salt-minion/bin/post_start_cleanup.sh || :'
+ExecStart=/bin/sh -c 'WAIT_IF_SALT_JOBS=1 /usr/lib/venv-salt-minion/bin/post_start_cleanup.sh || :'
 Type=oneshot
 
