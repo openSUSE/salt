@@ -1084,6 +1084,7 @@ class Single:
             self.argv = argv
 
         self.fun, self.args, self.kwargs = self.__arg_comps()
+        self.call_args = self.__get_call_args()
         self.id = id_
         self.set_path = kwargs.get("set_path", "")
 
@@ -1147,6 +1148,21 @@ class Single:
         args = parsed[0]
         kws = parsed[1]
         return fun, args, kws
+
+    def __get_call_args(self):
+        """
+        Put extra arguments to the salt-call for the remote client.
+        """
+        call_args = []
+        args_list = (
+            ("module_executors", "--module-executors"),
+            ("executor_opts", "--executor-opts"),
+            ("metadata", "--set-metadata"),
+        )
+        for src, dst in args_list:
+            if src in self.opts:
+                call_args.append(f"{dst}={self.opts[src]}")
+        return call_args if call_args else None
 
     def _escape_arg(self, arg):
         """
@@ -1509,6 +1525,7 @@ OPTIONS.wipe = {wipe}
 OPTIONS.tty = {tty}
 OPTIONS.cmd_umask = {cmd_umask}
 OPTIONS.code_checksum = {code_checksum}
+CALL_ARGS = {call_args}
 ARGS = {arguments}\n'''.format(
             config=self.minion_config,
             delimeter=RSTR,
@@ -1521,6 +1538,7 @@ ARGS = {arguments}\n'''.format(
             tty=self.tty,
             cmd_umask=self.cmd_umask,
             code_checksum=thin_code_digest,
+            call_args=self.call_args,
             arguments=self.argv,
         )
         py_code = SSH_PY_SHIM.replace("#%%OPTS", arg_str)

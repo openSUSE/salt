@@ -82,6 +82,9 @@ class SSHClient:
             ("ssh_run_pre_flight", bool),
             ("no_host_keys", bool),
             ("saltfile", str),
+            ("module_executors", list),
+            ("executor_opts", dict),
+            ("metadata", dict),
         ]
         sane_kwargs = {}
         for name, kind in roster_vals:
@@ -92,7 +95,7 @@ class SSHClient:
             except ValueError:
                 log.warning("Unable to cast kwarg %s", name)
                 continue
-            if kind is bool or kind is int:
+            if kind in (bool, int, dict):
                 sane_kwargs[name] = val
             elif kind is str:
                 if val.find("ProxyCommand") != -1:

@@ -37,6 +37,7 @@ class OptionsContainer:
 
 
 OPTIONS = OptionsContainer()
+CALL_ARGS = None
 ARGS = None
 # The below line is where OPTIONS can be redefined with internal options
 # (rather than cli arguments) when the shim is bundled by
@@ -284,13 +285,13 @@ def main(argv):  # pylint: disable=W0613
     # VIRTUAL_ENV environment variable is defined by venv-salt-minion wrapper
     # it's used to check if the shim is running under this wrapper
     venv_salt_call = None
+    cache_dir = os.path.join(OPTIONS.saltdir, "running_data", "var", "cache")
     if virt_env and "venv-salt-minion" in virt_env:
         venv_salt_call = os.path.join(virt_env, "bin", "salt-call")
         if not os.path.exists(venv_salt_call):
             venv_salt_call = None
         elif not os.path.exists(OPTIONS.saltdir):
             os.makedirs(OPTIONS.saltdir)
-            cache_dir = os.path.join(OPTIONS.saltdir, "running_data", "var", "cache")
             os.makedirs(os.path.join(cache_dir, "salt"))
             os.symlink(
                 "salt", os.path.relpath(os.path.join(cache_dir, "venv-salt-minion"))
@@ -401,6 +402,8 @@ def main(argv):  # pylint: disable=W0613
         "quiet",
         "-c",
         OPTIONS.saltdir,
+        "--cachedir",
+        cache_dir,
     ]
 
     try:
@@ -408,6 +411,9 @@ def main(argv):  # pylint: disable=W0613
             salt_argv.append(argv_prepared.pop(-1))
     except (IndexError, TypeError):
         pass
+
+    if CALL_ARGS and isinstance(CALL_ARGS, list):
+        salt_argv.extend(CALL_ARGS)
 
     salt_argv.append("--")
     salt_argv.extend(argv_prepared)
