@@ -95,6 +95,9 @@ class DeferredStreamHandler(StreamHandler):
         super().__init__(stream)
         self.__messages = deque(maxlen=max_queue_size)
         self.__emitting = False
+        import traceback
+
+        self.stack = "".join(traceback.format_stack())
 
     def handle(self, record):
         self.acquire()
