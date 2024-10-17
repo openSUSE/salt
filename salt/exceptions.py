@@ -362,6 +362,11 @@ class AuthorizationError(SaltException):
     """
 
 
+class SaltValidationError(SaltException):
+    """
+    Thrown when a value fails validation
+    """
+
 class SaltDaemonNotRunning(SaltException):
     """
     Throw when a running master/minion/syndic is not running but is needed to

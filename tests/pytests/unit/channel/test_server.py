@@ -7,8 +7,11 @@ import salt.ext.tornado.gen
 from tests.support.mock import MagicMock, patch
 
 
-def test__auth_cmd_stats_passing():
-    req_server_channel = server.ReqServerChannel({"master_stats": True}, None)
+def test__auth_cmd_stats_passing(master_opts):
+    master_opts.update(
+        {"master_stats": True}
+    )
+    req_server_channel = server.ReqServerChannel(master_opts, None)
 
     fake_ret = {"enc": "clear", "load": b"FAKELOAD"}
 

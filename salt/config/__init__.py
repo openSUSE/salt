@@ -998,6 +998,10 @@ VALID_OPTS = immutabletypes.freeze(
         # Use Adler32 hashing algorithm for server_id (default False until Sodium, "adler32" after)
         # Possible values are: False, adler32, crc32
         "server_id_use_crc": (bool, str),
+        "request_server_ttl": int,
+        "request_server_aes_session": int,
+        "request_channel_timeout": int,
+        "request_channel_tries": int,
     }
 )
 
@@ -1059,6 +1063,8 @@ DEFAULT_MINION_OPTS = immutabletypes.freeze(
         "pillar_cache": False,
         "pillar_cache_ttl": 3600,
         "pillar_cache_backend": "disk",
+        "request_channel_timeout": 30,
+        "request_channel_tries": 3,
         "gpg_cache": False,
         "gpg_cache_ttl": 86400,
         "gpg_cache_backend": "disk",
@@ -1652,6 +1658,8 @@ DEFAULT_MASTER_OPTS = immutabletypes.freeze(
         "netapi_enable_clients": [],
         "maintenance_interval": 3600,
         "fileserver_interval": 3600,
+        "request_server_aes_session": 0,
+        "request_server_ttl": 0,
     }
 )
 
