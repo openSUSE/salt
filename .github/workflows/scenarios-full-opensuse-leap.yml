@@ -13,7 +13,7 @@ jobs:
     env:
       GITHUB_ACTIONS: 1
     container:
-      image: registry.opensuse.org/systemsmanagement/saltstack/products/testing/containers/leap15.5/containers/salt-testsuite-github:leap15.5
+      image: registry.opensuse.org/systemsmanagement/saltstack/products/testing/containers/leap15.6/containers/salt-testsuite-github:leap15.6
       options: --hostname=salt-test-container
     steps:
       - name: Checkout Salt
