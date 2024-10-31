@@ -636,8 +636,7 @@ class SaltPkgInstall:
 
     def install_previous(self):
         """
-        Install previous version. This is used for
-        upgrade tests.
+        Install previous version. This is used for upgrade tests.
         """
         major_ver = self.major
         minor_ver = self.minor
@@ -648,16 +647,12 @@ class SaltPkgInstall:
         distro_name = self.distro_name
         if distro_name == "centos" or distro_name == "fedora":
             distro_name = "redhat"
-        root_url = "salt/py3/"
-        if self.classic:
-            root_url = "py3/"
+        root_url = "https://packages.broadcom.com/artifactory"
 
         if self.distro_name in ["redhat", "centos", "amazon", "fedora", "vmware"]:
             for fp in pathlib.Path("/etc", "yum.repos.d").glob("epel*"):
                 fp.unlink()
-            gpg_key = "SALTSTACK-GPG-KEY.pub"
-            if self.distro_version == "9":
-                gpg_key = "SALTSTACK-GPG-KEY2.pub"
+
             if platform.is_aarch64():
                 arch = "aarch64"
             else:
@@ -694,46 +689,86 @@ class SaltPkgInstall:
                 arch = "arm64"
             else:
                 arch = "amd64"
+
             pathlib.Path("/etc/apt/keyrings").mkdir(parents=True, exist_ok=True)
+            gpg_full_path = "/etc/apt/keyrings/salt-archive-keyring.gpg"
+
+            # download the gpg pub key
             download_file(
-                f"https://repo.saltproject.io/{root_url}{distro_name}/{self.distro_version}/{arch}/{major_ver}/salt-archive-keyring.gpg",
-                "/etc/apt/keyrings/salt-archive-keyring.gpg",
+                f"{root_url}/api/security/keypair/SaltProjectKey/public",
+                f"{gpg_full_path}",
             )
-            with open(
+            with salt.utils.files.fopen(
                 pathlib.Path("/etc", "apt", "sources.list.d", "salt.list"), "w"
             ) as fp:
                 fp.write(
-                    f"deb [signed-by=/etc/apt/keyrings/salt-archive-keyring.gpg arch={arch}] "
-                    f"https://repo.saltproject.io/{root_url}{distro_name}/{self.distro_version}/{arch}/{major_ver} {self.distro_codename} main"
+                    f"deb [signed-by={gpg_full_path} arch={arch}] "
+                    f"{root_url}/saltproject-deb/ {self.distro_codename} main"
                 )
-            ret = self.proc.run(self.pkg_mngr, "update")
             self._check_retcode(ret)
-            ret = self.proc.run(
-                self.pkg_mngr,
-                "install",
-                *self.salt_pkgs,
-                "-y",
-            )
-            self._check_retcode(ret)
+
+            cmd = [self.pkg_mngr, "install", *self.salt_pkgs, "-y"]
+
+            if downgrade:
+                pref_file = pathlib.Path("/etc", "apt", "preferences.d", "salt.pref")
+                pref_file.parent.mkdir(exist_ok=True)
+                # TODO: There's probably something I should put in here to say what version
+                # TODO: But maybe that's done elsewhere, hopefully in self.salt_pkgs
+                pref_file.write_text(
+                    textwrap.dedent(
+                        f"""\
+                Package: salt*
+                Pin: origin "{root_url}/saltproject-deb"
+                Pin-Priority: 1001
+                """
+                    ),
+                    encoding="utf-8",
+                )
+                cmd.append("--allow-downgrades")
+            env = os.environ.copy()
+            env["DEBIAN_FRONTEND"] = "noninteractive"
+            extra_args = [
+                "-o",
+                "DPkg::Options::=--force-confdef",
+                "-o",
+                "DPkg::Options::=--force-confold",
+            ]
+            self.proc.run(self.pkg_mngr, "update", *extra_args, env=env)
+
+            cmd.extend(extra_args)
+
+            ret = self.proc.run(*cmd, env=env)
+            # Pre-relenv packages down get downgraded to cleanly programmatically
+            # They work manually, and the install tests after downgrades will catch problems with the install
+            # Let's not check the returncode if this is the case
+            if not (
+                downgrade
+                and packaging.version.parse(self.prev_version)
+                < packaging.version.parse("3006.0")
+            ):
+                self._check_retcode(ret)
+            if downgrade:
+                pref_file.unlink()
             self.stop_services()
         elif platform.is_windows():
             self.onedir = True
             self.installer_pkg = True
             self.bin_dir = self.install_dir / "bin"
-            self.run_root = self.bin_dir / f"salt.exe"
-            self.ssm_bin = self.bin_dir / "ssm.exe"
-            if self.file_ext == "msi":
-                self.ssm_bin = self.install_dir / "ssm.exe"
+            self.run_root = self.bin_dir / "salt.exe"
+            self.ssm_bin = self.install_dir / "ssm.exe"
 
-            if not self.classic:
-                win_pkg = f"salt-{full_version}-windows-amd64.{self.file_ext}"
-                win_pkg_url = f"https://repo.saltproject.io/salt/py3/windows/{full_version}/{win_pkg}"
+            if self.file_ext == "exe":
+                win_pkg = (
+                    f"Salt-Minion-{self.prev_version}-Py3-AMD64-Setup.{self.file_ext}"
+                )
+            elif self.file_ext == "msi":
+                win_pkg = f"Salt-Minion-{self.prev_version}-Py3-AMD64.{self.file_ext}"
             else:
-                if self.file_ext == "msi":
-                    win_pkg = f"Salt-Minion-{min_ver}-1-Py3-AMD64.{self.file_ext}"
-                elif self.file_ext == "exe":
-                    win_pkg = f"Salt-Minion-{min_ver}-1-Py3-AMD64-Setup.{self.file_ext}"
-                win_pkg_url = f"https://repo.saltproject.io/windows/{win_pkg}"
+                log.debug(f"Unknown windows file extension: {self.file_ext}")
+
+            win_pkg_url = (
+                f"{root_url}/saltproject-generic/windows/{major_ver}/{win_pkg}"
+            )
             pkg_path = pathlib.Path(r"C:\TEMP", win_pkg)
             pkg_path.parent.mkdir(exist_ok=True)
             ret = requests.get(win_pkg_url)
@@ -763,12 +798,16 @@ class SaltPkgInstall:
                 self._install_system_service()
 
         elif platform.is_darwin():
-            if self.classic:
-                mac_pkg = f"salt-{min_ver}.{minor_ver}-1-py3-x86_64.pkg"
-                mac_pkg_url = f"https://repo.saltproject.io/osx/{mac_pkg}"
+            if relenv and platform.is_aarch64():
+                arch = "arm64"
+            elif platform.is_aarch64() and self.classic:
+                arch = "arm64"
             else:
-                mac_pkg = f"salt-{min_ver}.{minor_ver}-1-macos-x86_64.pkg"
-                mac_pkg_url = f"https://repo.saltproject.io/salt/py3/macos/{major_ver}.{minor_ver}-1/{mac_pkg}"
+                arch = "x86_64"
+
+            mac_pkg = f"salt-{self.prev_version}-py3-{arch}.pkg"
+            mac_pkg_url = f"{root_url}/saltproject-generic/macos/{major_ver}/{mac_pkg}"
+
             mac_pkg_path = f"/tmp/{mac_pkg}"
             if not os.path.exists(mac_pkg_path):
                 download_file(
