@@ -39,6 +39,7 @@ def find_json(raw):
     # Search for possible starts end ends of the json fragments
     for ind, _ in enumerate(lines):
         line = lines[ind].lstrip()
+        line = line[0] if line else line
         if line == "{" or line == "[":
             starts.append((ind, line))
         if line == "}" or line == "]":
@@ -61,10 +62,17 @@ def find_json(raw):
         working = "\n".join(lines[start : end + 1])
         try:
             ret = json.loads(working)
+            return ret
+        except ValueError:
+            pass
+        # Try filtering non-JSON text right after the last closing curly brace
+        end_str = lines[end].lstrip()[0]
+        working = "\n".join(lines[start : end]) + end_str
+        try:
+            ret = json.loads(working)
+            return ret
         except ValueError:
             continue
-        if ret:
-            return ret
 
     # Fall back to old implementation for backward compatibility
     # excpecting json after the text
