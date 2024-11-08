@@ -1,0 +1,3 @@
+[submodule "buildin-extensions/saltext-promotheus"]
+	path = buildin-extensions/saltext-promotheus
+	url = https://github.com/salt-extensions/saltext-prometheus
