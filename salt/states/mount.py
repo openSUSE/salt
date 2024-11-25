@@ -1228,6 +1228,7 @@ def fstab_present(
         if out == "present":
             msg = "{} entry is already in {}."
             ret["comment"].append(msg.format(fs_file, config))
+            ret["result"] = True
         elif out == "new":
             msg = "{} entry will be written in {}."
             ret["comment"].append(msg.format(fs_file, config))
