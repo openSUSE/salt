@@ -235,6 +235,12 @@ class PublishClient(salt.transport.base.PublishClient):
             self.master_pub,
         )
         log.debug("%r connecting to %s", self, self.master_pub)
+        if (
+            hasattr(self, "_monitor")
+            and self._monitor is not None
+            and disconnect_callback is not None
+        ):
+            self._monitor.disconnect_callback = disconnect_callback
         self._socket.connect(self.master_pub)
         if connect_callback is not None:
             connect_callback(True)
@@ -1141,6 +1147,12 @@ class ZeroMQSocketMonitor:
         log.debug("ZeroMQ event: %s", evt)
         if evt["event"] == zmq.EVENT_MONITOR_STOPPED:
             self.stop()
+        elif evt["event"] == zmq.EVENT_DISCONNECTED:
+            if (
+                hasattr(self, "disconnect_callback")
+                and self.disconnect_callback is not None
+            ):
+                self.disconnect_callback()
 
     def stop(self):
         if self._socket is None:
