@@ -914,9 +914,12 @@ def _virtual(osdata):
                 break
         elif command == "virt-what":
             for line in output.splitlines():
-                if line in ("kvm", "qemu", "uml", "xen"):
+                if line in ("kvm", "qemu", "uml", "xen", "nutanix-kvm"):
                     grains["virtual"] = line
                     break
+                elif "nutanix" in line:
+                    grains["virtual"] = "kvm"
+                    grains["virtual_subtype"] = "Nutanix"
                 elif "lxc" in line:
                     grains["virtual"] = "container"
                     grains["virtual_subtype"] = "LXC"
