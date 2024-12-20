@@ -478,8 +478,10 @@ class BatchAsync:
             log.trace("BatchAsync.schedule_next -> Batch already scheduled, nothing to do.")
             return
         self.scheduled = True
-        # call later so that we maybe gather more returns
-        yield tornado.gen.sleep(self.batch_delay)
+        if self._get_next():
+            # call later so that we maybe gather more returns
+            log.trace("BatchAsync.schedule_next delaying batch {} second(s).".format(self.batch_delay))
+            await asyncio.sleep(self.batch_delay)
         if self.event:
             await self.run_next()
 
