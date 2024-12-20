@@ -334,7 +334,7 @@ class BatchAsync:
         )
 
         if timedout_minions:
-            yield self.schedule_next()
+            asyncio.create_task(self.schedule_next())
 
         if self.event and running:
             self.find_job_returned = self.find_job_returned.difference(running)
