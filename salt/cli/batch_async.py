@@ -287,8 +287,6 @@ class BatchAsync:
             minion = data["id"]
             if op == "ping_return":
                 self.minions.add(minion)
-                if self.targeted_minions == self.minions:
-                    yield self.start_batch()
             elif op == "find_job_return":
                 if data.get("return", None):
                     self.find_job_returned.add(minion)
@@ -296,7 +294,8 @@ class BatchAsync:
                 if minion in self.active:
                     self.active.remove(minion)
                     self.done_minions.add(minion)
-                    yield self.schedule_next()
+                if not self.active:
+                    asyncio.create_task(self.schedule_next())
         except Exception as ex:  # pylint: disable=W0703
             log.error(
                 "Exception occured while processing event: %s: %s",
