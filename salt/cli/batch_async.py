@@ -126,6 +126,7 @@ class SharedEventsChannel:
         try:
             tag, data = self.master_event.unpack(raw)
             tag_match = self._re_tag_ret_event.match(tag)
+            log.trace("SharedEventsChannel.__handle_event -> {} - {}".format(tag, data))
             if tag_match:
                 jid = tag_match.group(1)
                 if jid in self._subscriptions:
@@ -179,6 +180,7 @@ class SharedEventsChannel:
         self._used_by.discard(subscriber_id)
 
     def destroy_unused(self):
+        log.trace("SharedEventsChannel.destroy_unused called")
         if self._used_by:
             return False
         self.master_event.remove_event_handler(self.__handle_event)
@@ -277,6 +279,9 @@ class BatchAsync:
         )
 
     async def __event_handler(self, tag, data, op):
+        # IMPORTANT: This function must run fast and not wait for any other task,
+        # otherwise it would cause events to be stuck.
+        log.trace("BatchAsync.__event_handler called with ({}, {}, {})".format(op, tag, data))
         if not self.event:
             return
         try:
@@ -341,6 +346,7 @@ class BatchAsync:
         """
         Find if the job was finished on the minions
         """
+        log.trace("BatchAsync.find_job called for minions: {}".format(minions))
         if not self.event:
             return
         not_done = minions.difference(self.done_minions).difference(
@@ -428,6 +434,7 @@ class BatchAsync:
         """
         End the batch and call safe closing
         """
+        log.trace("BatchAsync.end_batch called")
         left = self.minions.symmetric_difference(
             self.done_minions.union(self.timedout_minions)
         )
@@ -453,6 +460,7 @@ class BatchAsync:
         self.close_safe()
 
     def close_safe(self):
+        log.trace("BatchAsync.close_safe called")
         if self.events_channel is not None:
             self.events_channel.unsubscribe(None, None, id(self))
             self.events_channel.unuse(id(self))
@@ -461,7 +469,9 @@ class BatchAsync:
         self.event = None
 
     async def schedule_next(self):
+        log.trace("BatchAsync.schedule_next called")
         if self.scheduled:
+            log.trace("BatchAsync.schedule_next -> Batch already scheduled, nothing to do.")
             return
         self.scheduled = True
         # call later so that we maybe gather more returns
@@ -475,6 +485,7 @@ class BatchAsync:
         """
         self.scheduled = False
         next_batch = self._get_next()
+        log.trace("BatchAsync.run_next called. Next Batch -> {}".format(next_batch))
         if not next_batch:
             await self.end_batch()
             return
