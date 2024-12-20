@@ -400,11 +400,17 @@ class BatchAsync:
         )
         self.targeted_minions = set(ping_return["minions"])
         # start batching even if not all minions respond to ping
-        yield tornado.gen.sleep(
-            self.batch_presence_ping_timeout or self.opts["gather_job_timeout"]
-        )
-        if self.event:
-            yield self.start_batch()
+        try:
+            async with asyncio.timeout(
+                self.batch_presence_ping_timeout or self.opts["gather_job_timeout"]
+            ):
+                while True: 
+                    await asyncio.sleep(0.03)
+                    if self.targeted_minions == self.minions:
+                        break
+        except TimeoutError:
+            # Some minions are down, scheduling batch anyway
+            pass
 
         if self.event:
             await self.start_batch()
