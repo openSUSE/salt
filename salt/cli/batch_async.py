@@ -454,7 +454,7 @@ class BatchAsync:
             "timedout_minions": self.timedout_minions,
             "metadata": self.metadata,
         }
-        yield self.events_channel.master_event.fire_event_async(
+        ret = self.event.fire_event(
             data, f"salt/batch/{self.batch_jid}/done"
         )
 
