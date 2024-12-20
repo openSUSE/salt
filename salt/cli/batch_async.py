@@ -516,8 +516,8 @@ class BatchAsync:
             await asyncio.sleep(self.opts["timeout"])
 
             # The batch can be done already at this point, which means no self.event
-            if self.event:
-                yield self.find_job(set(next_batch))
+            if self.event and self.active.intersection(next_batch):
+                await self.find_job(set(next_batch))
         except Exception as ex:  # pylint: disable=W0703
             log.error(
                 "Error in scheduling next batch: %s. Aborting execution",
