@@ -48,15 +48,19 @@ except ImportError:
 if PY3:
     xrange = range
 
-if hasattr(ssl, 'match_hostname') and hasattr(ssl, 'CertificateError'):  # python 3.2+
-    ssl_match_hostname = ssl.match_hostname
-    SSLCertificateError = ssl.CertificateError
-elif ssl is None:
-    ssl_match_hostname = SSLCertificateError = None  # type: ignore
-else:
-    import backports.ssl_match_hostname
-    ssl_match_hostname = backports.ssl_match_hostname.match_hostname
-    SSLCertificateError = backports.ssl_match_hostname.CertificateError  # type: ignore
+try:
+    from salt.ext.ssl_match_hostname import CertificateError as SSLCertificateError
+    from salt.ext.ssl_match_hostname import match_hostname as ssl_match_hostname
+except ImportError:
+    if hasattr(ssl, 'match_hostname') and hasattr(ssl, 'CertificateError'):  # python 3.2+
+        ssl_match_hostname = ssl.match_hostname
+        SSLCertificateError = ssl.CertificateError
+    elif ssl is None:
+        ssl_match_hostname = SSLCertificateError = None  # type: ignore
+    else:
+        import backports.ssl_match_hostname
+        ssl_match_hostname = backports.ssl_match_hostname.match_hostname
+        SSLCertificateError = backports.ssl_match_hostname.CertificateError  # type: ignore
 
 if hasattr(ssl, 'SSLContext'):
     if hasattr(ssl, 'create_default_context'):
