@@ -1885,7 +1885,12 @@ class Pygit2(GitProvider):
         """
         # https://github.com/libgit2/pygit2/issues/339
         # https://github.com/libgit2/libgit2/issues/2122
+        # https://github.com/saltstack/salt/issues/64121
         home = os.path.expanduser("~")
+        if "HOME" not in os.environ:
+            # Make sure $HOME env variable is set to prevent
+            # _pygit2.GitError: error loading known_hosts in some libgit2 versions.
+            os.environ["HOME"] = home
         pygit2.settings.search_path[pygit2.GIT_CONFIG_LEVEL_GLOBAL] = home
         new = False
         if not os.listdir(self._cachedir):
@@ -1990,10 +1995,6 @@ class Pygit2(GitProvider):
             # pruning only available in pygit2 >= 0.26.2
             pass
         try:
-            # Make sure $HOME env variable is set to prevent
-            # _pygit2.GitError: error loading known_hosts in some libgit2 versions.
-            if "HOME" not in os.environ:
-                os.environ["HOME"] = salt.syspaths.HOME_DIR
             fetch_results = origin.fetch(**fetch_kwargs)
         except GitError as exc:  # pylint: disable=broad-except
             exc_str = get_error_message(exc).lower()
