@@ -22,7 +22,6 @@ import salt.auth
 import salt.channel.server
 import salt.client
 import salt.client.ssh.client
-import salt.crypt
 import salt.daemons.masterapi
 import salt.defaults.exitcodes
 import salt.engines
@@ -1151,7 +1150,6 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
         )
         self.clear_funcs.connect()
         self.aes_funcs = AESFuncs(self.opts, context=self.context)
-        salt.utils.crypt.reinit_crypto()
         self.__bind()
 
 
@@ -1272,7 +1270,7 @@ class AESFuncs(TransportMethods):
         pub_path = os.path.join(self.opts["pki_dir"], "minions", id_)
 
         try:
-            pub = salt.crypt.get_rsa_pub_key(pub_path)
+            pub = salt.crypt.PublicKey(pub_path)
         except OSError:
             log.warning(
                 "Salt minion claiming to be %s attempted to communicate with "
@@ -1283,7 +1281,7 @@ class AESFuncs(TransportMethods):
         except (ValueError, IndexError, TypeError) as err:
             log.error('Unable to load public key "%s": %s', pub_path, err)
         try:
-            if salt.crypt.public_decrypt(pub, token) == b"salt":
+            if pub.decrypt(token) == b"salt":
                 return True
         except ValueError as err:
             log.error("Unable to decrypt token: %s", err)

@@ -13,6 +13,7 @@ import types
 import urllib.parse
 from copy import deepcopy
 
+import salt.crypt
 import salt.defaults.exitcodes
 import salt.exceptions
 import salt.syspaths
@@ -75,7 +76,7 @@ elif salt.utils.platform.is_darwin():
 else:
     _DFLT_IPC_MODE = "ipc"
     _DFLT_FQDNS_GRAINS = False
-    _MASTER_TRIES = -1
+    _MASTER_TRIES = 1
     _MASTER_USER = salt.utils.user.get_user()
 
 
@@ -998,6 +999,12 @@ VALID_OPTS = immutabletypes.freeze(
         # Use Adler32 hashing algorithm for server_id (default False until Sodium, "adler32" after)
         # Possible values are: False, adler32, crc32
         "server_id_use_crc": (bool, str),
+        # RSA encryption for minion
+        "encryption_algorithm": str,
+        # RSA signing for minion
+        "signing_algorithm": str,
+        # Master publish channel signing
+        "publish_signing_algorithm": str,
     }
 )
 
@@ -1272,7 +1279,7 @@ DEFAULT_MINION_OPTS = immutabletypes.freeze(
         "username": None,
         "password": None,
         "zmq_filtering": False,
-        "zmq_monitor": True,
+        "zmq_monitor": False,
         "cache_sreqs": True,
         "cmd_safe": True,
         "sudo_user": "",
@@ -1304,6 +1311,8 @@ DEFAULT_MINION_OPTS = immutabletypes.freeze(
         "reactor_niceness": None,
         "fips_mode": False,
         "server_id_use_crc": False,
+        "encryption_algorithm": "OAEP-SHA1",
+        "signing_algorithm": "PKCS1v15-SHA1",
     }
 )
 
@@ -1652,6 +1661,7 @@ DEFAULT_MASTER_OPTS = immutabletypes.freeze(
         "netapi_enable_clients": [],
         "maintenance_interval": 3600,
         "fileserver_interval": 3600,
+        "publish_signing_algorithm": "PKCS1v15-SHA1",
     }
 )
 
@@ -3846,6 +3856,17 @@ def apply_minion_config(
     # to make overriding more accurate.
     if "__cachedir" not in opts:
         opts["__cachedir"] = opts["cachedir"]
+
+    if opts["encryption_algorithm"] not in salt.crypt.VALID_ENCRYPTION_ALGORITHMS:
+        raise salt.exceptions.SaltConfigurationError(
+            f"The encryption algorithm '{opts['encryption_algorithm']}' is not valid. "
+            f"Please specify one of {','.join(salt.crypt.VALID_ENCRYPTION_ALGORITHMS)}."
+        )
+    if opts["signing_algorithm"] not in salt.crypt.VALID_SIGNING_ALGORITHMS:
+        raise salt.exceptions.SaltConfigurationError(
+            f"The signging algorithm '{opts['signing_algorithm']}' is not valid. "
+            f"Please specify one of {','.join(salt.crypt.VALID_SIGNING_ALGORITHMS)}."
+        )
 
     return opts
 
