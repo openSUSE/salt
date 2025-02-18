@@ -2118,7 +2118,7 @@ def del_repo(repo, **kwargs):
                 source.type == repo_type
                 and source.architectures == repo_architectures
                 and source.uri == repo_uri
-                and source.dist == repo_dist
+                and repo_dist in source.dist
             ):
 
                 s_comps = set(source.comps)
@@ -3166,7 +3166,7 @@ def _expand_repo_def(os_name, os_codename=None, **kwargs):
     sanitized["dist"] = _source_entry.dist
     sanitized["type"] = _source_entry.type
     sanitized["uri"] = _source_entry.uri
-    sanitized["line"] = _source_entry.line.strip()
+    sanitized["line"] = getattr(_source_entry, "line", "").strip()
     sanitized["architectures"] = getattr(_source_entry, "architectures", [])
     sanitized["signedby"] = signedby
     if HAS_APT and signedby:
