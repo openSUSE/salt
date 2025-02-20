@@ -1036,7 +1036,7 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
 
         :param dict payload: The payload route to the appropriate handler
         """
-        if payload["cmd"] == "_auth":
+        if payload.get("cmd") == "_auth":
             if self.opts["master_stats"]:
                 self.stats["_auth"]["runs"] += 1
                 self._post_stats(payload["_start"], "_auth")
