@@ -1,6 +1,7 @@
 import ctypes
 import multiprocessing
 import uuid
+import time
 
 import pytest
 
@@ -14,6 +15,8 @@ import salt.utils.files
 import salt.utils.stringutils
 from salt.master import SMaster
 
+import salt.ext.tornado.gen
+from tests.support.mock import MagicMock, patch
 
 @pytest.fixture
 def key_data():
@@ -345,3 +348,29 @@ def test_handle_message_version_extraction(auth_master_opts):
 # Note: The remaining security bypasses (token, TTL, ID mismatch, session keys)
 # are already tested via the parametrized downgrade tests above and the
 # functional tests. The key regression test is ensuring old versions are rejected.
+
+def test__auth_cmd_stats_passing():
+    req_server_channel = server.ReqServerChannel({"master_stats": True}, None)
+
+    fake_ret = {"enc": "clear", "load": b"FAKELOAD"}
+
+    def _auth_mock(*_, **__):
+        time.sleep(0.03)
+        return fake_ret
+
+    future = salt.ext.tornado.gen.Future()
+    future.set_result({})
+
+    with patch.object(req_server_channel, "_auth", _auth_mock):
+        req_server_channel.payload_handler = MagicMock(return_value=future)
+        req_server_channel.handle_message(
+            {"enc": "clear", "load": {"cmd": "_auth", "id": "minion"}}
+        )
+        cur_time = time.time()
+        req_server_channel.payload_handler.assert_called_once()
+        assert req_server_channel.payload_handler.call_args[0][0]["cmd"] == "_auth"
+        auth_call_duration = (
+            cur_time - req_server_channel.payload_handler.call_args[0][0]["_start"]
+        )
+        assert auth_call_duration >= 0.03
+        assert auth_call_duration < 0.05
