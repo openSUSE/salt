@@ -937,10 +937,6 @@ def _virtual(osdata):
                 grains["virtual"] = "container"
                 grains["virtual_subtype"] = "Podman"
                 break
-            elif "docker" in output:
-                grains["virtual"] = "container"
-                grains["virtual_subtype"] = "Docker"
-                break
             elif "amazon" in output:
                 grains["virtual"] = "Nitro"
                 grains["virtual_subtype"] = "Amazon EC2"
