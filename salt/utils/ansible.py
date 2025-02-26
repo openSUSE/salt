@@ -18,32 +18,55 @@ def __virtual__():  # pylint: disable=expected-2-blank-lines-found-0
     return (False, "Install `ansible` to use inventory")
 
 
-def targets(inventory="/etc/ansible/hosts", yaml=False, export=False):
+def targets(inventory=None, inventories=None, yaml=False, export=False):
     """
     Return the targets from the ansible inventory_file
     Default: /etc/salt/roster
     """
-    if not os.path.isfile(inventory):
-        raise CommandExecutionError("Inventory file not found: {}".format(inventory))
-    if not os.path.isabs(inventory):
-        raise CommandExecutionError("Path to inventory file must be an absolute path")
+
+    if inventory is None and inventories is None:
+        inventory = "/etc/ansible/hosts"
+    multi_inventory = True
+    if not isinstance(inventories, list):
+        multi_inventory = False
+        inventories = []
+    if inventory is not None and inventory not in inventories:
+        inventories.append(inventory)
 
     extra_cmd = []
     if export:
         extra_cmd.append("--export")
     if yaml:
         extra_cmd.append("--yaml")
-    inv = salt.modules.cmdmod.run(
-        "ansible-inventory -i {} --list {}".format(inventory, " ".join(extra_cmd)),
-        env={"ANSIBLE_DEPRECATION_WARNINGS": "0"},
-        reset_system_locale=False,
-    )
-    if yaml:
-        return salt.utils.stringutils.to_str(inv)
-    else:
-        try:
-            return salt.utils.json.loads(salt.utils.stringutils.to_str(inv))
-        except ValueError:
-            raise CommandExecutionError(
-                "Error processing the inventory: {}".format(inv)
-            )
+
+    ret = {}
+
+    for inventory in inventories:
+        if not os.path.isfile(inventory):
+            raise CommandExecutionError("Inventory file not found: {}".format(inventory))
+        if not os.path.isabs(inventory):
+            raise CommandExecutionError("Path to inventory file must be an absolute path")
+
+        inv = salt.modules.cmdmod.run(
+            "ansible-inventory -i {} --list {}".format(inventory, " ".join(extra_cmd)),
+            env={"ANSIBLE_DEPRECATION_WARNINGS": "0"},
+            reset_system_locale=False,
+        )
+
+        if yaml:
+            inv = salt.utils.stringutils.to_str(inv)
+        else:
+            try:
+                inv = salt.utils.json.loads(salt.utils.stringutils.to_str(inv))
+            except ValueError:
+                raise CommandExecutionError(
+                    "Error processing the inventory {}: {}".format(inventory, inv)
+                )
+
+        if not multi_inventory:
+            ret = inv
+            break
+
+        ret[inventory] = inv
+
+    return ret
