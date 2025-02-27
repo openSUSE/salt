@@ -42,8 +42,14 @@ from salt.utils.odict import OrderedDict
 
 try:
     import M2Crypto
+
+    # These imports intended to be used from M2Crypto,
+    # but not loaded by-default with recent M2Crypto version.
+    from M2Crypto import ASN1, BIO, EVP, RSA, X509, m2  # pylint: disable=unused-import
+
+    HAS_M2 = True
 except ImportError:
-    M2Crypto = None
+    HAS_M2 = False
 
 try:
     import OpenSSL
@@ -92,7 +98,7 @@ def __virtual__():
     if __opts__.get("features", {}).get("x509_v2"):
         return (False, "Superseded, using x509_v2")
     return (
-        __virtualname__ if M2Crypto is not None else False,
+        __virtualname__ if HAS_M2 else False,
         "Could not load x509 module, m2crypto unavailable",
     )
 
