@@ -2807,7 +2807,9 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
             if not invalid:
                 repos.append(source)
         else:
-            if HAS_DEB822 and source.types == [""]:
+            if HAS_DEB822 and (
+                source.types == [""] or not bool(source.types) or not source.type
+            ):
                 # most probably invalid or comment line
                 continue
             repos.append(source)
@@ -2991,8 +2993,10 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
         kwargs["comments"] = salt.utils.pkg.deb.combine_comments(kwargs["comments"])
 
     if not mod_source:
-        if HAS_DEB822:
-            apt_source_file = kwargs.get("file")
+        apt_source_file = kwargs.get("file")
+        if not apt_source_file:
+            raise SaltInvocationError("missing 'file' argument when defining a new repository")
+        if HAS_DEB822 and not apt_source_file.endswith(".list"):
             section = _deb822.Section("")
             section["Types"] = repo_type
             section["URIs"] = repo_uri
