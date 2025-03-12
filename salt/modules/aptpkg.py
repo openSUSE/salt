@@ -2807,7 +2807,9 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
             if not invalid:
                 repos.append(source)
         else:
-            if HAS_DEB822 and (source.types == [""] or not bool(source.types)):
+            if HAS_DEB822 and (
+                source.types == [""] or not bool(source.types) or not source.type
+            ):
                 # most probably invalid or comment line
                 continue
             repos.append(source)
