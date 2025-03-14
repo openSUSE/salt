@@ -45,7 +45,13 @@ from salt.exceptions import (
 )
 from salt.modules.cmdmod import _parse_env
 from salt.utils.versions import warn_until_date
-from salt.utils.pkg.deb import SourceEntry, SourcesList
+from salt.utils.pkg.deb import (
+    Deb822SourceEntry,
+    Section,
+    SourceEntry,
+    SourcesList,
+    _invalid,
+)
 
 log = logging.getLogger(__name__)
 
@@ -1608,20 +1614,12 @@ def list_repos(**kwargs):
        salt '*' pkg.list_repos disabled=True
     """
     repos = {}
-    if HAS_DEB822:
-        sources = SourcesList(deb822=True)
-    else:
-        sources = SourcesList()
+    sources = SourcesList()
     for source in sources:
         if _skip_source(source):
             continue
         signedby = source.signedby
         repo = {}
-        if HAS_DEB822:
-            try:
-                signedby = source.section.tags.get("Signed-By", signedby)
-            except AttributeError:
-                pass
         repo["file"] = source.file
         repo_comps = getattr(source, "comps", [])
         repo_dists = source.dist.split(" ")
@@ -1631,6 +1629,7 @@ def list_repos(**kwargs):
             "disabled"
         ]  # This is for compatibility with the other modules
         repo["dist"] = repo_dists.pop(0)
+        repo["suites"] = list(source.suites)
         repo["type"] = source.type
         repo["uri"] = source.uri
         if "Types: " in source.line and "\n" in source.line:
@@ -1753,10 +1752,7 @@ def del_repo(repo, **kwargs):
         else:
             repo = LP_SRC_FORMAT.format(owner_name, ppa_name, dist)
 
-    if HAS_DEB822:
-        sources = SourcesList(deb822=True)
-    else:
-        sources = SourcesList()
+    sources = SourcesList()
     repos = [s for s in sources.list if not s.invalid]
     if repos:
         deleted_from = dict()
@@ -1772,11 +1768,22 @@ def del_repo(repo, **kwargs):
                 source.type == repo_entry["type"]
                 and source.architectures == repo_entry["architectures"]
                 and source.uri.rstrip("/") == repo_entry["uri"].rstrip("/")
-                and source.dist == repo_entry["dist"]
+                and repo_entry["dist"] in source.suites
             ):
-
                 s_comps = set(source.comps)
                 r_comps = set(repo_entry["comps"])
+                if s_comps == r_comps:
+                    r_suites = list(source.suites)
+                    r_suites.remove(repo_entry["dist"])
+                    source.suites = r_suites
+                    deleted_from[source.file] = 0
+                    if not source.suites:
+                        try:
+                            sources.remove(source)
+                        except ValueError:
+                            pass
+                    sources.save()
+                    continue
                 if s_comps.intersection(r_comps) or (not s_comps and not r_comps):
                     deleted_from[source.file] = 0
                     source.comps = list(s_comps.difference(r_comps))
@@ -1793,11 +1800,23 @@ def del_repo(repo, **kwargs):
                 and repo_entry["type"] == "deb"
                 and source.type == "deb-src"
                 and source.uri == repo_entry["uri"]
-                and source.dist == repo_entry["dist"]
+                and repo_entry["dist"] in source.suites
             ):
 
                 s_comps = set(source.comps)
                 r_comps = set(repo_entry["comps"])
+                if s_comps == r_comps:
+                    r_suites = list(source.suites)
+                    r_suites.remove(repo_entry["dist"])
+                    source.suites = r_suites
+                    deleted_from[source.file] = 0
+                    if not source.suites:
+                        try:
+                            sources.remove(source)
+                        except ValueError:
+                            pass
+                    sources.save()
+                    continue
                 if s_comps.intersection(r_comps) or (not s_comps and not r_comps):
                     deleted_from[source.file] = 0
                     source.comps = list(s_comps.difference(r_comps))
@@ -1810,6 +1829,8 @@ def del_repo(repo, **kwargs):
         if deleted_from:
             ret = ""
             for source in sources:
+                if source.invalid:
+                    continue
                 if source.file in deleted_from:
                     deleted_from[source.file] += 1
             for repo_file, count in deleted_from.items():
@@ -2415,10 +2436,7 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
                 'cannot parse "ppa:" style repo definitions: {}'.format(repo)
             )
 
-    if HAS_DEB822:
-        sources = SourcesList(deb822=True)
-    else:
-        sources = SourcesList()
+    sources = SourcesList()
     if kwargs.get("consolidate", False):
         # attempt to de-dup and consolidate all sources
         # down to entries in sources.list
@@ -2435,6 +2453,13 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
 
     repos = []
     for source in sources:
+        if isinstance(source, Deb822SourceEntry):
+            if source.types == [""] or not bool(source.types) or not source.type:
+                continue
+        else:
+            _, invalid, _, _ = _invalid(source.line)
+            if invalid:
+                continue
         repos.append(source)
 
     mod_source = None
@@ -2586,13 +2611,12 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
         # and the resulting source line.  The idea here is to ensure
         # we are not returning bogus data because the source line
         # has already been modified on a previous run.
-        apt_source_dists = apt_source.dist.split(" ")
         repo_matches = (
             apt_source.type == repo_entry["type"]
             and apt_source.uri.rstrip("/") == repo_entry["uri"].rstrip("/")
-            and apt_source.dist == repo_entry["dist"]
+            and repo_entry["dist"] in apt_source.suites
         )
-        kw_matches = apt_source.dist == kw_dist and apt_source.type == kw_type
+        kw_matches = kw_dist in apt_source.suites and apt_source.type == kw_type
 
         if repo_matches or kw_matches:
             for comp in full_comp_list:
@@ -2611,14 +2635,17 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
     if not mod_source:
         apt_source_file = kwargs.get("file")
         if not apt_source_file:
-            raise SaltInvocationError("missing 'file' argument when defining a new repository")
-        if HAS_DEB822 and not apt_source_file.endswith(".list"):
-            section = _deb822.Section("")
-            section["Types"] = repo_type
-            section["URIs"] = repo_uri
-            section["Suites"] = repo_dist
-            section["Components"] = " ".join(repo_comps)
-            if kwargs.get("trusted") == True or kwargs.get("Trusted") == True:
+            raise SaltInvocationError(
+                "missing 'file' argument when defining a new repository"
+            )
+
+        if not apt_source_file.endswith(".list"):
+            section = Section("")
+            section["Types"] = repo_entry["type"]
+            section["URIs"] = repo_entry["uri"]
+            section["Suites"] = repo_entry["dist"]
+            section["Components"] = " ".join(repo_entry["comps"])
+            if kwargs.get("trusted") is True or kwargs.get("Trusted") is True:
                 section["Trusted"] = "yes"
             mod_source = Deb822SourceEntry(section, apt_source_file)
         else:
@@ -2629,14 +2656,11 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
     elif "comments" in kwargs:
         mod_source.comment = kwargs["comments"]
 
-    if HAS_APT:
-        # workaround until python3-apt supports signedby
-        if str(mod_source) != str(SourceEntry(repo)) and "signed-by" in str(mod_source):
-            rline = SourceEntry(repo)
-            mod_source.line = rline.line
-
     if not mod_source.line.endswith("\n"):
         mod_source.line = mod_source.line + "\n"
+
+    if not kwargs["architectures"] and not mod_source.architectures:
+        kwargs.pop("architectures")
 
     for key in kwargs:
         if key in _MODIFY_OK and hasattr(mod_source, key):
@@ -2655,12 +2679,13 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
 
     repo_source_line = mod_source.line
     if "Types: " in repo_source_line and "\n" in repo_source_line:
-        repo_source_line = f"{mod_source.type} {mod_source.uri} {repo_dist} {' '.join(mod_source.comps)}"
+        repo_source_line = f"{mod_source.type} {mod_source.uri} {repo_entry['dist']} {' '.join(mod_source.comps)}"
 
     return {
         repo: {
             "architectures": getattr(mod_source, "architectures", []),
             "dist": mod_source.dist,
+            "suites": mod_source.suites,
             "comps": mod_source.comps,
             "disabled": mod_source.disabled,
             "file": mod_source.file,
@@ -2744,10 +2769,7 @@ def _expand_repo_def(os_name, os_codename=None, **kwargs):
         if kwarg in kwargs:
             setattr(source_entry, kwarg, kwargs[kwarg])
 
-    if HAS_DEB822:
-        source_list = SourcesList(deb822=True)
-    else:
-        source_list = SourcesList()
+    source_list = SourcesList()
     kwargs = {}
     signedby = source_entry.signedby
     kwargs["signedby"] = signedby
