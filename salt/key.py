@@ -543,12 +543,13 @@ class Key:
         for dir_ in key_dirs:
             if dir_ is None:
                 continue
-            ret[os.path.basename(dir_)] = []
+            base_dir = os.path.basename(dir_)
+            ret[base_dir] = []
             try:
                 for fn_ in salt.utils.data.sorted_ignorecase(os.listdir(dir_)):
                     if not fn_.startswith("."):
                         if os.path.isfile(os.path.join(dir_, fn_)):
-                            ret[os.path.basename(dir_)].append(
+                            ret[base_dir].append(
                                 salt.utils.stringutils.to_unicode(fn_)
                             )
             except OSError:
