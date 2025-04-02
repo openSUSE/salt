@@ -196,11 +196,11 @@ class MockSourceEntry:
         self.file = file
         self.disabled = False
         self.dist = dist
+        self.suites = [dist]
         self.comps = []
         self.architectures = []
         self.signedby = ""
-        if HAS_DEB822:
-            self.types = []
+        self.types = []
 
     def mysplit(self, line):
         return line.split()
@@ -249,26 +249,25 @@ def deb822_repo_file(tmp_path: pathlib.Path, deb822_repo_content: str):
 def mock_apt_config(deb822_repo_file: pathlib.Path):
     """
     Mocking common to deb822 testing so that apt_pkg uses the
-    tmp_path/sources.list.d as the Dir::Etc::sourceparts location
+    tmp_path/sources.list.d as the sourceparts location
     """
     with patch.dict(
         aptpkg.__salt__,
         {"config.option": MagicMock()},
-    ), patch.object(apt_pkg, "config") as mock_config:
-        mock_config.find_file.return_value = "/etc/apt/sources.list"
-        mock_config.find_dir.return_value = os.path.dirname(str(deb822_repo_file))
+    ) as mock_config, patch(
+        "salt.utils.pkg.deb._APT_SOURCES_PARTSDIR",
+        os.path.dirname(str(deb822_repo_file)),
+    ):
         yield mock_config
 
 
-@pytest.mark.skipif(not HAS_DEB822, reason="Requires deb822 support")
-@pytest.mark.skipif(not HAS_APT_PKG, reason="Requires debian/ubuntu apt_pkg system library")
 def test_mod_repo_deb822_modify(deb822_repo_file: pathlib.Path, mock_apt_config):
     """
     Test that aptpkg can modify an existing repository in the deb822 format.
     In this test, we match the repository by name and disable it.
     """
     uri = "http://cz.archive.ubuntu.com/ubuntu/"
-    repo = f"deb {uri} noble main"
+    repo = f"deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] {uri} noble main"
 
     aptpkg.mod_repo(repo, enabled=False, file=str(deb822_repo_file), refresh_db=False)
 
@@ -277,14 +276,12 @@ def test_mod_repo_deb822_modify(deb822_repo_file: pathlib.Path, mock_apt_config)
     assert f"URIs: {uri}" in repo_file
 
 
-@pytest.mark.skipif(not HAS_DEB822, reason="Requires deb822 support")
-@pytest.mark.skipif(not HAS_APT_PKG, reason="Requires debian/ubuntu apt_pkg system library")
 def test_mod_repo_deb822_add(deb822_repo_file: pathlib.Path, mock_apt_config):
     """
     Test that aptpkg can add a repository in the deb822 format.
     """
     uri = "http://security.ubuntu.com/ubuntu/"
-    repo = f"deb {uri} noble-security main"
+    repo = f"deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] {uri} noble-security main"
 
     aptpkg.mod_repo(repo, file=str(deb822_repo_file), refresh_db=False)
 
@@ -293,23 +290,26 @@ def test_mod_repo_deb822_add(deb822_repo_file: pathlib.Path, mock_apt_config):
     assert "URIs: http://cz.archive.ubuntu.com/ubuntu/" in repo_file
 
 
-@pytest.mark.skipif(not HAS_DEB822, reason="Requires deb822 support")
-@pytest.mark.skipif(not HAS_APT_PKG, reason="Requires debian/ubuntu apt_pkg system library")
 def test_del_repo_deb822(deb822_repo_file: pathlib.Path, mock_apt_config):
     """
     Test that aptpkg can delete a repository in the deb822 format.
     """
     uri = "http://cz.archive.ubuntu.com/ubuntu/"
-    repo = f"deb {uri} noble main"
 
     with patch.object(aptpkg, "refresh_db"):
+        repo = f"deb {uri} noble main"
         aptpkg.del_repo(repo, file=str(deb822_repo_file))
+        assert os.path.isfile(str(deb822_repo_file))
 
-    assert not os.path.isfile(str(deb822_repo_file))
+        repo = f"deb {uri} noble-updates main"
+        aptpkg.del_repo(repo, file=str(deb822_repo_file))
+        assert os.path.isfile(str(deb822_repo_file))
+
+        repo = f"deb {uri} noble-backports main"
+        aptpkg.del_repo(repo, file=str(deb822_repo_file))
+        assert not os.path.isfile(str(deb822_repo_file))
 
 
-@pytest.mark.skipif(not HAS_DEB822, reason="Requires deb822 support")
-@pytest.mark.skipif(not HAS_APT_PKG, reason="Requires debian/ubuntu apt_pkg system library")
 def test_get_repo_deb822(deb822_repo_file: pathlib.Path, mock_apt_config):
     """
     Test that aptpkg can match a repository in the deb822 format.
@@ -945,14 +945,14 @@ def test_mod_repo_match(tmp_path):
                         with patch(
                             "salt.modules.aptpkg._split_repo_str",
                             MagicMock(
-                                return_value=(
-                                    "deb",
-                                    [],
-                                    "http://cdn-aws.deb.debian.org/debian/",
-                                    "stretch",
-                                    ["main"],
-                                    "",
-                                )
+                                return_value={
+                                    "type": "deb",
+                                    "architectures": [],
+                                    "uri": "http://cdn-aws.deb.debian.org/debian/",
+                                    "dist": "stretch",
+                                    "comps": ["main"],
+                                    "signedby": "",
+                                }
                             ),
                         ):
                             source_line_no_slash = (
@@ -1506,26 +1506,22 @@ SERVICE:cups-daemon,390,/usr/sbin/cupsd
         ]
 
 
-@pytest.mark.skipif(
-    HAS_APTSOURCES is True, reason="Only run test with python3-apt library is missing."
-)
 def test_sourceslist_multiple_comps():
     """
     Test SourcesList when repo has multiple comps
     """
     repo_line = "deb http://archive.ubuntu.com/ubuntu/ focal-updates main restricted"
-    with patch.object(aptpkg, "HAS_APT", return_value=True):
-        with patch("salt.utils.files.fopen", mock_open(read_data=repo_line)):
-            with patch("pathlib.Path.is_file", side_effect=[True, False]):
-                sources = aptpkg.SourcesList()
-                for source in sources:
-                    assert source.type == "deb"
-                    assert source.uri == "http://archive.ubuntu.com/ubuntu/"
-                    assert source.comps == ["main", "restricted"]
-                    assert source.dist == "focal-updates"
+    with patch("salt.utils.files.fopen", mock_open(read_data=repo_line)), patch(
+        "pathlib.Path.is_file", side_effect=[True, False]
+    ):
+        sources = aptpkg.SourcesList()
+        for source in sources:
+            assert source.type == "deb"
+            assert source.uri == "http://archive.ubuntu.com/ubuntu/"
+            assert source.comps == ["main", "restricted"]
+            assert source.dist == "focal-updates"
 
 
-@pytest.mark.usefixtures("_test_sourceslist_multiple_comps_fs")
 def test_sourceslist_multiple_comps():
     """
     Test SourcesList when repo has multiple comps
@@ -1538,8 +1534,9 @@ def test_sourceslist_multiple_comps():
         assert source.dist == "focal-updates"
 
 
-@pytest.fixture(
-    params=(
+@pytest.mark.parametrize(
+    "repo_line",
+    [
         "deb [ arch=amd64 ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64 ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64 test=one ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
@@ -1547,14 +1544,8 @@ def test_sourceslist_multiple_comps():
         "deb [ arch=amd64,armel test=one ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [ arch=amd64,armel test=one] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
-    )
+    ],
 )
-def repo_line(request, fs):
-    fs.create_dir("/etc/apt/sources.list.d")
-    fs.create_file("/etc/apt/sources.list", contents=request.param)
-    yield request.param
-
-
 def test_sourceslist_architectures(repo_line):
     """
     Test SourcesList when architectures is in repo
