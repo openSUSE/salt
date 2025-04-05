@@ -59,7 +59,7 @@ def show(config_file=False):
     comps = [""]
     for line in out.splitlines():
         if any([line.startswith("{}.".format(root)) for root in roots]):
-            comps = re.split("[=:]", line, 1)
+            comps = re.split("[=:]", line, maxsplit=1)
             ret[comps[0]] = comps[1]
         elif comps[0]:
             ret[comps[0]] += "{}\n".format(line)
