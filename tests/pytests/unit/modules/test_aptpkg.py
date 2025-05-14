@@ -920,10 +920,11 @@ def test_show():
     not (pathlib.Path("/etc") / "apt" / "sources.list").is_file(),
     reason="Requires sources.list file",
 )
-def test_mod_repo_enabled():
+def test_mod_repo_enabled(tmp_path):
     """
     Checks if a repo is enabled or disabled depending on the passed kwargs.
     """
+    file = tmp_path / "repo.list"
     with patch.dict(
         aptpkg.__salt__,
         {"config.option": MagicMock(), "no_proxy": MagicMock(return_value=False)},
@@ -937,19 +938,19 @@ def test_mod_repo_enabled():
                         "salt.modules.aptpkg.SourceEntry", MagicMock(), create=True
                     ):
                         with patch("pathlib.Path", MagicMock()):
-                            repo = aptpkg.mod_repo("foo", enabled=False)
+                            repo = aptpkg.mod_repo("foo", file=file, enabled=False)
                             data_is_true.assert_called_with(False)
                             # with disabled=True; should call salt.utils.data.is_true True
                             data_is_true.reset_mock()
-                            repo = aptpkg.mod_repo("foo", disabled=True)
+                            repo = aptpkg.mod_repo("foo", file=file, disabled=True)
                             data_is_true.assert_called_with(True)
                             # with enabled=True; should call salt.utils.data.is_true with False
                             data_is_true.reset_mock()
-                            repo = aptpkg.mod_repo("foo", enabled=True)
+                            repo = aptpkg.mod_repo("foo", file=file, enabled=True)
                             data_is_true.assert_called_with(True)
                             # with disabled=True; should call salt.utils.data.is_true False
                             data_is_true.reset_mock()
-                            repo = aptpkg.mod_repo("foo", disabled=False)
+                            repo = aptpkg.mod_repo("foo", file=file, disabled=False)
                             data_is_true.assert_called_with(False)
 
 
