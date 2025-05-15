@@ -647,7 +647,7 @@ class Repo:
 
     @repo_url.default
     def _default_repo_url(self):
-        return f"https://repo.saltproject.io/py3/{self.fullname}/{self.grains['osrelease']}/{self.grains['osarch']}/latest"
+        return "https://packages.broadcom.com/artifactory/saltproject-deb/"
 
     @repo_content.default
     def _default_repo_content(self):
