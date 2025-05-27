@@ -924,7 +924,7 @@ def test_mod_repo_enabled(tmp_path):
     """
     Checks if a repo is enabled or disabled depending on the passed kwargs.
     """
-    file = tmp_path / "repo.list"
+    file = str(tmp_path / "repo.list")
     with patch.dict(
         aptpkg.__salt__,
         {"config.option": MagicMock(), "no_proxy": MagicMock(return_value=False)},
@@ -954,7 +954,7 @@ def test_mod_repo_enabled(tmp_path):
                             data_is_true.assert_called_with(False)
 
 
-def test_mod_repo_match():
+def test_mod_repo_match(tmp_path):
     """
     Checks if a repo is matched without taking into account any ending "/" in the uri.
     """
@@ -967,6 +967,7 @@ def test_mod_repo_match():
     )
     mock_source_list = MockSourceList()
     mock_source_list.list = [mock_source]
+    file = str(tmp_path / "repo.list")
 
     with patch.dict(
         aptpkg.__salt__,
@@ -999,13 +1000,13 @@ def test_mod_repo_match():
                             )
                             if salt.utils.path.which("apt-key"):
                                 repo = aptpkg.mod_repo(
-                                    source_line_no_slash, enabled=False
+                                    source_line_no_slash, file=file, enabled=False
                                 )
                                 assert repo[source_line_no_slash]["uri"] == source_uri
                             else:
                                 with pytest.raises(Exception) as err:
                                     repo = aptpkg.mod_repo(
-                                        source_line_no_slash, enabled=False
+                                        source_line_no_slash, file=file, enabled=False
                                     )
                                 assert (
                                     "missing 'signedby' option when apt-key is missing"
