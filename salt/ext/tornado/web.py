@@ -1478,6 +1478,14 @@ class RequestHandler(object):
         try:
             if self.request.method not in self.SUPPORTED_METHODS:
                 raise HTTPError(405)
+
+            # If we're not in stream_request_body mode, this is the place where we parse the body.
+            if not _has_stream_request_body(self.__class__):
+                try:
+                    self.request._parse_body()
+                except httputil.HTTPInputError as e:
+                    raise HTTPError(400, "Invalid body: %s" % e)
+
             self.path_args = [self.decode_argument(arg) for arg in args]
             self.path_kwargs = dict((k, self.decode_argument(v, name=k))
                                     for (k, v) in kwargs.items())
@@ -2093,8 +2101,9 @@ class _HandlerDelegate(httputil.HTTPMessageDelegate):
         if self.stream_request_body:
             self.request.body.set_result(None)
         else:
+            # Note that the body gets parsed in RequestHandler._execute so it can be in
+            # the right exception handler scope.
             self.request.body = b''.join(self.chunks)
-            self.request._parse_body()
             self.execute()
 
     def on_connection_close(self):
