@@ -1,8 +1,10 @@
 """
-    :codeauthor: Bo Maryniuk <bo@suse.de>
+:codeauthor: Bo Maryniuk <bo@suse.de>
 """
-import imp
+
+import importlib.util
 import os
+import sys
 
 import pytest
 
@@ -24,6 +26,13 @@ ZYPPNOTIFY_FILE = os.path.sep.join(
 )
 
 
+def import_zyppnotify():
+    spec = importlib.util.spec_from_file_location("zyppnotify", ZYPPNOTIFY_FILE)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 @pytest.mark.skipif(not HAS_ZYPP_PLUGIN, reason="zypp_plugin is missing.")
 class ZyppPluginsTestCase(TestCase):
     """
@@ -40,7 +49,7 @@ class ZyppPluginsTestCase(TestCase):
         Returns:
 
         """
-        zyppnotify = imp.load_source("zyppnotify", ZYPPNOTIFY_FILE)
+        zyppnotify = import_zyppnotify()
         drift = zyppnotify.DriftDetector()
         drift._get_mtime = MagicMock(return_value=123)
         drift._get_checksum = MagicMock(return_value="deadbeef")
