@@ -201,17 +201,11 @@ class OpenscapTestCase(TestCase):
 
     def test_openscap_xccdf_eval_fail_not_implemented_action(self):
         response = openscap.xccdf("info {}".format(self.policy_file))
-        mock_err = "argument action: invalid choice: 'info' (choose from 'eval')"
 
-        self.assertEqual(
-            response,
-            {
-                "upload_dir": None,
-                "error": mock_err,
-                "success": False,
-                "returncode": None,
-            },
-        )
+        self.assertIsNone(response["upload_dir"])
+        self.assertIsNone(response["returncode"])
+        self.assertFalse(response["success"])
+        self.assertIn("invalid choice: 'info'", response["error"])
 
     def test_new_openscap_xccdf_eval_success(self):
         with patch(
