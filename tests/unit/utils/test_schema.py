@@ -96,10 +96,10 @@ class ConfigTestCase(TestCase):
             "x-ordering": ["thirsty", "base", "hungry"],
             "additionalProperties": False,
         }
-        self.assertDictContainsSubset(
+        self.assertDictEqual(
             MergedConfigClass.serialize()["properties"], expected["properties"]
         )
-        self.assertDictContainsSubset(expected, MergedConfigClass.serialize())
+        self.assertDictEqual(expected, MergedConfigClass.serialize())
 
     def test_configuration_items_order(self):
         class One(schema.Schema):
@@ -292,7 +292,7 @@ class ConfigTestCase(TestCase):
             ],
             "additionalProperties": False,
         }
-        self.assertDictContainsSubset(expected, Requirements2.serialize())
+        self.assertDictEqual(expected, Requirements2.serialize())
 
         class Requirements3(schema.Schema):
             title = "DigitalOcean"
@@ -347,7 +347,7 @@ class ConfigTestCase(TestCase):
             ],
             "additionalProperties": False,
         }
-        self.assertDictContainsSubset(expected, Requirements3.serialize())
+        self.assertDictEqual(expected, Requirements3.serialize())
 
         class Requirements4(schema.Schema):
             title = "DigitalOcean"
@@ -449,7 +449,7 @@ class ConfigTestCase(TestCase):
             ],
             "additionalProperties": False,
         }
-        self.assertDictContainsSubset(expected, Requirements4.serialize())
+        self.assertDictEqual(expected, Requirements4.serialize())
 
     @pytest.mark.skipif(
         HAS_JSONSCHEMA is False, reason="The 'jsonschema' library is missing"
@@ -1770,7 +1770,7 @@ class ConfigTestCase(TestCase):
                 ),
             )
 
-        self.assertDictContainsSubset(
+        self.assertDictEqual(
             TestConf.serialize(),
             {
                 "$schema": "http://json-schema.org/draft-04/schema#",
