@@ -271,7 +271,7 @@ def _load_config(section, options, default_value="", filename=INI_FILE):
         config_parser = configparser.RawConfigParser(
             dict_type=CaseInsensitiveDict, converters={"unquoted": _remove_quotes}
         )
-        config_parser.readfp(config_file)
+        config_parser.read_file(config_file)
         for option in options:
             results[option] = config_parser.getunquoted(
                 section, option, fallback=default_value
@@ -576,7 +576,7 @@ def _change_dhcp_config(interface, enable_dhcp=True, filename=INTERFACES_CONFIG)
     if os.path.exists(filename):
         try:
             with salt.utils.files.fopen(filename, "r") as config_file:
-                parser.readfp(config_file)
+                parser.read_file(config_file)
         except configparser.MissingSectionHeaderError:
             pass
     interface = pyiface.Interface(name=interface)
@@ -858,7 +858,7 @@ def _configure_static_interface(interface, **settings):
     if os.path.exists(INTERFACES_CONFIG):
         try:
             with salt.utils.files.fopen(INTERFACES_CONFIG, "r") as config_file:
-                parser.readfp(config_file)
+                parser.read_file(config_file)
         except configparser.MissingSectionHeaderError:
             pass
     hwaddr = interface.hwaddr[:-1]
