@@ -1976,7 +1976,7 @@ Repository 'DUMMY' not found by its alias, number, or URI.
         """
         repos_cfg = configparser.ConfigParser()
         for cfg in ["zypper-repo-1.cfg", "zypper-repo-2.cfg"]:
-            repos_cfg.readfp(io.StringIO(get_test_data(cfg)))
+            repos_cfg.read_file(io.StringIO(get_test_data(cfg)))
 
         for alias in repos_cfg.sections():
             r_info = zypper._get_repo_info(alias, repos_cfg=repos_cfg)
