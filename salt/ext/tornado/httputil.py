@@ -777,8 +777,9 @@ def parse_body_arguments(content_type, body, arguments, files, headers=None):
     with the parsed contents.
     """
     if headers and "Content-Encoding" in headers:
-        raise HTTPInputError("Unsupported Content-Encoding: %s" % headers["Content-Encoding"])
-        return
+        raise HTTPInputError(
+            "Unsupported Content-Encoding: %s" % headers["Content-Encoding"]
+        )
     if content_type.startswith("application/x-www-form-urlencoded"):
         try:
             uri_arguments = parse_qs_bytes(native_str(body), keep_blank_values=True)
@@ -826,7 +827,7 @@ def parse_multipart_form_data(boundary, data, arguments, files, config=None):
         boundary = boundary[1:-1]
     final_boundary_index = data.rfind(b"--" + boundary + b"--")
     if final_boundary_index == -1:
-        raise HTTPInputError("Invalid multipart/form-data: no final boundary")
+        raise HTTPInputError("Invalid multipart/form-data: no final boundary found")
     parts = data[:final_boundary_index].split(b"--" + boundary + b"\r\n")
     if len(parts) > config.max_parts:
         raise HTTPInputError("multipart/form-data has too many parts")
