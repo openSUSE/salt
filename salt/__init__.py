@@ -3,6 +3,7 @@ Salt package
 """
 
 import importlib
+import importlib.util
 import sys
 import warnings
 
@@ -16,33 +17,25 @@ USE_VENDORED_TORNADO = True
 
 
 class TornadoImporter:
-    def find_module(self, module_name, package_path=None):
-        if USE_VENDORED_TORNADO:
-            if module_name.startswith("tornado"):
-                return self
-        else:
-            if module_name.startswith("salt.ext.tornado"):
-                return self
-        return None
+    """Implementation of importlib.abc.MetaPathFinder that intercepts tornado imports.
 
-    def load_module(self, name):
-        if USE_VENDORED_TORNADO:
-            mod = importlib.import_module("salt.ext.{}".format(name))
-        else:
-            # Remove 'salt.ext.' from the module
-            mod = importlib.import_module(name[9:])
-        sys.modules[name] = mod
-        return mod
+    Normally, a Finder is only responsible for finding a source. However, we not
+    only need to redirect the import, we also need to add it to sys.modules.
+    That's outside of a finder's scope, but it is easiest to do it in one place.
+    """
 
-    def create_module(self, spec):
-        return self.load_module(spec.name)
-
-    def exec_module(self, module):
+    def find_spec(self, fullname, path=None, target=None):
+        if USE_VENDORED_TORNADO and fullname.startswith("tornado"):
+            vendored_name = fullname.replace("tornado", "salt.ext.tornado", 1)
+            spec = importlib.util.find_spec(vendored_name)
+            if spec is not None:
+                sys.modules[fullname] = importlib.import_module(vendored_name)
+                return spec
         return None
 
 
 # Try our importer first
-sys.meta_path = [TornadoImporter()] + sys.meta_path
+sys.meta_path.insert(0, TornadoImporter())
 
 
 # All salt related deprecation warnings should be shown once each!
