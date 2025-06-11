@@ -5,9 +5,9 @@
 
 from __future__ import absolute_import, division, print_function
 from salt.ext.tornado.httputil import url_concat, parse_multipart_form_data, HTTPHeaders, format_timestamp, HTTPServerRequest, parse_request_start_line, parse_cookie
+from salt.ext.tornado.httputil import HTTPInputError
 from salt.ext.tornado.escape import utf8, native_str
 from salt.ext.tornado.log import gen_log
-from salt.ext.tornado.testing import ExpectLog
 from salt.ext.tornado.test.util import unittest
 
 import copy
@@ -180,7 +180,9 @@ Foo
 --1234--'''.replace(b"\n", b"\r\n")
         args = {}
         files = {}
-        with ExpectLog(gen_log, "multipart/form-data missing headers"):
+        with self.assertRaises(
+            HTTPInputError, msg="multipart/form-data missing headers"
+        ):
             parse_multipart_form_data(b"1234", data, args, files)
         self.assertEqual(files, {})
 
@@ -193,7 +195,7 @@ Foo
 --1234--'''.replace(b"\n", b"\r\n")
         args = {}
         files = {}
-        with ExpectLog(gen_log, "Invalid multipart/form-data"):
+        with self.assertRaises(HTTPInputError, msg="Invalid multipart/form-data"):
             parse_multipart_form_data(b"1234", data, args, files)
         self.assertEqual(files, {})
 
@@ -205,7 +207,7 @@ Content-Disposition: form-data; name="files"; filename="ab.txt"
 Foo--1234--'''.replace(b"\n", b"\r\n")
         args = {}
         files = {}
-        with ExpectLog(gen_log, "Invalid multipart/form-data"):
+        with self.assertRaises(HTTPInputError, msg="Invalid multipart/form-data"):
             parse_multipart_form_data(b"1234", data, args, files)
         self.assertEqual(files, {})
 
@@ -218,7 +220,9 @@ Foo
 --1234--""".replace(b"\n", b"\r\n")
         args = {}
         files = {}
-        with ExpectLog(gen_log, "multipart/form-data value missing name"):
+        with self.assertRaises(
+            HTTPInputError, msg="multipart/form-data value missing name"
+        ):
             parse_multipart_form_data(b"1234", data, args, files)
         self.assertEqual(files, {})
 
