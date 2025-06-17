@@ -373,7 +373,7 @@ class ReqServerChannel:
                 return False
             try:
                 if salt.crypt.public_decrypt(pub, payload["load"]["tok"]) != b"salt":
-                    log.error("Minion token did not validate: %s", payload["id"])
+                    log.error("Minion token did not validate: %s", payload["load"]["id"])
                     return False
             except ValueError as err:
                 log.error("Unable to decrypt token: %s", err)

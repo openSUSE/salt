@@ -189,7 +189,7 @@ def _get_key_with_evict(path, timestamp, passphrase):
     """
     log.debug("salt.crypt._get_key_with_evict: Loading private key")
     if HAS_M2:
-        key = RSA.load_key(path, lambda x: bytes(passphrase))
+        key = RSA.load_key(path, lambda x: salt.utils.stringutils.to_bytes(passphrase))
     else:
         with salt.utils.files.fopen(path) as f:
             key = RSA.importKey(f.read(), passphrase)

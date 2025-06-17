@@ -440,5 +440,5 @@ async def test_req_channel_v2_invalid_token(
     }
     with caplog.at_level(logging.WARNING):
         ret = await req_server.handle_message(payload)
-        assert "Unable to decrypt token:" in caplog.text
+        assert "Minion token did not validate:" in caplog.text
         assert ret == "bad load"
