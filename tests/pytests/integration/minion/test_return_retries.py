@@ -1,4 +1,5 @@
 import time
+import sys
 
 import pytest
 from saltfactories.utils import random_string
@@ -56,9 +57,10 @@ def test_publish_retry(salt_master, salt_minion_retry, salt_cli, salt_run_cli):
 
 @pytest.mark.slow_test
 def test_pillar_timeout(salt_master_factory):
-    cmd = """
-    python -c "import time; time.sleep(4.8); print('{\\"foo\\": \\"bar\\"}');\"
-    """.strip()
+    cmd = (
+        sys.executable
+        + ' -c "import time; time.sleep(4.8); print(\'{\\"foo\\": \\"bar\\"}\');"'
+    ).strip()
     master_overrides = {
         "ext_pillar": [
             {"cmd_json": cmd},
