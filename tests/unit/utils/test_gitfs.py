@@ -95,6 +95,7 @@ class TestGitBase(TestCase, AdaptedConfigurationTestCaseMixin):
             remote.fetched = False
         del self.main_class
         self._tmp_dir.cleanup()
+        _clear_instance_map()
 
     def test_update_all(self):
         self.main_class.update()
