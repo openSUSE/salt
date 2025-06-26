@@ -586,23 +586,25 @@ def test_zeromq_async_pub_channel_filtering_decode_message(
     assert res.result()["enc"] == "aes"
 
 
-def test_req_server_chan_encrypt_v2(pki_dir):
+def test_req_server_chan_encrypt_v2(pki_dir, master_opts):
     loop = salt.ext.tornado.ioloop.IOLoop.current()
-    opts = {
-        "worker_threads": 1,
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "zmq_monitor": False,
-        "mworker_queue_niceness": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("master")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-    }
-    server = salt.channel.server.ReqServerChannel.factory(opts)
+    master_opts.update(
+        {
+            "worker_threads": 1,
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "zmq_monitor": False,
+            "mworker_queue_niceness": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("master")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+        }
+    )
+    server = salt.channel.server.ReqServerChannel.factory(master_opts)
     dictkey = "pillar"
     nonce = "abcdefg"
     pillar_data = {"pillar1": "meh"}
@@ -616,7 +618,7 @@ def test_req_server_chan_encrypt_v2(pki_dir):
     else:
         cipher = PKCS1_OAEP.new(key)
         aes = cipher.decrypt(ret["key"])
-    pcrypt = salt.crypt.Crypticle(opts, aes)
+    pcrypt = salt.crypt.Crypticle(master_opts, aes)
     signed_msg = pcrypt.loads(ret[dictkey])
 
     assert "sig" in signed_msg
@@ -630,23 +632,25 @@ def test_req_server_chan_encrypt_v2(pki_dir):
     assert data["pillar"] == pillar_data
 
 
-def test_req_server_chan_encrypt_v1(pki_dir):
+def test_req_server_chan_encrypt_v1(pki_dir, master_opts):
     loop = salt.ext.tornado.ioloop.IOLoop.current()
-    opts = {
-        "worker_threads": 1,
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "zmq_monitor": False,
-        "mworker_queue_niceness": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("master")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-    }
-    server = salt.channel.server.ReqServerChannel.factory(opts)
+    master_opts.update(
+        {
+            "worker_threads": 1,
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "zmq_monitor": False,
+            "mworker_queue_niceness": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("master")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+        }
+    )
+    server = salt.channel.server.ReqServerChannel.factory(master_opts)
     dictkey = "pillar"
     nonce = "abcdefg"
     pillar_data = {"pillar1": "meh"}
@@ -661,29 +665,31 @@ def test_req_server_chan_encrypt_v1(pki_dir):
     else:
         cipher = PKCS1_OAEP.new(key)
         aes = cipher.decrypt(ret["key"])
-    pcrypt = salt.crypt.Crypticle(opts, aes)
+    pcrypt = salt.crypt.Crypticle(master_opts, aes)
     data = pcrypt.loads(ret[dictkey])
     assert data == pillar_data
 
 
-def test_req_chan_decode_data_dict_entry_v1(pki_dir):
+def test_req_chan_decode_data_dict_entry_v1(pki_dir, master_opts, minion_opts):
     mockloop = MagicMock()
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
+    master_opts = dict(master_opts, pki_dir=str(pki_dir.joinpath("master")))
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
-    client = salt.channel.client.ReqChannel.factory(opts, io_loop=mockloop)
+    client = salt.channel.client.ReqChannel.factory(minion_opts, io_loop=mockloop)
     dictkey = "pillar"
     target = "minion"
     pillar_data = {"pillar1": "meh"}
@@ -699,24 +705,26 @@ def test_req_chan_decode_data_dict_entry_v1(pki_dir):
     assert ret_pillar_data == pillar_data
 
 
-async def test_req_chan_decode_data_dict_entry_v2(pki_dir):
+async def test_req_chan_decode_data_dict_entry_v2(pki_dir, master_opts, minion_opts):
     mockloop = MagicMock()
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=mockloop)
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=mockloop)
 
     dictkey = "pillar"
     target = "minion"
@@ -724,19 +732,25 @@ async def test_req_chan_decode_data_dict_entry_v2(pki_dir):
 
     # Mock auth and message client.
     auth = client.auth
-    auth._crypticle = salt.crypt.Crypticle(opts, AES_KEY)
+    auth._crypticle = salt.crypt.Crypticle(minion_opts, AES_KEY)
+    auth._session_crypticle = salt.crypt.Crypticle(
+        minion_opts, server.session_key(target)
+    )
     client.auth = MagicMock()
     client.auth.mpub = auth.mpub
     client.auth.authenticated = True
     client.auth.get_keys = auth.get_keys
+    client.auth.gen_token = auth.gen_token
     client.auth.crypticle.dumps = auth.crypticle.dumps
     client.auth.crypticle.loads = auth.crypticle.loads
+    client.auth.session_crypticle.dumps = auth.session_crypticle.dumps
+    client.auth.session_crypticle.loads = auth.session_crypticle.loads
     client.transport = MagicMock()
 
     @salt.ext.tornado.gen.coroutine
     def mocksend(msg, timeout=60, tries=3):
         client.transport.msg = msg
-        load = client.auth.crypticle.loads(msg["load"])
+        load = client.auth.session_crypticle.loads(msg["load"])
         ret = server._encrypt_private(
             pillar_data, dictkey, target, nonce=load["nonce"], sign_messages=True
         )
@@ -753,7 +767,7 @@ async def test_req_chan_decode_data_dict_entry_v2(pki_dir):
         "pillarenv": "base",
         "pillar_override": True,
         "extra_minion_data": {},
-        "ver": "2",
+        "ver": "3",
         "cmd": "_pillar",
     }
     ret = await client.crypted_transfer_decode_dictentry(
@@ -761,28 +775,30 @@ async def test_req_chan_decode_data_dict_entry_v2(pki_dir):
         dictkey="pillar",
     )
     assert "version" in client.transport.msg
-    assert client.transport.msg["version"] == 2
+    assert client.transport.msg["version"] == 3
     assert ret == {"pillar1": "meh"}
 
 
-async def test_req_chan_decode_data_dict_entry_v2_bad_nonce(pki_dir):
+async def test_req_chan_decode_data_dict_entry_v2_bad_nonce(pki_dir, master_opts, minion_opts):
     mockloop = MagicMock()
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=mockloop)
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=mockloop)
 
     dictkey = "pillar"
     badnonce = "abcdefg"
@@ -791,7 +807,7 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_nonce(pki_dir):
 
     # Mock auth and message client.
     auth = client.auth
-    auth._crypticle = salt.crypt.Crypticle(opts, AES_KEY)
+    auth._crypticle = salt.crypt.Crypticle(minion_opts, AES_KEY)
     client.auth = MagicMock()
     client.auth.mpub = auth.mpub
     client.auth.authenticated = True
@@ -831,24 +847,26 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_nonce(pki_dir):
     assert "Pillar nonce verification failed." == excinfo.value.message
 
 
-async def test_req_chan_decode_data_dict_entry_v2_bad_signature(pki_dir):
+async def test_req_chan_decode_data_dict_entry_v2_bad_signature(pki_dir, master_opts, minion_opts):
     mockloop = MagicMock()
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=mockloop)
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=mockloop)
 
     dictkey = "pillar"
     badnonce = "abcdefg"
@@ -857,19 +875,25 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_signature(pki_dir):
 
     # Mock auth and message client.
     auth = client.auth
-    auth._crypticle = salt.crypt.Crypticle(opts, AES_KEY)
+    auth._crypticle = salt.crypt.Crypticle(minion_opts, AES_KEY)
+    auth._session_crypticle = salt.crypt.Crypticle(
+        minion_opts, server.session_key(target)
+    )
     client.auth = MagicMock()
     client.auth.mpub = auth.mpub
     client.auth.authenticated = True
     client.auth.get_keys = auth.get_keys
+    client.auth.gen_token = auth.gen_token
     client.auth.crypticle.dumps = auth.crypticle.dumps
     client.auth.crypticle.loads = auth.crypticle.loads
+    client.auth.session_crypticle.dumps = auth.session_crypticle.dumps
+    client.auth.session_crypticle.loads = auth.session_crypticle.loads
     client.transport = MagicMock()
 
     @salt.ext.tornado.gen.coroutine
     def mocksend(msg, timeout=60, tries=3):
         client.transport.msg = msg
-        load = client.auth.crypticle.loads(msg["load"])
+        load = client.auth.session_crypticle.loads(msg["load"])
         ret = server._encrypt_private(
             pillar_data, dictkey, target, nonce=load["nonce"], sign_messages=True
         )
@@ -901,7 +925,7 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_signature(pki_dir):
         "pillarenv": "base",
         "pillar_override": True,
         "extra_minion_data": {},
-        "ver": "2",
+        "ver": "3",
         "cmd": "_pillar",
     }
 
@@ -913,24 +937,26 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_signature(pki_dir):
     assert "Pillar payload signature failed to validate." == excinfo.value.message
 
 
-async def test_req_chan_decode_data_dict_entry_v2_bad_key(pki_dir):
+async def test_req_chan_decode_data_dict_entry_v2_bad_key(pki_dir, master_opts, minion_opts):
     mockloop = MagicMock()
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=mockloop)
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=mockloop)
 
     dictkey = "pillar"
     badnonce = "abcdefg"
@@ -939,19 +965,25 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_key(pki_dir):
 
     # Mock auth and message client.
     auth = client.auth
-    auth._crypticle = salt.crypt.Crypticle(opts, AES_KEY)
+    auth._crypticle = salt.crypt.Crypticle(minion_opts, AES_KEY)
+    auth._session_crypticle = salt.crypt.Crypticle(
+        minion_opts, server.session_key(target)
+    )
     client.auth = MagicMock()
     client.auth.mpub = auth.mpub
     client.auth.authenticated = True
     client.auth.get_keys = auth.get_keys
+    client.auth.gen_token = auth.gen_token
     client.auth.crypticle.dumps = auth.crypticle.dumps
     client.auth.crypticle.loads = auth.crypticle.loads
+    client.auth.session_crypticle.dumps = auth.session_crypticle.dumps
+    client.auth.session_crypticle.loads = auth.session_crypticle.loads
     client.transport = MagicMock()
 
     @salt.ext.tornado.gen.coroutine
     def mocksend(msg, timeout=60, tries=3):
         client.transport.msg = msg
-        load = client.auth.crypticle.loads(msg["load"])
+        load = client.auth.session_crypticle.loads(msg["load"])
         ret = server._encrypt_private(
             pillar_data, dictkey, target, nonce=load["nonce"], sign_messages=True
         )
@@ -967,7 +999,7 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_key(pki_dir):
 
         # Now encrypt with a different key
         key = salt.crypt.Crypticle.generate_key_string()
-        pcrypt = salt.crypt.Crypticle(opts, key)
+        pcrypt = salt.crypt.Crypticle(master_opts, key)
         pubfn = os.path.join(master_opts["pki_dir"], "minions", "minion")
         pub = salt.crypt.get_rsa_pub_key(pubfn)
         ret[dictkey] = pcrypt.dumps(signed_msg)
@@ -1002,25 +1034,27 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_key(pki_dir):
     assert "Key verification failed." == excinfo.value.message
 
 
-async def test_req_serv_auth_v1(pki_dir):
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "max_minions": 0,
-        "auto_accept": False,
-        "open_mode": False,
-        "key_pass": None,
-        "master_sign_pubkey": False,
-        "publish_port": 4505,
-        "auth_mode": 1,
-    }
+async def test_req_serv_auth_v1(pki_dir, master_opts, minion_opts):
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "max_minions": 0,
+            "auto_accept": False,
+            "open_mode": False,
+            "key_pass": None,
+            "master_sign_pubkey": False,
+            "publish_port": 4505,
+            "auth_mode": 1,
+        }
+    )
     SMaster.secrets["aes"] = {
         "secret": multiprocessing.Array(
             ctypes.c_char,
@@ -1028,10 +1062,13 @@ async def test_req_serv_auth_v1(pki_dir):
         ),
         "reload": salt.crypt.Crypticle.generate_key_string,
     }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
     server.auto_key = salt.daemons.masterapi.AutoKey(server.opts)
     server.cache_cli = False
+    server.event = salt.utils.event.get_master_event(
+        master_opts, master_opts["sock_dir"], listen=False
+    )
     server.master_key = salt.crypt.MasterKeys(server.opts)
 
     pub = salt.crypt.get_rsa_pub_key(str(pki_dir.joinpath("minion", "minion.pub")))
@@ -1055,25 +1092,27 @@ async def test_req_serv_auth_v1(pki_dir):
     assert "load" not in ret
 
 
-async def test_req_serv_auth_v2(pki_dir):
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "max_minions": 0,
-        "auto_accept": False,
-        "open_mode": False,
-        "key_pass": None,
-        "master_sign_pubkey": False,
-        "publish_port": 4505,
-        "auth_mode": 1,
-    }
+async def test_req_serv_auth_v2(pki_dir, master_opts, minion_opts):
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "max_minions": 0,
+            "auto_accept": False,
+            "open_mode": False,
+            "key_pass": None,
+            "master_sign_pubkey": False,
+            "publish_port": 4505,
+            "auth_mode": 1,
+        }
+    )
     SMaster.secrets["aes"] = {
         "secret": multiprocessing.Array(
             ctypes.c_char,
@@ -1081,10 +1120,13 @@ async def test_req_serv_auth_v2(pki_dir):
         ),
         "reload": salt.crypt.Crypticle.generate_key_string,
     }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
     server.auto_key = salt.daemons.masterapi.AutoKey(server.opts)
     server.cache_cli = False
+    server.event = salt.utils.event.get_master_event(
+        master_opts, master_opts["sock_dir"], listen=False
+    )
     server.master_key = salt.crypt.MasterKeys(server.opts)
 
     pub = salt.crypt.get_rsa_pub_key(str(pki_dir.joinpath("minion", "minion.pub")))
@@ -1110,26 +1152,28 @@ async def test_req_serv_auth_v2(pki_dir):
     assert "load" in ret
 
 
-async def test_req_chan_auth_v2(pki_dir, io_loop):
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "max_minions": 0,
-        "auto_accept": False,
-        "open_mode": False,
-        "key_pass": None,
-        "publish_port": 4505,
-        "auth_mode": 1,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
+async def test_req_chan_auth_v2(pki_dir, io_loop, master_opts, minion_opts):
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "max_minions": 0,
+            "auto_accept": False,
+            "open_mode": False,
+            "key_pass": None,
+            "publish_port": 4505,
+            "auth_mode": 1,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
     SMaster.secrets["aes"] = {
         "secret": multiprocessing.Array(
             ctypes.c_char,
@@ -1137,19 +1181,26 @@ async def test_req_chan_auth_v2(pki_dir, io_loop):
         ),
         "reload": salt.crypt.Crypticle.generate_key_string,
     }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     master_opts["master_sign_pubkey"] = False
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
     server.auto_key = salt.daemons.masterapi.AutoKey(server.opts)
     server.cache_cli = False
+    server.event = salt.utils.event.get_master_event(
+        master_opts, master_opts["sock_dir"], listen=False
+    )
     server.master_key = salt.crypt.MasterKeys(server.opts)
-    opts["verify_master_pubkey_sign"] = False
-    opts["always_verify_signature"] = False
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=io_loop)
+    minion_opts["verify_master_pubkey_sign"] = False
+    minion_opts["always_verify_signature"] = False
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=io_loop)
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=io_loop)
+    auth_client = salt.channel.client.AsyncReqChannel.factory(
+        minion_opts, io_loop=io_loop, crypt="clear"
+    )
     signin_payload = client.auth.minion_sign_in_payload()
-    pload = client._package_load(signin_payload)
+    pload = auth_client._package_load(signin_payload)
     assert "version" in pload
-    assert pload["version"] == 2
+    assert pload["version"] == 3
 
     ret = server._auth(pload["load"], sign_messages=True)
     assert "sig" in ret
@@ -1159,26 +1210,28 @@ async def test_req_chan_auth_v2(pki_dir, io_loop):
     assert "publish_port" in ret
 
 
-async def test_req_chan_auth_v2_with_master_signing(pki_dir, io_loop):
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "max_minions": 0,
-        "auto_accept": False,
-        "open_mode": False,
-        "key_pass": None,
-        "publish_port": 4505,
-        "auth_mode": 1,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
+async def test_req_chan_auth_v2_with_master_signing(pki_dir, io_loop, minion_opts, master_opts):
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "max_minions": 0,
+            "auto_accept": False,
+            "open_mode": False,
+            "key_pass": None,
+            "publish_port": 4505,
+            "auth_mode": 1,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
     SMaster.secrets["aes"] = {
         "secret": multiprocessing.Array(
             ctypes.c_char,
@@ -1186,7 +1239,7 @@ async def test_req_chan_auth_v2_with_master_signing(pki_dir, io_loop):
         ),
         "reload": salt.crypt.Crypticle.generate_key_string,
     }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     master_opts["master_sign_pubkey"] = True
     master_opts["master_use_pubkey_signature"] = False
     master_opts["signing_key_pass"] = True
@@ -1194,22 +1247,28 @@ async def test_req_chan_auth_v2_with_master_signing(pki_dir, io_loop):
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
     server.auto_key = salt.daemons.masterapi.AutoKey(server.opts)
     server.cache_cli = False
+    server.event = salt.utils.event.get_master_event(
+        master_opts, master_opts["sock_dir"], listen=False
+    )
     server.master_key = salt.crypt.MasterKeys(server.opts)
-    opts["verify_master_pubkey_sign"] = True
-    opts["always_verify_signature"] = True
-    opts["master_sign_key_name"] = "master_sign"
-    opts["master"] = "master"
+    minion_opts["verify_master_pubkey_sign"] = True
+    minion_opts["always_verify_signature"] = True
+    minion_opts["master_sign_key_name"] = "master_sign"
+    minion_opts["master"] = "master"
 
     assert (
         pki_dir.joinpath("minion", "minion_master.pub").read_text()
         == pki_dir.joinpath("master", "master.pub").read_text()
     )
 
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=io_loop)
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=io_loop)
+    auth_client = salt.channel.client.AsyncReqChannel.factory(
+        minion_opts, io_loop=io_loop, crypt="clear"
+    )
     signin_payload = client.auth.minion_sign_in_payload()
-    pload = client._package_load(signin_payload)
+    pload = auth_client._package_load(signin_payload)
     assert "version" in pload
-    assert pload["version"] == 2
+    assert pload["version"] == 3
 
     server_reply = server._auth(pload["load"], sign_messages=True)
     # With version 2 we always get a clear signed response
@@ -1233,10 +1292,14 @@ async def test_req_chan_auth_v2_with_master_signing(pki_dir, io_loop):
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
     server.auto_key = salt.daemons.masterapi.AutoKey(server.opts)
     server.cache_cli = False
+    server.event = salt.utils.event.get_master_event(
+        master_opts, master_opts["sock_dir"], listen=False
+    )
     server.master_key = salt.crypt.MasterKeys(server.opts)
 
     signin_payload = client.auth.minion_sign_in_payload()
-    pload = client._package_load(signin_payload)
+
+    pload = auth_client._package_load(signin_payload)
     server_reply = server._auth(pload["load"], sign_messages=True)
     ret = client.auth.handle_signin_response(signin_payload, server_reply)
 
@@ -1250,28 +1313,30 @@ async def test_req_chan_auth_v2_with_master_signing(pki_dir, io_loop):
     )
 
 
-async def test_req_chan_auth_v2_new_minion_with_master_pub(pki_dir, io_loop):
+async def test_req_chan_auth_v2_new_minion_with_master_pub(pki_dir, io_loop, master_opts, minion_opts):
 
     pki_dir.joinpath("master", "minions", "minion").unlink()
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "max_minions": 0,
-        "auto_accept": False,
-        "open_mode": False,
-        "key_pass": None,
-        "publish_port": 4505,
-        "auth_mode": 1,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
+    minion_opts.update(
+            {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "max_minions": 0,
+            "auto_accept": False,
+            "open_mode": False,
+            "key_pass": None,
+            "publish_port": 4505,
+            "auth_mode": 1,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
     SMaster.secrets["aes"] = {
         "secret": multiprocessing.Array(
             ctypes.c_char,
@@ -1279,19 +1344,26 @@ async def test_req_chan_auth_v2_new_minion_with_master_pub(pki_dir, io_loop):
         ),
         "reload": salt.crypt.Crypticle.generate_key_string,
     }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     master_opts["master_sign_pubkey"] = False
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
     server.auto_key = salt.daemons.masterapi.AutoKey(server.opts)
     server.cache_cli = False
+    server.event = salt.utils.event.get_master_event(
+        master_opts, master_opts["sock_dir"], listen=False
+    )
     server.master_key = salt.crypt.MasterKeys(server.opts)
-    opts["verify_master_pubkey_sign"] = False
-    opts["always_verify_signature"] = False
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=io_loop)
+    minion_opts["verify_master_pubkey_sign"] = False
+    minion_opts["always_verify_signature"] = False
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=io_loop)
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=io_loop)
+    auth_client = salt.channel.client.AsyncReqChannel.factory(
+        minion_opts, io_loop=io_loop, crypt="clear"
+    )
     signin_payload = client.auth.minion_sign_in_payload()
-    pload = client._package_load(signin_payload)
+    pload = auth_client._package_load(signin_payload)
     assert "version" in pload
-    assert pload["version"] == 2
+    assert pload["version"] == 3
 
     ret = server._auth(pload["load"], sign_messages=True)
     assert "sig" in ret
@@ -1299,7 +1371,7 @@ async def test_req_chan_auth_v2_new_minion_with_master_pub(pki_dir, io_loop):
     assert ret == "retry"
 
 
-async def test_req_chan_auth_v2_new_minion_with_master_pub_bad_sig(pki_dir, io_loop):
+async def test_req_chan_auth_v2_new_minion_with_master_pub_bad_sig(pki_dir, io_loop, master_opts, minion_opts):
 
     pki_dir.joinpath("master", "minions", "minion").unlink()
 
@@ -1311,25 +1383,27 @@ async def test_req_chan_auth_v2_new_minion_with_master_pub_bad_sig(pki_dir, io_l
     mapub.unlink()
     mapub.write_text(MASTER2_PUB_KEY.strip())
 
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "max_minions": 0,
-        "auto_accept": False,
-        "open_mode": False,
-        "key_pass": None,
-        "publish_port": 4505,
-        "auth_mode": 1,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
+    minion_opts.update(
+            {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "max_minions": 0,
+            "auto_accept": False,
+            "open_mode": False,
+            "key_pass": None,
+            "publish_port": 4505,
+            "auth_mode": 1,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
     SMaster.secrets["aes"] = {
         "secret": multiprocessing.Array(
             ctypes.c_char,
@@ -1337,19 +1411,25 @@ async def test_req_chan_auth_v2_new_minion_with_master_pub_bad_sig(pki_dir, io_l
         ),
         "reload": salt.crypt.Crypticle.generate_key_string,
     }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     master_opts["master_sign_pubkey"] = False
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
     server.auto_key = salt.daemons.masterapi.AutoKey(server.opts)
     server.cache_cli = False
+    server.event = salt.utils.event.get_master_event(
+        master_opts, master_opts["sock_dir"], listen=False
+    )
     server.master_key = salt.crypt.MasterKeys(server.opts)
-    opts["verify_master_pubkey_sign"] = False
-    opts["always_verify_signature"] = False
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=io_loop)
+    minion_opts["verify_master_pubkey_sign"] = False
+    minion_opts["always_verify_signature"] = False
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=io_loop)
     signin_payload = client.auth.minion_sign_in_payload()
-    pload = client._package_load(signin_payload)
+    auth_client = salt.channel.client.AsyncReqChannel.factory(
+        minion_opts, io_loop=io_loop, crypt="clear"
+    )
+    pload = auth_client._package_load(signin_payload)
     assert "version" in pload
-    assert pload["version"] == 2
+    assert pload["version"] == 3
 
     ret = server._auth(pload["load"], sign_messages=True)
     assert "sig" in ret
@@ -1357,29 +1437,31 @@ async def test_req_chan_auth_v2_new_minion_with_master_pub_bad_sig(pki_dir, io_l
         ret = client.auth.handle_signin_response(signin_payload, ret)
 
 
-async def test_req_chan_auth_v2_new_minion_without_master_pub(pki_dir, io_loop):
+async def test_req_chan_auth_v2_new_minion_without_master_pub(pki_dir, io_loop, minion_opts, master_opts):
 
     pki_dir.joinpath("master", "minions", "minion").unlink()
     pki_dir.joinpath("minion", "minion_master.pub").unlink()
-    opts = {
-        "master_uri": "tcp://127.0.0.1:4506",
-        "interface": "127.0.0.1",
-        "ret_port": 4506,
-        "ipv6": False,
-        "sock_dir": ".",
-        "pki_dir": str(pki_dir.joinpath("minion")),
-        "id": "minion",
-        "__role": "minion",
-        "keysize": 4096,
-        "max_minions": 0,
-        "auto_accept": False,
-        "open_mode": False,
-        "key_pass": None,
-        "publish_port": 4505,
-        "auth_mode": 1,
-        "acceptance_wait_time": 3,
-        "acceptance_wait_time_max": 3,
-    }
+    minion_opts.update(
+        {
+            "master_uri": "tcp://127.0.0.1:4506",
+            "interface": "127.0.0.1",
+            "ret_port": 4506,
+            "ipv6": False,
+            "sock_dir": ".",
+            "pki_dir": str(pki_dir.joinpath("minion")),
+            "id": "minion",
+            "__role": "minion",
+            "keysize": 4096,
+            "max_minions": 0,
+            "auto_accept": False,
+            "open_mode": False,
+            "key_pass": None,
+            "publish_port": 4505,
+            "auth_mode": 1,
+            "acceptance_wait_time": 3,
+            "acceptance_wait_time_max": 3,
+        }
+    )
     SMaster.secrets["aes"] = {
         "secret": multiprocessing.Array(
             ctypes.c_char,
@@ -1387,19 +1469,25 @@ async def test_req_chan_auth_v2_new_minion_without_master_pub(pki_dir, io_loop):
         ),
         "reload": salt.crypt.Crypticle.generate_key_string,
     }
-    master_opts = dict(opts, pki_dir=str(pki_dir.joinpath("master")))
+    master_opts.update(pki_dir=str(pki_dir.joinpath("master")))
     master_opts["master_sign_pubkey"] = False
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
     server.auto_key = salt.daemons.masterapi.AutoKey(server.opts)
     server.cache_cli = False
+    server.event = salt.utils.event.get_master_event(
+        master_opts, master_opts["sock_dir"], listen=False
+    )
     server.master_key = salt.crypt.MasterKeys(server.opts)
-    opts["verify_master_pubkey_sign"] = False
-    opts["always_verify_signature"] = False
-    client = salt.channel.client.AsyncReqChannel.factory(opts, io_loop=io_loop)
+    minion_opts["verify_master_pubkey_sign"] = False
+    minion_opts["always_verify_signature"] = False
+    client = salt.channel.client.AsyncReqChannel.factory(minion_opts, io_loop=io_loop)
+    auth_client = salt.channel.client.AsyncReqChannel.factory(
+        minion_opts, io_loop=io_loop, crypt="clear"
+    )
     signin_payload = client.auth.minion_sign_in_payload()
-    pload = client._package_load(signin_payload)
+    pload = auth_client._package_load(signin_payload)
     assert "version" in pload
-    assert pload["version"] == 2
+    assert pload["version"] == 3
 
     ret = server._auth(pload["load"], sign_messages=True)
     assert "sig" in ret
@@ -1436,13 +1524,14 @@ async def test_req_server_garbage_request(io_loop):
     request_server.stream.send.assert_called_once_with(valid_response)
 
 
-async def test_req_chan_bad_payload_to_decode(pki_dir, io_loop):
+async def test_req_chan_bad_payload_to_decode(pki_dir, io_loop, caplog):
     opts = {
         "master_uri": "tcp://127.0.0.1:4506",
         "interface": "127.0.0.1",
         "ret_port": 4506,
         "ipv6": False,
         "sock_dir": ".",
+        "cachedir": "",
         "pki_dir": str(pki_dir.joinpath("minion")),
         "id": "minion",
         "__role": "minion",
@@ -1467,9 +1556,16 @@ async def test_req_chan_bad_payload_to_decode(pki_dir, io_loop):
     master_opts["master_sign_pubkey"] = False
     server = salt.channel.server.ReqServerChannel.factory(master_opts)
 
-    with pytest.raises(salt.exceptions.SaltDeserializationError):
-        server._decode_payload(None)
-    with pytest.raises(salt.exceptions.SaltDeserializationError):
-        server._decode_payload({})
-    with pytest.raises(salt.exceptions.SaltDeserializationError):
-        server._decode_payload(12345)
+    with caplog.at_level(logging.WARNING):
+        await server.handle_message(None)
+        assert "bad load received on socket" in caplog.text
+    caplog.clear()
+
+    with caplog.at_level(logging.WARNING):
+        await server.handle_message({})
+        assert "bad load received on socket" in caplog.text
+    caplog.clear()
+
+    with caplog.at_level(logging.WARNING):
+        await server.handle_message(12345)
+        assert "bad load received on socket" in caplog.text

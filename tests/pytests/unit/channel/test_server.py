@@ -7,8 +7,11 @@ import salt.ext.tornado.gen
 from tests.support.mock import MagicMock, patch
 
 
-def test__auth_cmd_stats_passing():
-    req_server_channel = server.ReqServerChannel({"master_stats": True}, None)
+def test__auth_cmd_stats_passing(master_opts):
+    master_opts.update(
+        {"master_stats": True}
+    )
+    req_server_channel = server.ReqServerChannel(master_opts, None)
 
     fake_ret = {"enc": "clear", "load": b"FAKELOAD"}
 
@@ -32,3 +35,48 @@ def test__auth_cmd_stats_passing():
         )
         assert auth_call_duration >= 0.03
         assert auth_call_duration < 0.05
+
+
+@pytest.fixture
+def root_dir(tmp_path):
+    (tmp_path / "var").mkdir()
+    (tmp_path / "var" / "cache").mkdir()
+    (tmp_path / "etc").mkdir()
+    (tmp_path / "etc" / "salt").mkdir()
+    (tmp_path / "etc" / "salt" / "pki").mkdir()
+    (tmp_path / "etc" / "salt" / "pki" / "minions").mkdir()
+    yield tmp_path
+
+
+def test_req_server_validate_token_removes_token(root_dir):
+    opts = {
+        "master_uri": "tcp://127.0.0.1:4505",
+        "cachedir": str(root_dir / "var" / "cache"),
+        "pki_dir": str(root_dir / "etc" / "salt" / "pki"),
+    }
+    reqsrv = server.ReqServerChannel.factory(opts)
+    payload = {
+        "load": {
+            "id": "minion",
+            "tok": "asdf",
+        }
+    }
+    assert reqsrv.validate_token(payload) is False
+    assert "tok" not in payload["load"]
+
+
+def test_req_server_validate_token_removes_token_id_traversal(root_dir):
+    opts = {
+        "master_uri": "tcp://127.0.0.1:4505",
+        "cachedir": str(root_dir / "var" / "cache"),
+        "pki_dir": str(root_dir / "etc" / "salt" / "pki"),
+    }
+    reqsrv = server.ReqServerChannel.factory(opts)
+    payload = {
+        "load": {
+            "id": "minion/../../foo",
+            "tok": "asdf",
+        }
+    }
+    assert reqsrv.validate_token(payload) is False
+    assert "tok" not in payload["load"]

@@ -100,6 +100,16 @@ bQIDAQAB
 """
 
 
+@pytest.fixture
+def minion_root(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "etc").mkdir()
+    (root / "etc" / "salt").mkdir()
+    (root / "etc" / "salt" / "pki").mkdir()
+    yield root
+
+
 def test_get_rsa_pub_key_bad_key(tmp_path):
     """
     get_rsa_pub_key raises InvalidKeyError when encoutering a bad key
@@ -170,3 +180,142 @@ def test_verify_signature_bad_sig(tmp_path):
     msg = b"foo bar"
     sig = salt.crypt.sign_message(str(tmp_path.joinpath("foo.pem")), msg)
     assert not salt.crypt.verify_signature(str(tmp_path.joinpath("bar.pub")), msg, sig)
+
+
+async def test_auth_aes_key_rotation(minion_root, io_loop):
+    pki_dir = minion_root / "etc" / "salt" / "pki"
+    opts = {
+        "id": "minion",
+        "__role": "minion",
+        "pki_dir": str(pki_dir),
+        "master_uri": "tcp://127.0.0.1:4505",
+        "keysize": 4096,
+        "acceptance_wait_time": 60,
+        "acceptance_wait_time_max": 60,
+    }
+    credskey = (
+        opts["pki_dir"],  # where the keys are stored
+        opts["id"],  # minion ID
+        opts["master_uri"],  # master ID
+    )
+    salt.crypt.gen_keys(pki_dir, "minion", opts["keysize"])
+
+    aes = salt.crypt.Crypticle.generate_key_string()
+    session = salt.crypt.Crypticle.generate_key_string()
+
+    auth = salt.crypt.AsyncAuth(opts, io_loop)
+
+    async def mock_sign_in(*args, **kwargs):
+        return mock_sign_in.response
+
+    mock_sign_in.response = {
+        "enc": "pub",
+        "aes": aes,
+        "session": session,
+    }
+    auth.sign_in = mock_sign_in
+
+    assert credskey not in auth.creds_map
+
+    await auth.authenticate()
+
+    assert credskey in auth.creds_map
+    assert auth.creds_map[credskey]["aes"] == aes
+    assert auth.creds_map[credskey]["session"] == session
+
+    aes1 = salt.crypt.Crypticle.generate_key_string()
+
+    mock_sign_in.response = {
+        "enc": "pub",
+        "aes": aes1,
+        "session": session,
+    }
+
+    await auth.authenticate()
+
+    assert credskey in auth.creds_map
+    assert auth.creds_map[credskey]["aes"] == aes1
+    assert auth.creds_map[credskey]["session"] == session
+
+    session1 = salt.crypt.Crypticle.generate_key_string()
+    mock_sign_in.response = {
+        "enc": "pub",
+        "aes": aes1,
+        "session": session1,
+    }
+
+    await auth.authenticate()
+
+    assert credskey in auth.creds_map
+    assert auth.creds_map[credskey]["aes"] == aes1
+    assert auth.creds_map[credskey]["session"] == session1
+
+
+def test_sauth_aes_key_rotation(minion_root, io_loop):
+
+    pki_dir = minion_root / "etc" / "salt" / "pki"
+    opts = {
+        "id": "minion",
+        "__role": "minion",
+        "pki_dir": str(pki_dir),
+        "master_uri": "tcp://127.0.0.1:4505",
+        "keysize": 4096,
+        "acceptance_wait_time": 60,
+        "acceptance_wait_time_max": 60,
+    }
+    credskey = (
+        opts["pki_dir"],  # where the keys are stored
+        opts["id"],  # minion ID
+        opts["master_uri"],  # master ID
+    )
+    salt.crypt.gen_keys(pki_dir, "minion", opts["keysize"])
+
+    aes = salt.crypt.Crypticle.generate_key_string()
+    session = salt.crypt.Crypticle.generate_key_string()
+
+    auth = salt.crypt.SAuth(opts, io_loop)
+
+    def mock_sign_in(*args, **kwargs):
+        return mock_sign_in.response
+
+    mock_sign_in.response = {
+        "enc": "pub",
+        "aes": aes,
+        "session": session,
+    }
+    auth.sign_in = mock_sign_in
+
+    assert auth._creds is None
+
+    auth.authenticate()
+
+    assert isinstance(auth._creds, dict)
+    assert auth._creds["aes"] == aes
+    assert auth._creds["session"] == session
+
+    aes1 = salt.crypt.Crypticle.generate_key_string()
+
+    mock_sign_in.response = {
+        "enc": "pub",
+        "aes": aes1,
+        "session": session,
+    }
+
+    auth.authenticate()
+
+    assert isinstance(auth._creds, dict)
+    assert auth._creds["aes"] == aes1
+    assert auth._creds["session"] == session
+
+    session1 = salt.crypt.Crypticle.generate_key_string()
+    mock_sign_in.response = {
+        "enc": "pub",
+        "aes": aes1,
+        "session": session1,
+    }
+
+    auth.authenticate()
+
+    assert isinstance(auth._creds, dict)
+    assert auth._creds["aes"] == aes1
+    assert auth._creds["session"] == session1
