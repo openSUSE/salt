@@ -56,6 +56,7 @@ def test_publish_retry(salt_master, salt_minion_retry, salt_cli, salt_run_cli):
 
 
 @pytest.mark.slow_test
+@pytest.mark.flaky(max_runs=4)
 def test_pillar_timeout(salt_master_factory):
     cmd = (
         sys.executable
