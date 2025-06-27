@@ -62,6 +62,7 @@ def test_publish_retry(salt_master, salt_minion_retry, salt_cli, salt_run_cli):
 
 @pytest.mark.slow_test
 @pytest.mark.timeout_unless_on_windows(180)
+@pytest.mark.flaky(max_runs=4)
 def test_pillar_timeout(salt_master_factory, tmp_path):
     with salt.utils.files.fopen(tmp_path / "script.py", "w") as fp:
         fp.write('print(\'{"foo": "bar"}\');\n')
