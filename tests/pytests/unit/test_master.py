@@ -701,4 +701,3 @@ def test_collect__auth_to_master_stats():
         assert mworker.stats["_auth"]["mean"] < 0.04
         handle_aes_mock.assert_not_called()
         handle_clear_mock.assert_not_called()
-
