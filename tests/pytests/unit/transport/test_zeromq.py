@@ -1034,7 +1034,7 @@ async def test_req_chan_decode_data_dict_entry_v2_bad_key(pki_dir, master_opts, 
     assert "Key verification failed." == excinfo.value.message
 
 
-async def test_req_serv_auth_v1(pki_dir, master_opts, minion_opts):
+async def test_req_serv_auth_v1(pki_dir, master_opts, minion_opts, caplog):
     minion_opts.update(
         {
             "master_uri": "tcp://127.0.0.1:4506",
@@ -1088,8 +1088,24 @@ async def test_req_serv_auth_v1(pki_dir, master_opts, minion_opts):
         "token": token,
         "pub": pub_key,
     }
-    ret = server._auth(load, sign_messages=False)
-    assert "load" not in ret
+    with caplog.at_level(logging.WARNING):
+        ret = server._auth(load, sign_messages=False)
+        assert "Minion using legacy request server protocol, please upgrade minion" in caplog.text
+        assert "load" not in ret
+
+    caplog.clear()
+
+    with caplog.at_level(logging.WARNING), patch.dict(server.opts, {"minion_legacy_req_warnings": False}):
+        ret = server._auth(load, sign_messages=False)
+        assert "Minion using legacy request server protocol, please upgrade minion" not in caplog.text
+        assert "load" not in ret
+
+    caplog.clear()
+
+    with caplog.at_level(logging.WARNING), patch.dict(server.opts, {"minion_legacy_req_warnings": True}):
+        ret = server._auth(load, sign_messages=False)
+        assert "Minion using legacy request server protocol, please upgrade minion" in caplog.text
+        assert "load" not in ret
 
 
 async def test_req_serv_auth_v2(pki_dir, master_opts, minion_opts):
