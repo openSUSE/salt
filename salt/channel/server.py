@@ -852,7 +852,7 @@ class ReqServerChannel:
             ret["aes"] = pub.encrypt(aes, enc_algo)
             ret["session"] = pub.encrypt(self.session_key(load["id"]), enc_algo)
 
-        if version < 3:
+        if version < 3 and self.opts.get("minion_legacy_req_warnings", True):
             log.warning(
                 "Minion using legacy request server protocol, please upgrade %s",
                 load["id"],
