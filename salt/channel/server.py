@@ -819,7 +819,7 @@ class ReqServerChannel:
                 ret["aes"] = cipher.encrypt(aes)
                 ret["session"] = cipher.encrypt(salt.utils.stringutils.to_bytes(self.session_key(load["id"])))
 
-        if version < 3:
+        if version < 3 and self.opts.get("minion_legacy_req_warnings", True):
             log.warning(
                 "Minion using legacy request server protocol, please upgrade %s",
                 load["id"],
