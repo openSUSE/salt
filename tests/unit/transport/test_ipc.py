@@ -1,6 +1,7 @@
 """
-    :codeauthor: Mike Place <mp@saltstack.com>
+:codeauthor: Mike Place <mp@saltstack.com>
 """
+
 import errno
 import logging
 import os
@@ -102,9 +103,12 @@ class IPCMessagePubSubCase(salt.ext.tornado.testing.AsyncTestCase):
                 evt.set()
                 self.stop()
 
+        client1.callbacks.add(handler)
+        client2.callbacks.add(handler)
+
         # Now let both waiting data at once
-        client1.read_async(handler)
-        client2.read_async(handler)
+        client1.read_async()
+        client2.read_async()
         self.pub_channel.publish("TEST")
         self.wait()
         self.assertEqual(len(call_cnt), 2)
@@ -145,8 +149,10 @@ class IPCMessagePubSubCase(salt.ext.tornado.testing.AsyncTestCase):
         def handler(raw):
             pass
 
+        client1.callbacks.add(handler)
+
         try:
-            ret1 = yield client1.read_async(handler)
+            ret1 = yield client1.read_async()
             self.wait()
         except StreamClosedError as ex:
             assert False, "StreamClosedError was raised inside the Future"
