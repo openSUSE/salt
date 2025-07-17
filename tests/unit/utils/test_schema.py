@@ -1548,7 +1548,10 @@ class ConfigTestCase(TestCase):
                 TestConf.serialize(),
                 format_checker=jsonschema.FormatChecker(),
             )
-        self.assertIn("is too short", excinfo.exception.message)
+        self.assertTrue(
+            ("is too short" in excinfo.exception.message)
+            or ("should be non-empty" in excinfo.exception.message)
+        )
 
         class TestConf(schema.Schema):
             item = schema.ArrayItem(
