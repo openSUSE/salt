@@ -1,3 +1,5 @@
+import asyncio
+
 import tornado.gen
 import tornado.ioloop
 
@@ -41,7 +43,8 @@ def test_helpers():
     """
     Test that the helper classes do what we expect within a regular asynchronous env
     """
-    io_loop = tornado.ioloop.IOLoop(make_current=False)
+    asyncio_loop = asyncio.new_event_loop()
+    io_loop = tornado.ioloop.IOLoop(asyncio_loop=asyncio_loop, make_current=False)
     ret = io_loop.run_sync(lambda: HelperA().sleep())
     assert ret is True
 

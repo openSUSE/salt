@@ -24,7 +24,7 @@ import yaml
 
 import salt
 import salt.exceptions
-import salt.ext.tornado as tornado
+import tornado as tornado
 import salt.utils.files
 import salt.utils.hashutils
 import salt.utils.json

@@ -2,11 +2,14 @@
 Helpers/utils for working with tornado asynchronous stuff
 """
 
+import asyncio
 import contextlib
 import logging
+import sys
+import threading
 
-import salt.ext.tornado.concurrent
-import salt.ext.tornado.ioloop
+import tornado.concurrent
+import tornado.ioloop
 
 log = logging.getLogger(__name__)
 
@@ -16,12 +19,18 @@ def current_ioloop(io_loop):
     """
     A context manager that will set the current ioloop to io_loop for the context
     """
-    orig_loop = salt.ext.tornado.ioloop.IOLoop.current()
-    io_loop.make_current()
+    try:
+        orig_loop = tornado.ioloop.IOLoop.current()
+    except RuntimeError:
+        orig_loop = None
+    asyncio.set_event_loop(io_loop.asyncio_loop)
     try:
         yield
     finally:
-        orig_loop.make_current()
+        if orig_loop:
+            asyncio.set_event_loop(orig_loop.asyncio_loop)
+        else:
+            asyncio.set_event_loop(None)
 
 
 class SyncWrapper:
@@ -31,7 +40,7 @@ class SyncWrapper:
     This is uses as a simple wrapper, for example:
 
     asynchronous = AsyncClass()
-    # this method would reguarly return a future
+    # this method would regularly return a future
     future = asynchronous.async_method()
 
     sync = SyncWrapper(async_factory_method, (arg1, arg2), {'kwarg1': 'val'})
@@ -48,7 +57,10 @@ class SyncWrapper:
         close_methods=None,
         loop_kwarg=None,
     ):
-        self.io_loop = salt.ext.tornado.ioloop.IOLoop()
+        self.asyncio_loop = asyncio.new_event_loop()
+        self.io_loop = tornado.ioloop.IOLoop(
+            asyncio_loop=self.asyncio_loop, make_current=False
+        )
         if args is None:
             args = []
         if kwargs is None:
@@ -61,7 +73,8 @@ class SyncWrapper:
         self.cls = cls
         if loop_kwarg:
             kwargs[self.loop_kwarg] = self.io_loop
-        self.obj = cls(*args, **kwargs)
+        with current_ioloop(self.io_loop):
+            self.obj = cls(*args, **kwargs)
         self._async_methods = list(
             set(async_methods + getattr(self.obj, "async_methods", []))
         )
@@ -79,7 +92,7 @@ class SyncWrapper:
             self._async_methods += self.obj._coroutines
 
     def __repr__(self):
-        return "<SyncWrapper(cls={})".format(self.cls)
+        return f"<SyncWrapper(cls={self.cls})"
 
     def close(self):
         for method in self._close_methods:
@@ -99,7 +112,11 @@ class SyncWrapper:
                 log.exception("Exception encountered while running stop method")
         io_loop = self.io_loop
         io_loop.stop()
-        io_loop.close(all_fds=True)
+        try:
+            io_loop.close(all_fds=True)
+        except KeyError:
+            pass
+        self.asyncio_loop.close()
 
     def __getattr__(self, key):
         if key in self._async_methods:
@@ -108,14 +125,59 @@ class SyncWrapper:
 
     def _wrap(self, key):
         def wrap(*args, **kwargs):
-            return self.io_loop.run_sync(
-                lambda: getattr(self.obj, key)(*args, **kwargs)
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                # asyncio.get_running_loop() raises RuntimeError
+                # if there is no running loop, so we can run the method
+                # directly with no detaching it to the distinct thread.
+                # It will make SyncWrapper way faster for the cases
+                # when there are no nested SyncWrapper objects used.
+                return self.io_loop.run_sync(
+                    lambda: getattr(self.obj, key)(*args, **kwargs)
+                )
+            results = []
+            thread = threading.Thread(
+                target=self._target,
+                args=(key, args, kwargs, results, self.asyncio_loop),
             )
+            thread.start()
+            thread.join()
+            if results[0]:
+                return results[1]
+            else:
+                exc_info = results[1]
+                raise exc_info[1].with_traceback(exc_info[2])
 
         return wrap
 
+    def _target(self, key, args, kwargs, results, asyncio_loop):
+        asyncio.set_event_loop(asyncio_loop)
+        io_loop = tornado.ioloop.IOLoop.current()
+        try:
+            result = io_loop.run_sync(lambda: getattr(self.obj, key)(*args, **kwargs))
+            results.append(True)
+            results.append(result)
+        except Exception:  # pylint: disable=broad-except
+            results.append(False)
+            results.append(sys.exc_info())
+
     def __enter__(self):
+        if hasattr(self.obj, "__aenter__"):
+            ret = self._wrap("__aenter__")()
+            if ret == self.obj:
+                return self
+            else:
+                return ret
+        elif hasattr(self.obj, "__enter__"):
+            ret = self.obj.__enter__()
+            if ret == self.obj:
+                return self
+            else:
+                return ret
         return self
 
     def __exit__(self, exc_type, exc_val, tb):
+        if hasattr(self.obj, "__aexit__"):
+            self._wrap("__aexit__")(exc_type, exc_val, tb)
         self.close()

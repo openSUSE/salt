@@ -26,7 +26,7 @@ import salt.utils.files
 import salt.utils.path
 import salt.utils.platform
 import salt.utils.versions
-from salt.ext.tornado import gen
+from tornado import gen
 
 log = logging.getLogger(__name__)
 

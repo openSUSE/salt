@@ -10,10 +10,11 @@ import os
 import time
 import uuid
 
+import tornado.gen
+import tornado.ioloop
+
 import salt.crypt
 import salt.exceptions
-import salt.ext.tornado.gen
-import salt.ext.tornado.ioloop
 import salt.payload
 import salt.transport.frame
 import salt.utils.event
@@ -121,7 +122,7 @@ class AsyncReqChannel:
             opts["master_uri"] = kwargs["master_uri"]
         io_loop = kwargs.get("io_loop")
         if io_loop is None:
-            io_loop = salt.ext.tornado.ioloop.IOLoop.current()
+            io_loop = tornado.ioloop.IOLoop.current()
 
         timeout = opts.get("request_channel_timeout", REQUEST_CHANNEL_TIMEOUT)
         tries = opts.get("request_channel_tries", REQUEST_CHANNEL_TRIES)
@@ -201,7 +202,7 @@ class AsyncReqChannel:
             ret["id"] = self.opts["id"]
         return ret
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def _send_with_retry(self, load, tries, timeout):
         _try = 1
         while True:
@@ -218,9 +219,9 @@ class AsyncReqChannel:
                 else:
                     _try += 1
                     continue
-        raise salt.ext.tornado.gen.Return(ret)
+        raise tornado.gen.Return(ret)
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def crypted_transfer_decode_dictentry(
         self,
         load,
@@ -274,12 +275,12 @@ class AsyncReqChannel:
         # Validate the nonce.
         if data["nonce"] != nonce:
             raise salt.crypt.AuthenticationError("Pillar nonce verification failed.")
-        raise salt.ext.tornado.gen.Return(data["pillar"])
+        raise tornado.gen.Return(data["pillar"])
 
     def verify_signature(self, data, sig):
         return salt.crypt.verify_signature(self.master_pubkey_path, data, sig)
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def _crypted_transfer(self, load, timeout, raw=False):
         """
         Send a load across the wire, with encryption
@@ -294,7 +295,7 @@ class AsyncReqChannel:
         :param int timeout: The number of seconds on a response before failing
         """
 
-        @salt.ext.tornado.gen.coroutine
+        @tornado.gen.coroutine
         def _do_transfer():
             # Yield control to the caller. When send() completes, resume by populating data with the Future.result
             nonce = uuid.uuid4().hex
@@ -311,7 +312,7 @@ class AsyncReqChannel:
             if not raw or self.ttype == "tcp":  # XXX Why is this needed for tcp
                 data = salt.transport.frame.decode_embedded_strs(data)
 
-            raise salt.ext.tornado.gen.Return(data)
+            raise tornado.gen.Return(data)
 
         if not self.auth.authenticated:
             # Return control back to the caller, resume when authentication succeeds
@@ -323,9 +324,9 @@ class AsyncReqChannel:
             # If auth error, return control back to the caller, continue when authentication succeeds
             yield self.auth.authenticate()
             ret = yield _do_transfer()
-        raise salt.ext.tornado.gen.Return(ret)
+        raise tornado.gen.Return(ret)
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def _uncrypted_transfer(self, load, timeout):
         """
         Send a load across the wire in cleartext
@@ -338,9 +339,9 @@ class AsyncReqChannel:
             timeout=timeout,
         )
 
-        raise salt.ext.tornado.gen.Return(ret)
+        raise tornado.gen.Return(ret)
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def send(self, load, tries=None, timeout=None, raw=False):
         """
         Send a request, return a future which will complete when we send the message
@@ -370,7 +371,7 @@ class AsyncReqChannel:
                 else:
                     _try += 1
                     continue
-        raise salt.ext.tornado.gen.Return(ret)
+        raise tornado.gen.Return(ret)
 
     def close(self):
         """
@@ -424,7 +425,7 @@ class AsyncPubChannel:
 
         io_loop = kwargs.get("io_loop")
         if io_loop is None:
-            io_loop = salt.ext.tornado.ioloop.IOLoop.current()
+            io_loop = tornado.ioloop.IOLoop.current()
 
         auth = salt.crypt.AsyncAuth(opts, io_loop=io_loop)
         transport = salt.transport.publish_client(opts, io_loop)
@@ -445,7 +446,7 @@ class AsyncPubChannel:
     def crypt(self):
         return "aes" if self.auth else "clear"
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def connect(self):
         """
         Return a future which completes when connected to the remote publisher
@@ -487,7 +488,7 @@ class AsyncPubChannel:
         if callback is None:
             return self.transport.on_recv(None)
 
-        @salt.ext.tornado.gen.coroutine
+        @tornado.gen.coroutine
         def wrap_callback(messages):
             payload = yield self.transport._decode_messages(messages)
             decoded = yield self._decode_payload(payload)
@@ -504,7 +505,7 @@ class AsyncPubChannel:
             "version": 3,
         }
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def send_id(self, tok, force_auth):
         """
         Send the minion id to the master so that the master may better
@@ -514,13 +515,13 @@ class AsyncPubChannel:
         """
         load = {"id": self.opts["id"], "tok": tok}
 
-        @salt.ext.tornado.gen.coroutine
+        @tornado.gen.coroutine
         def _do_transfer():
             msg = self._package_load(self.auth.crypticle.dumps(load))
             package = salt.transport.frame.frame_msg(msg, header=None)
             yield self.transport.send(package)
 
-            raise salt.ext.tornado.gen.Return(True)
+            raise tornado.gen.Return(True)
 
         if force_auth or not self.auth.authenticated:
             count = 0
@@ -536,13 +537,13 @@ class AsyncPubChannel:
                     count += 1
         try:
             ret = yield _do_transfer()
-            raise salt.ext.tornado.gen.Return(ret)
+            raise tornado.gen.Return(ret)
         except salt.crypt.AuthenticationError:
             yield self.auth.authenticate()
             ret = yield _do_transfer()
-            raise salt.ext.tornado.gen.Return(ret)
+            raise tornado.gen.Return(ret)
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def connect_callback(self, result):
         if self._closing:
             return
@@ -614,7 +615,7 @@ class AsyncPubChannel:
                     "Message signature failed to validate."
                 )
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def _decode_payload(self, payload):
         # we need to decrypt it
         log.trace("Decoding payload: %s", payload)
@@ -626,7 +627,7 @@ class AsyncPubChannel:
                 yield self.auth.authenticate()
                 payload["load"] = self.auth.crypticle.loads(payload["load"])
 
-        raise salt.ext.tornado.gen.Return(payload)
+        raise tornado.gen.Return(payload)
 
     def __enter__(self):
         return self

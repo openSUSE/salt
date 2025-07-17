@@ -7,7 +7,7 @@ import tempfile
 
 import pytest
 
-import salt.ext.tornado.ioloop
+import tornado.ioloop
 import salt.fileserver.gitfs
 import salt.utils.files
 import salt.utils.gitfs
@@ -20,7 +20,7 @@ from tests.support.unit import TestCase
 def _clear_instance_map():
     try:
         del salt.utils.gitfs.GitFS.instance_map[
-            salt.ext.tornado.ioloop.IOLoop.current()
+            tornado.ioloop.IOLoop.current()
         ]
     except KeyError:
         pass

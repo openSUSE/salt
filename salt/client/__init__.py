@@ -25,11 +25,12 @@ import sys
 import time
 from datetime import datetime
 
+import tornado.gen
+
 import salt.cache
 import salt.channel.client
 import salt.config
 import salt.defaults.exitcodes
-import salt.ext.tornado.gen
 import salt.loader
 import salt.payload
 import salt.syspaths as syspaths
@@ -416,7 +417,7 @@ class LocalClient:
         )
         return _res["minions"]
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def run_job_async(
         self,
         tgt,
@@ -473,7 +474,7 @@ class LocalClient:
             # Convert to generic client error and pass along message
             raise SaltClientError(general_exception)
 
-        raise salt.ext.tornado.gen.Return(self._check_pub_data(pub_data, listen=listen))
+        raise tornado.gen.Return(self._check_pub_data(pub_data, listen=listen))
 
     def cmd_async(
         self, tgt, fun, arg=(), tgt_type="glob", ret="", jid="", kwarg=None, **kwargs
@@ -1924,7 +1925,7 @@ class LocalClient:
 
         return {"jid": payload["load"]["jid"], "minions": payload["load"]["minions"]}
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def pub_async(
         self,
         tgt,
@@ -2005,7 +2006,7 @@ class LocalClient:
                 # and try again if the key has changed
                 key = self.__read_master_key()
                 if key == self.key:
-                    raise salt.ext.tornado.gen.Return(payload)
+                    raise tornado.gen.Return(payload)
                 self.key = key
                 payload_kwargs["key"] = self.key
                 payload = yield channel.send(payload_kwargs)
@@ -2023,9 +2024,9 @@ class LocalClient:
                 raise PublishError(error)
 
             if not payload:
-                raise salt.ext.tornado.gen.Return(payload)
+                raise tornado.gen.Return(payload)
 
-        raise salt.ext.tornado.gen.Return(
+        raise tornado.gen.Return(
             {"jid": payload["load"]["jid"], "minions": payload["load"]["minions"]}
         )
 

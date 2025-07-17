@@ -12,7 +12,7 @@ if sys.version_info < (3,):
     )
     sys.stderr.flush()
 
-USE_VENDORED_TORNADO = True
+USE_VENDORED_TORNADO = True if sys.version_info < (3,11) else False
 
 
 class TornadoImporter:
