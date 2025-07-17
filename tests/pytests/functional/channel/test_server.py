@@ -14,8 +14,8 @@ from saltfactories.utils import random_string
 import salt.channel.client
 import salt.channel.server
 import salt.config
-import salt.ext.tornado.gen
-import salt.ext.tornado.ioloop
+import tornado.gen
+import tornado.ioloop
 import salt.master
 import salt.utils.platform
 import salt.utils.process
@@ -117,7 +117,7 @@ def master_secrets():
     salt.master.SMaster.secrets.pop("aes")
 
 
-@salt.ext.tornado.gen.coroutine
+@tornado.gen.coroutine
 def _connect_and_publish(
     io_loop, channel_minion_id, channel, server, received, timeout=60
 ):
@@ -134,7 +134,7 @@ def _connect_and_publish(
     server.publish({"tgt_type": "glob", "tgt": [channel_minion_id], "WTF": "SON"})
     start = time.time()
     while time.time() - start < timeout:
-        yield salt.ext.tornado.gen.sleep(1)
+        yield tornado.gen.sleep(1)
     io_loop.stop()
 
 
