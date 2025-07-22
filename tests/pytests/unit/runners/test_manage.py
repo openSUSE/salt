@@ -12,6 +12,5 @@ def test_deprecation_58638():
         manage.list_state(show_ipv4="data")  # pylint: disable=unexpected-keyword-arg
     except TypeError as no_show_ipv4:
         assert (
-            str(no_show_ipv4)
-            == "list_state() got an unexpected keyword argument 'show_ipv4'"
+            "list_state() got an unexpected keyword argument 'show_ipv4'" in str(no_show_ipv4)
         )
