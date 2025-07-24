@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import logging
 import os
@@ -19,6 +20,27 @@ from salt.exceptions import SaltClientError, SaltMasterUnresolvableError, SaltSy
 from tests.support.mock import MagicMock, patch
 
 log = logging.getLogger(__name__)
+
+
+@pytest.fixture(autouse=True)
+def new_tornado_ioloop():
+    """
+    From version 6, tornado is a wrapper around asyncio event loop.
+    This means that if previous tests close down the event loop,
+    `tornado.ioloop.IOLoop.clear_current()` might attempt to use
+    already closed event loop.
+
+    This fixture ensures that each test uses a running event loop.
+
+    NOTE: Do not tear down the loop after the tests, otherwise
+    you have to instantiate it in later tests that depend on it.
+    """
+    if tornado.version_info < (6,):
+        yield
+    tornado.ioloop.IOLoop.clear_current()
+    new_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(new_loop)
+    yield
 
 
 def test_minion_load_grains_false(minion_opts):
