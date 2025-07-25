@@ -32,11 +32,13 @@ import tempfile
 
 import salt.exceptions
 import salt.utils.data
+import salt.utils.dictupdate
 import salt.utils.files
 import salt.utils.path
 import salt.utils.platform
 import salt.utils.stringutils
 import salt.utils.versions
+import salt.utils.x509 as x509util
 from salt.state import STATE_INTERNAL_KEYWORDS as _STATE_INTERNAL_KEYWORDS
 from salt.utils.odict import OrderedDict
 
@@ -983,86 +985,38 @@ def create_crl(
         raise salt.exceptions.SaltInvocationError(
             "Could not load OpenSSL module, OpenSSL unavailable"
         )
-    crl = OpenSSL.crypto.CRL()
 
     if revoked is None:
         revoked = []
 
     for rev_item in revoked:
-        if "certificate" in rev_item:
-            rev_cert = read_certificate(rev_item["certificate"])
-            rev_item["serial_number"] = rev_cert["Serial Number"]
-            rev_item["not_after"] = rev_cert["Not After"]
-
-        serial_number = rev_item["serial_number"].replace(":", "")
-        # OpenSSL bindings requires this to be a non-unicode string
-        serial_number = salt.utils.stringutils.to_bytes(serial_number)
-
-        if "not_after" in rev_item and not include_expired:
-            not_after = datetime.datetime.strptime(
-                rev_item["not_after"], "%Y-%m-%d %H:%M:%S"
-            )
-            if datetime.datetime.now() > not_after:
-                continue
-
-        if "revocation_date" not in rev_item:
-            rev_item["revocation_date"] = datetime.datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-
-        rev_date = datetime.datetime.strptime(
-            rev_item["revocation_date"], "%Y-%m-%d %H:%M:%S"
-        )
-        rev_date = rev_date.strftime("%Y%m%d%H%M%SZ")
-        rev_date = salt.utils.stringutils.to_bytes(rev_date)
-
-        rev = OpenSSL.crypto.Revoked()
-        rev.set_serial(salt.utils.stringutils.to_bytes(serial_number))
-        rev.set_rev_date(salt.utils.stringutils.to_bytes(rev_date))
-
         if "reason" in rev_item:
-            # Same here for OpenSSL bindings and non-unicode strings
-            reason = salt.utils.stringutils.to_bytes(rev_item["reason"])
-            rev.set_reason(reason)
+            salt.utils.dictupdate.set_dict_key_value(
+                rev_item, "extensions:CRLReason", rev_item["reason"]
+            )
 
-        crl.add_revoked(rev)
-
-    signing_cert = _text_or_file(signing_cert)
-    cert = OpenSSL.crypto.load_certificate(
-        OpenSSL.crypto.FILETYPE_PEM, get_pem_entry(signing_cert, pem_type="CERTIFICATE")
-    )
-    signing_private_key = _get_private_key_obj(
-        signing_private_key, passphrase=signing_private_key_passphrase
-    ).as_pem(cipher=None)
-    key = OpenSSL.crypto.load_privatekey(
-        OpenSSL.crypto.FILETYPE_PEM, get_pem_entry(signing_private_key)
+    builder, private_key_obj = x509util.build_crl(
+        signing_private_key=signing_private_key,
+        signing_private_key_passphrase=signing_private_key_passphrase,
+        include_expired=include_expired,
+        revoked=revoked,
+        signing_cert=signing_cert,
+        days_valid=days_valid,
     )
 
-    export_kwargs = {
-        "cert": cert,
-        "key": key,
-        "type": OpenSSL.crypto.FILETYPE_PEM,
-        "days": days_valid,
-    }
     if digest:
-        export_kwargs["digest"] = salt.utils.stringutils.to_bytes(digest)
+        hashing_algorithm = x509util.get_hashing_algorithm(digest)
     else:
         log.warning("No digest specified. The default md5 digest will be used.")
+        hashing_algorithm = x509util.get_hashing_algorithm("MD5")
 
-    try:
-        crltext = crl.export(**export_kwargs)
-    except (TypeError, ValueError):
-        log.warning(
-            "Error signing crl with specified digest. Are you using "
-            "pyopenssl 0.15 or newer? The default md5 digest will be used."
-        )
-        export_kwargs.pop("digest", None)
-        crltext = crl.export(**export_kwargs)
+    crl = builder.sign(private_key_obj, algorithm=hashing_algorithm)
+    crl_bytes = crl.public_bytes(x509util.serialization.Encoding.PEM)
 
     if text:
-        return crltext
+        return crl_bytes.decode()
 
-    return write_pem(text=crltext, path=path, pem_type="X509 CRL")
+    return write_pem(text=crl_bytes, path=path, pem_type="X509 CRL")
 
 
 def sign_remote_certificate(argdic, **kwargs):
