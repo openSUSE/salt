@@ -53,7 +53,7 @@ def PKG_TARGETS(grains):
             _PKG_TARGETS = ["wget", "zsh-html"]
         elif (
             grains["os"] in ("CentOS Stream", "AlmaLinux")
-            and grains["osmajorrelease"] == 9
+            and grains["osmajorrelease"] >= 9
         ):
             _PKG_TARGETS = ["units", "zsh"]
         else:
