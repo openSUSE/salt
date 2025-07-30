@@ -22,6 +22,7 @@ import salt.config
 import salt.crypt
 import salt.defaults.exitcodes
 import salt.engines
+import salt.ext.tornado.stack_context # pylint: disable=F0401
 import salt.loader
 import salt.minion
 import salt.payload
@@ -562,7 +563,7 @@ def target(cls, minion_instance, opts, data, connected):
         uid = salt.utils.user.get_uid(user=opts.get("user", None))
         minion_instance.proc_dir = salt.minion.get_proc_dir(opts["cachedir"], uid=uid)
 
-    with tornado.stack_context.StackContext(minion_instance.ctx):
+    with salt.ext.tornado.stack_context.StackContext(minion_instance.ctx):
         if isinstance(data["fun"], tuple) or isinstance(data["fun"], list):
             ProxyMinion._thread_multi_return(minion_instance, opts, data)
         else:
