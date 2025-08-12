@@ -2,7 +2,7 @@
 Functions to work with JSON
 """
 
-
+import contextlib
 import json
 import logging
 
@@ -25,69 +25,25 @@ def __split(raw):
     return raw.splitlines()
 
 
-def find_json(raw):
+def find_json(s: str):
+    """Pass in a string and load JSON within it.
+
+    The string may contain non-JSON text before and after the JSON document.
+
+    Raises ValueError if no valid JSON was found.
     """
-    Pass in a raw string and load the json when it starts. This allows for a
-    string to start with garbage and end with json but be cleanly loaded
-    """
-    ret = {}
-    lines = __split(raw)
-    lengths = list(map(len, lines))
-    starts = []
-    ends = []
+    decoder = json.JSONDecoder()
 
-    # Search for possible starts end ends of the json fragments
-    for ind, _ in enumerate(lines):
-        line = lines[ind].lstrip()
-        line = line[0] if line else line
-        if line == "{" or line == "[":
-            starts.append((ind, line))
-        if line == "}" or line == "]":
-            ends.append((ind, line))
+    # We look for the beginning of JSON objects / arrays and let raw_decode() handle
+    # extraneous data at the end.
+    for idx, char in enumerate(s):
+        if char == "{" or char == "[":
+            # JSONDecodeErrors are expected on stray '{'/'[' in the non-JSON part
+            with contextlib.suppress(json.JSONDecodeError):
+                data, _ = decoder.raw_decode(s[idx:])
+                return data
 
-    # List all the possible pairs of starts and ends,
-    # and fill the length of each block to sort by size after
-    starts_ends = []
-    for start, start_br in starts:
-        for end, end_br in reversed(ends):
-            if end > start and (
-                (start_br == "{" and end_br == "}")
-                or (start_br == "[" and end_br == "]")
-            ):
-                starts_ends.append((start, end, sum(lengths[start : end + 1])))
-
-    # Iterate through all the possible pairs starting from the largest
-    starts_ends.sort(key=lambda x: (x[2], x[1] - x[0], x[0]), reverse=True)
-    for start, end, _ in starts_ends:
-        working = "\n".join(lines[start : end + 1])
-        try:
-            ret = json.loads(working)
-            return ret
-        except ValueError:
-            pass
-        # Try filtering non-JSON text right after the last closing curly brace
-        end_str = lines[end].lstrip()[0]
-        working = "\n".join(lines[start : end]) + end_str
-        try:
-            ret = json.loads(working)
-            return ret
-        except ValueError:
-            continue
-
-    # Fall back to old implementation for backward compatibility
-    # excpecting json after the text
-    for ind, _ in enumerate(lines):
-        working = "\n".join(lines[ind:])
-        try:
-            ret = json.loads(working)
-        except ValueError:
-            continue
-        if ret:
-            return ret
-
-    if not ret:
-        # Not json, raise an error
-        raise ValueError
+    raise ValueError
 
 
 def import_json():
