@@ -339,7 +339,7 @@ class IPCClient:
             try:
                 log.trace("IPCClient: Connecting to socket: %s", self.socket_path)
                 yield self.stream.connect(sock_addr)
-                if self._connecting_future is not None:
+                if self._connecting_future is not None and not self._connecting_future.done():
                     self._connecting_future.set_result(True)
                 break
             except Exception as e:  # pylint: disable=broad-except
@@ -350,7 +350,7 @@ class IPCClient:
                     if self.stream is not None:
                         self.stream.close()
                         self.stream = None
-                    if self._connecting_future is not None:
+                    if self._connecting_future is not None and not self._connecting_future.done():
                         self._connecting_future.set_exception(e)
                     break
 
@@ -366,7 +366,7 @@ class IPCClient:
             return
 
         self._closing = True
-        if self._connecting_future is not None:
+        if self._connecting_future is not None and not self._connecting_future.done():
             try:
                 self._connecting_future.set_result(True)
                 self._connecting_future.exception()  # pylint: disable=E0203
