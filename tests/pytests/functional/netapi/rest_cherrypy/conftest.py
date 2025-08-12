@@ -29,9 +29,9 @@ def app(client_config, load_auth):
 
 
 @pytest.fixture
-def http_server(io_loop, app, netapi_port):
+def http_server(app, netapi_port):
     with netapi.TestsTornadoHttpServer(
-        io_loop=io_loop, app=app, port=netapi_port
+        app=app, port=netapi_port
     ) as server:
         yield server
 

@@ -123,6 +123,7 @@ class HTTPTestCase(TestCase):
         This tests that we get a null response when raise_error=False and the
         host/port cannot be reached.
         """
+
         host = "127.0.0.1"
 
         # Find unused port

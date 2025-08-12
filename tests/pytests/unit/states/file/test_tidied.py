@@ -412,10 +412,30 @@ def test_tidied_age_size_args_AND_operator_age_not_size():
         ("test", ["test1", "test2"], ["file3"]),
     ]
     today_delta = (datetime.today() - timedelta(days=14)) - datetime.utcfromtimestamp(0)
+
+    mystat = MagicMock()
+    mystat.st_atime = today_delta.total_seconds()
+    # dir = 16877
+    # file = 33188
+    mock_st_mode = PropertyMock(
+        side_effect=[
+            33188,
+            33188,
+            16877,
+            33188,
+            16877,
+            16877,
+        ]
+    )
+    type(mystat).st_mode = mock_st_mode
+    mystat.st_size = 10
+
     remove = MagicMock(name="file.remove")
     with patch("os.walk", return_value=walker), patch(
         "os.path.islink", return_value=False
-    ), patch("os.path.getatime", return_value=today_delta.total_seconds()), patch(
+    ), patch("os.stat", return_value=mystat), patch(
+        "os.path.getatime", return_value=today_delta.total_seconds()
+    ), patch(
         "os.path.getsize", return_value=10
     ), patch.dict(
         filestate.__opts__, {"test": False}
@@ -517,9 +537,28 @@ def test_tidied_age_size_args_AND_operator_size_not_age():
         ("test", ["test1", "test2"], ["file3"]),
     ]
     today_delta = (datetime.today() - timedelta(days=14)) - datetime.utcfromtimestamp(0)
+
+    mystat = MagicMock()
+    mystat.st_atime = today_delta.total_seconds()
+    # dir = 16877
+    # file = 33188
+    mock_st_mode = PropertyMock(
+        side_effect=[
+            33188,
+            33188,
+            16877,
+            33188,
+            16877,
+            16877,
+        ]
+    )
+    type(mystat).st_mode = mock_st_mode
+    mystat.st_size = 10
     remove = MagicMock(name="file.remove")
     with patch("os.walk", return_value=walker), patch(
         "os.path.islink", return_value=False
+    ), patch(
+        "os.stat", return_value=mystat
     ), patch("os.path.getatime", return_value=today_delta.total_seconds()), patch(
         "os.path.getsize", return_value=10
     ), patch.dict(

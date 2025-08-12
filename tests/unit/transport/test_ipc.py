@@ -8,15 +8,15 @@ import os
 import threading
 
 import pytest
-import tornado.gen
-import tornado.ioloop
-import tornado.testing
-from tornado.iostream import StreamClosedError
 
 import salt.config
 import salt.exceptions
+import tornado.gen
+import tornado.ioloop
+import tornado.testing
 import salt.transport.ipc
 import salt.utils.platform
+from tornado.iostream import StreamClosedError
 from tests.support.runtests import RUNTIME_VARS
 
 pytestmark = [
@@ -64,16 +64,12 @@ class IPCMessagePubSubCase(tornado.testing.AsyncTestCase):
         super().tearDown()
         try:
             self.pub_channel.close()
-        except RuntimeError as exc:
-            pass
         except OSError as exc:
             if exc.errno != errno.EBADF:
                 # If its not a bad file descriptor error, raise
                 raise
         try:
             self.sub_channel.close()
-        except RuntimeError as exc:
-            pass
         except OSError as exc:
             if exc.errno != errno.EBADF:
                 # If its not a bad file descriptor error, raise

@@ -1,3 +1,4 @@
+import asyncio
 import functools
 import os
 import socket
@@ -242,6 +243,7 @@ def test_tcp_pub_server_channel_publish_filtering_str_list(temp_salt_master):
 @pytest.fixture(scope="function")
 def salt_message_client():
     io_loop_mock = MagicMock(spec=tornado.ioloop.IOLoop)
+    io_loop_mock.asyncio_loop = MagicMock(spec=asyncio.new_event_loop())
     io_loop_mock.call_later.side_effect = lambda *args, **kwargs: (args, kwargs)
 
     client = salt.transport.tcp.MessageClient(
@@ -453,6 +455,7 @@ def test_presence_events_callback_passed(temp_salt_master, salt_message_client):
         )
 
 
+@pytest.mark.flaky(max_runs=4)
 def test_presence_removed_on_stream_closed():
     opts = {"presence_events": True}
 

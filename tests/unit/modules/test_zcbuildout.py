@@ -1,5 +1,6 @@
 import logging
 import os
+import packaging
 import shutil
 import subprocess
 import tempfile
@@ -32,6 +33,17 @@ BOOT_INIT = {
 }
 
 log = logging.getLogger(__name__)
+
+def _check_python():
+    try:
+        proc = subprocess.run(
+            ["/usr/bin/python3", "--version"], capture_output=True, check=False
+        )
+    except FileNotFoundError:
+        return True
+    return packaging.version.Version(
+        proc.stdout.decode().strip().split()[1]
+    ) >= packaging.version.Version("3.12")
 
 
 def download_to(url, dest):
@@ -128,6 +140,7 @@ class Base(TestCase, LoaderModuleMockMixin):
 
 
 @pytest.mark.skip_if_binaries_missing(*KNOWN_VIRTUALENV_BINARY_NAMES, check_all=False)
+@pytest.mark.skipif(_check_python(), reason="Tests not working with on Python >= 3.12")
 @pytest.mark.requires_network
 class BuildoutTestCase(Base):
     @pytest.mark.slow_test

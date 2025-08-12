@@ -35,11 +35,14 @@ import pytest
 
 from tests.support.case import SSHCase
 
-
 @pytest.mark.skip_on_windows
 @pytest.mark.skipif(
     "venv-salt-minion" in sys.executable,
     reason="Skipping for Salt Bundle (tests are not compatible)",
+)
+@pytest.mark.skipif(
+    'grains["osfullname"] == "openSUSE Tumbleweed"',
+    reason="saltfactories tries to generate not compatible keys"
 )
 class SSHCustomModuleTest(SSHCase):
     """

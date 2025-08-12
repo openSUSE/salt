@@ -22,7 +22,7 @@ import salt.config
 import salt.crypt
 import salt.defaults.exitcodes
 import salt.engines
-import salt.ext.tornado.stack_context # pylint: disable=F0401
+import salt.ext.tornado.stack_context
 import salt.loader
 import salt.minion
 import salt.payload
