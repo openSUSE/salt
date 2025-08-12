@@ -2,7 +2,6 @@
 Functions to work with JSON
 """
 
-
 import json
 import logging
 
@@ -25,69 +24,47 @@ def __split(raw):
     return raw.splitlines()
 
 
-def find_json(raw):
+def find_json(s):
+    """Pass in a string and load json within it.
+
+    The string may contain non-json text before and after the a json blob.
     """
-    Pass in a raw string and load the json when it starts. This allows for a
-    string to start with garbage and end with json but be cleanly loaded
-    """
-    ret = {}
-    lines = __split(raw)
-    lengths = list(map(len, lines))
-    starts = []
-    ends = []
 
-    # Search for possible starts end ends of the json fragments
-    for ind, _ in enumerate(lines):
-        line = lines[ind].lstrip()
-        line = line[0] if line else line
-        if line == "{" or line == "[":
-            starts.append((ind, line))
-        if line == "}" or line == "]":
-            ends.append((ind, line))
+    # Contains tuples (start_idx, end_idx, length) for JSON objects / lists
+    json_structures = []
 
-    # List all the possible pairs of starts and ends,
-    # and fill the length of each block to sort by size after
-    starts_ends = []
-    for start, start_br in starts:
-        for end, end_br in reversed(ends):
-            if end > start and (
-                (start_br == "{" and end_br == "}")
-                or (start_br == "[" and end_br == "]")
-            ):
-                starts_ends.append((start, end, sum(lengths[start : end + 1])))
+    # Track currently open objects
+    open_obj = []
+    open_list = []
 
-    # Iterate through all the possible pairs starting from the largest
-    starts_ends.sort(key=lambda x: (x[2], x[1] - x[0], x[0]), reverse=True)
-    for start, end, _ in starts_ends:
-        working = "\n".join(lines[start : end + 1])
+    # Iterate through all chars, saving JSON structures when they are closed
+    for idx, char in enumerate(s):
+        if char == "{":
+            open_obj.append(idx)
+        elif char == "}":
+            start = open_obj.pop()
+            json_structures.append((start, idx, idx - start))
+        elif char == "[":
+            open_list.append(idx)
+        elif char == "]":
+            start = open_list.pop()
+            json_structures.append((start, idx, idx - start))
+
+    def length_start(x):
+        """Sort key function. Sort by length, then by start index."""
+        return x[2], x[0]
+
+    json_structures.sort(key=length_start)
+
+    while json_structures:
+        start, end, _ = json_structures.pop()
+        substring = s[start : end + 1]
         try:
-            ret = json.loads(working)
-            return ret
-        except ValueError:
-            pass
-        # Try filtering non-JSON text right after the last closing curly brace
-        end_str = lines[end].lstrip()[0]
-        working = "\n".join(lines[start : end]) + end_str
-        try:
-            ret = json.loads(working)
+            ret = json.loads(substring)
             return ret
         except ValueError:
             continue
-
-    # Fall back to old implementation for backward compatibility
-    # excpecting json after the text
-    for ind, _ in enumerate(lines):
-        working = "\n".join(lines[ind:])
-        try:
-            ret = json.loads(working)
-        except ValueError:
-            continue
-        if ret:
-            return ret
-
-    if not ret:
-        # Not json, raise an error
-        raise ValueError
+    raise ValueError
 
 
 def import_json():
