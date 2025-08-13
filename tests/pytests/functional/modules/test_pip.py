@@ -15,8 +15,18 @@ from tests.support.helpers import VirtualEnv
                 reason="'pip==9.0.3' is not available on Py >= 3.10",
             ),
         ),
-        "pip<20.0",
-        "pip<21.0",
+        pytest.param(
+            "pip<20.0",
+            marks=pytest.mark.skipif(
+                sys.version_info >= (3, 12), reason="incompatible version: distutils removed on Python 3.12",
+            ),
+        ),
+        pytest.param(
+            "pip<21.0",
+            marks=pytest.mark.skipif(
+                sys.version_info >= (3, 12), reason="incompatible version: distutils removed on Python 3.12",
+            ),
+        ),
         "pip>=21.0",
     ),
 )
