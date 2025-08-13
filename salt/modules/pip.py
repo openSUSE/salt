@@ -429,6 +429,25 @@ def _format_env_vars(env_vars):
     return ret
 
 
+def _handle_extra_args(extra_args):
+    # These are arguments from the latest version of pip that
+    # have not yet been implemented in salt
+    for arg in extra_args:
+        # It is a keyword argument
+        if isinstance(arg, dict):
+            # There will only ever be one item in this dictionary
+            key, val = arg.popitem()
+            # Don't allow any recursion into keyword arg definitions
+            # Don't allow multiple definitions of a keyword
+            if isinstance(val, (dict, list)):
+                raise TypeError("Too many levels in: {}".format(key))
+            # This is a a normal one-to-one keyword argument
+            return [key, val]
+        # It is a positional argument, append it to the list
+        else:
+            return arg
+
+
 def install(
     pkgs=None,  # pylint: disable=R0912,R0913,R0914
     requirements=None,
@@ -997,22 +1016,11 @@ def install(
         cmd.extend(["--trusted-host", trusted_host])
 
     if extra_args:
-        # These are arguments from the latest version of pip that
-        # have not yet been implemented in salt
-        for arg in extra_args:
-            # It is a keyword argument
-            if isinstance(arg, dict):
-                # There will only ever be one item in this dictionary
-                key, val = arg.popitem()
-                # Don't allow any recursion into keyword arg definitions
-                # Don't allow multiple definitions of a keyword
-                if isinstance(val, (dict, list)):
-                    raise TypeError("Too many levels in: {}".format(key))
-                # This is a a normal one-to-one keyword argument
-                cmd.extend([key, val])
-            # It is a positional argument, append it to the list
-            else:
-                cmd.append(arg)
+        _args = _handle_extra_args(extra_args)
+        if isinstance(_args, list):
+            cmd.extend(_args)
+        else:
+            cmd.append(_args)
 
     cmd_kwargs = dict(saltenv=saltenv, use_vt=use_vt, runas=user)
 
@@ -1052,6 +1060,7 @@ def uninstall(
     cwd=None,
     saltenv="base",
     use_vt=False,
+    extra_args=None,
 ):
     """
     Uninstall packages individually or from a pip requirements file
@@ -1093,6 +1102,9 @@ def uninstall(
 
     use_vt
         Use VT terminal emulation (see output while installing)
+
+    extra_args
+        pip keyword and positional arguments not yet implemented in salt
 
     CLI Example:
 
@@ -1149,6 +1161,13 @@ def uninstall(
                 "'{}' is not a valid timeout, must be an integer".format(timeout)
             )
         cmd.extend(["--timeout", timeout])
+
+    if extra_args:
+        _args = _handle_extra_args(extra_args)
+        if isinstance(_args, list):
+            cmd.extend(_args)
+        else:
+            cmd.append(_args)
 
     if pkgs:
         if isinstance(pkgs, str):

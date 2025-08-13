@@ -1120,6 +1120,7 @@ def removed(
     user=None,
     cwd=None,
     use_vt=False,
+    extra_args=None,
 ):
     """
     Make sure that a package is not installed.
@@ -1132,6 +1133,22 @@ def removed(
         the pip executable or virtualenenv to use
     use_vt
         Use VT terminal emulation (see output while installing)
+    extra_args
+        pip keyword and positional arguments not yet implemented in salt
+
+        .. code-block:: yaml
+
+            pandas:
+              pip.removed:
+                - name: pandas
+                - extra_args:
+                  - --latest-pip-kwarg: param
+                  - --latest-pip-arg
+
+        .. warning::
+
+            If unsupported options are passed here that are not supported in a
+            minion's version of pip, a `No such option error` will be thrown.
     """
     ret = {"name": name, "result": None, "comment": "", "changes": {}}
 
@@ -1162,6 +1179,7 @@ def removed(
         user=user,
         cwd=cwd,
         use_vt=use_vt,
+        extra_args=extra_args,
     ):
         ret["result"] = True
         ret["changes"][name] = "Removed"

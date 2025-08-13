@@ -95,9 +95,16 @@ def test_pip_installed_removed(modules, states):
     name = "pudb"
     if name in modules.pip.list():
         pytest.skip("{} is already installed, uninstall to run this test".format(name))
-    ret = states.pip.installed(name=name)
+
+    # --break-system-package was introduced in pip 23.0.1
+    if salt.utils.versions.version_cmp(modules.pip.version(), "23.0.1") >= 0:
+        extra_args = ["--break-system-packages"]
+    else:
+        extra_args = []
+
+    ret = states.pip.installed(name=name, extra_args=extra_args)
     assert ret.result is True
-    ret = states.pip.removed(name=name)
+    ret = states.pip.removed(name=name, extra_args=extra_args)
     assert ret.result is True
 
 
@@ -256,7 +263,7 @@ pip.installed:
     assert ret["retcode"] == 0
 
     # Let's remove the pip binary
-    pip_bin = venv_dir / "bin" / "pip"
+    pip_bin = venv_dir / "bin" / "pip3"
     site_dir = modules.virtualenv.get_distribution_path(str(venv_dir), "pip")
     if salt.utils.platform.is_windows():
         pip_bin = venv_dir / "Scripts" / "pip.exe"
@@ -426,6 +433,9 @@ def test_issue_6912_wrong_owner_requirements_file(
 @pytest.mark.destructive_test
 @pytest.mark.slow_test
 @pytest.mark.skip_if_binaries_missing("virtualenv", reason="Needs virtualenv binary")
+@pytest.mark.skipif(
+    sys.version_info >= (3, 12), reason="incompatible version: distutils removed on Python 3.12",
+)
 def test_issue_6833_pip_upgrade_pip(tmp_path, create_virtualenv, modules, states):
     # Create the testing virtualenv
     if sys.platform == "win32":
@@ -465,7 +475,7 @@ def test_issue_6833_pip_upgrade_pip(tmp_path, create_virtualenv, modules, states
     assert ret["retcode"] == 0
     assert "Successfully installed pip" in ret["stdout"]
 
-    # Let's make sure we have pip 9.0.1 installed
+    # Let's make sure we have pip 19.3.1 installed
     assert modules.pip.list("pip", bin_env=venv_dir) == {"pip": "19.3.1"}
 
     # Now the actual pip upgrade pip test
