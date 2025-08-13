@@ -15,7 +15,7 @@ from tests.support.runtests import RUNTIME_VARS
 from tests.support.unit import TestCase
 
 try:
-    import tornado.curl_httpclient  # pylint: disable=unused-import
+    import salt.ext.tornado.curl_httpclient  # pylint: disable=unused-import
 
     HAS_CURL = True
 except ImportError:
@@ -207,7 +207,7 @@ class HTTPPostTestCase(TestCase):
 
     @pytest.mark.skipif(
         HAS_CURL is False,
-        reason="Missing prerequisites for tornado.curl_httpclient library",
+        reason="Missing prerequisites for salt.ext.tornado.curl_httpclient library",
     )
     def test_query_proxy(self):
         """
@@ -225,7 +225,7 @@ class HTTPPostTestCase(TestCase):
 
         mock_curl = MagicMock()
 
-        with patch("tornado.httpclient.HTTPClient.fetch", mock_curl):
+        with patch("salt.ext.tornado.httpclient.HTTPClient.fetch", mock_curl):
             ret = http.query(
                 self.post_web_root,
                 method="POST",

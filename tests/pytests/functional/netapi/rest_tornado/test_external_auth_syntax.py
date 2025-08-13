@@ -281,7 +281,6 @@ def client_config(client_config, external_auth):
 @pytest.fixture
 def http_server(io_loop, app, netapi_port, content_type_map):
     with netapi.TestsTornadoHttpServer(
-        io_loop=io_loop,
         app=app,
         port=netapi_port,
         client_headers={"Content-Type": content_type_map["form"]},

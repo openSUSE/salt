@@ -23,8 +23,8 @@ import xml.etree.ElementTree as ET
 import zlib
 
 import salt.config
-import tornado.httputil
-import tornado.simple_httpclient
+import salt.ext.tornado.httputil
+import salt.ext.tornado.simple_httpclient
 import salt.loader
 import salt.syspaths
 import salt.utils.args
@@ -38,7 +38,7 @@ import salt.utils.stringutils
 import salt.utils.xmlutil as xml
 import salt.utils.yaml
 import salt.version
-from tornado.httpclient import HTTPClient
+from salt.ext.tornado.httpclient import HTTPClient
 from salt.template import compile_template
 from salt.utils.decorators.jinja import jinja_filter
 
@@ -63,7 +63,7 @@ except ImportError:
 
 
 try:
-    import tornado.curl_httpclient
+    import salt.ext.tornado.curl_httpclient
 
     HAS_CURL_HTTPCLIENT = True
 except ImportError:
@@ -213,7 +213,7 @@ def query(
 
     # Some libraries don't support separation of url and GET parameters
     # Don't need a try/except block, since Salt depends on tornado
-    url_full = tornado.httputil.url_concat(url, params) if params else url
+    url_full = salt.ext.tornado.httputil.url_concat(url, params) if params else url
 
     if ca_bundle is None:
         ca_bundle = get_ca_bundle(opts)
@@ -564,16 +564,16 @@ def query(
                 log.error(ret["error"])
                 return ret
 
-            tornado.httpclient.AsyncHTTPClient.configure(
-                "tornado.curl_httpclient.CurlAsyncHTTPClient"
+            salt.ext.tornado.httpclient.AsyncHTTPClient.configure(
+                "salt.ext.tornado.curl_httpclient.CurlAsyncHTTPClient"
             )
             client_argspec = salt.utils.args.get_function_argspec(
-                tornado.curl_httpclient.CurlAsyncHTTPClient.initialize
+                salt.ext.tornado.curl_httpclient.CurlAsyncHTTPClient.initialize
             )
         else:
-            tornado.httpclient.AsyncHTTPClient.configure(None)
+            salt.ext.tornado.httpclient.AsyncHTTPClient.configure(None)
             client_argspec = salt.utils.args.get_function_argspec(
-                tornado.simple_httpclient.SimpleAsyncHTTPClient.initialize
+                salt.ext.tornado.simple_httpclient.SimpleAsyncHTTPClient.initialize
             )
 
         supports_max_body_size = "max_body_size" in client_argspec.args
@@ -612,7 +612,7 @@ def query(
                 else HTTPClient()
             )
             result = download_client.fetch(url_full, **req_kwargs)
-        except tornado.httpclient.HTTPError as exc:
+        except salt.ext.tornado.httpclient.HTTPError as exc:
             ret["status"] = exc.code
             ret["error"] = str(exc)
             return ret

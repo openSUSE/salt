@@ -89,7 +89,6 @@ def test_check_file_meta_binary_contents():
     UnicodeDecodeError when used with binary contents (issue #57184).
     """
     contents = b"\xf4\x91"
-    import pdb; pdb.set_trace()
     filemod.check_file_meta(
         "test",
         "test",

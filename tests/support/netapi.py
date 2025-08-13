@@ -18,13 +18,11 @@ log = logging.getLogger(__name__)
 @attr.s
 class TestsHttpClient:
     address = attr.ib()
-#    io_loop = attr.ib(repr=False)
     headers = attr.ib(default=None)
     client = attr.ib(init=False, repr=False)
 
     @client.default
     def _client_default(self):
-#        return AsyncHTTPClient(self.io_loop)
         return AsyncHTTPClient()
 
     async def fetch(self, path, **kwargs):
@@ -53,7 +51,6 @@ class TestsHttpClient:
 
 @attr.s
 class TestsTornadoHttpServer:
-    io_loop = attr.ib(repr=False)
     app = attr.ib()
     port = attr.ib(repr=False)
     protocol = attr.ib(default="http", repr=False)
@@ -81,7 +78,6 @@ class TestsTornadoHttpServer:
     @server.default
     def _server_default(self):
         server = HTTPServer(self.app, **self.http_server_options)
-#        server = HTTPServer(self.app, io_loop=self.io_loop, **self.http_server_options)
         server.add_sockets([self.sock])
         return server
 
@@ -89,7 +85,6 @@ class TestsTornadoHttpServer:
     def _client_default(self):
         return TestsHttpClient(
             address=self.address, headers=self.client_headers
-#            address=self.address, io_loop=self.io_loop, headers=self.client_headers
         )
 
     def __enter__(self):
@@ -97,10 +92,6 @@ class TestsTornadoHttpServer:
 
     def __exit__(self, *_):
         self.server.stop()
-#        try:
-#            self.io_loop.run_sync(self.server.close_all_connections, timeout=10)
-#        except IOLoopTimeoutError:
-#            pass
         self.client.client.close()
 
 
