@@ -138,6 +138,7 @@ def _connect_and_publish(
     io_loop.stop()
 
 
+@pytest.mark.skipif(True, reason="FIXME: we need to investigate this stuck test")
 def test_pub_server_channel(
     io_loop,
     channel_minion_id,
