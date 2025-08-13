@@ -1676,7 +1676,7 @@ class Minion(MinionBase):
                 timeout_handler = handle_timeout
 
             # pylint: disable=unexpected-keyword-arg
-            self._send_req_async(load, timeout, callback=lambda f: None)
+            self._send_req_async(load, timeout)
             # pylint: enable=unexpected-keyword-arg
         return True
 
@@ -2253,7 +2253,7 @@ class Minion(MinionBase):
         else:
             # pylint: disable=unexpected-keyword-arg
             ret_val = self._send_req_async(
-                load, timeout=timeout, callback=lambda f: None
+                load, timeout=timeout
             )
             # pylint: enable=unexpected-keyword-arg
 
@@ -2343,7 +2343,7 @@ class Minion(MinionBase):
         else:
             # pylint: disable=unexpected-keyword-arg
             ret_val = self._send_req_async(
-                load, timeout=timeout, callback=lambda f: None
+                load, timeout=timeout
             )
             # pylint: enable=unexpected-keyword-arg
 
