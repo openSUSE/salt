@@ -380,10 +380,16 @@ def get_distribution_path(venv, distribution):
     _verify_safe_py_code(distribution)
     bin_path = _verify_virtualenv(venv)
 
+    if sys.version_info >= (3, 8):
+        python_get_distribution = "import importlib.metadata; " \
+        "print(importlib.metadata.distribution('{}')._path.parent)".format(distribution)
+    else:
+        python_get_distribution = "import pkg_resources; " \
+        "print(pkg_resources.get_distribution('{}').location)".format(distribution)
+
     ret = __salt__["cmd.exec_code_all"](
         bin_path,
-        "import pkg_resources; "
-        "print(pkg_resources.get_distribution('{}').location)".format(distribution),
+        python_get_distribution
     )
 
     if ret["retcode"] != 0:
@@ -420,10 +426,16 @@ def get_resource_path(venv, package=None, resource=None):
     _verify_safe_py_code(package, resource)
     bin_path = _verify_virtualenv(venv)
 
+    if sys.version_info >= (3, 9):
+        python_resources_filename = "import importlib.metadata; " \
+        "print(importlib.resources.files(package) / resource)"
+    else:
+        python_resources_filename = "import pkg_resources; " \
+        "print(pkg_resources.resource_filename('{}', '{}'))".format(package, resource)
+
     ret = __salt__["cmd.exec_code_all"](
         bin_path,
-        "import pkg_resources; "
-        "print(pkg_resources.resource_filename('{}', '{}'))".format(package, resource),
+        python_resources_filename
     )
 
     if ret["retcode"] != 0:
