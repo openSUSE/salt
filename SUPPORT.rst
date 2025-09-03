@@ -21,5 +21,4 @@ guidelines for filing bug reports:
 `<https://docs.saltproject.io/en/master/topics/development/reporting_bugs.html>`_
 
 **Salt Project Support** - If you need dedicated, prioritized support, please
-consider taking a look at the Enterprise product:
-`VMware Salt <https://techdocs.broadcom.com/us/en/vmware-cis/other/vmware-salt/8-18.html>`__
+consider contacting `SUSE <https://www.suse.com/contact/>`_ for premium support plans.
