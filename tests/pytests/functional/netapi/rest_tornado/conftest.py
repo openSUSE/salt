@@ -16,7 +16,7 @@ def client_config(client_config, netapi_port):
 
 
 @pytest.fixture
-def app(app_urls, load_auth, client_config, minion_config):
+def app(app_urls, load_auth, client_config, minion_config, io_loop):
     return netapi.build_tornado_app(app_urls, load_auth, client_config, minion_config)
 
 
