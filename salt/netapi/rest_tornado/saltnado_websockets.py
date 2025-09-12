@@ -326,7 +326,7 @@ class AllEventsHandler(
             log.debug("Refusing websocket connection, bad token!")
             self.send_error(401)
             return
-        super().get(token)
+        return super().get(token)
 
     def open(self, token):  # pylint: disable=W0221
         """
