@@ -59,10 +59,8 @@ def test_publish_retry(salt_master, salt_minion_retry, salt_cli, salt_run_cli):
 @pytest.mark.slow_test
 @pytest.mark.flaky(max_runs=4)
 def test_pillar_timeout(salt_master_factory, tmp_path):
-    cmd = 'print(\'{"foo": "bar"}\');\n'
-
     with salt.utils.files.fopen(tmp_path / "script.py", "w") as fp:
-        fp.write(cmd)
+        fp.write('print(\'{"foo": "bar"}\');\n')
 
     master_overrides = {
         "ext_pillar": [
@@ -115,9 +113,8 @@ def test_pillar_timeout(salt_master_factory, tmp_path):
     with master.started(), minion1.started(), minion2.started(), minion3.started(), minion4.started(), (
         sls_tempfile
     ):
-        cmd = 'import time; time.sleep(6); print(\'{"foo": "bang"}\');\n'
         with salt.utils.files.fopen(tmp_path / "script.py", "w") as fp:
-            fp.write(cmd)
+            fp.write('import time; time.sleep(6); print(\'{"foo": "bang"}\');\n')
         proc = cli.run("state.sls", sls_name, minion_tgt="*")
         # At least one minion should have a Pillar timeout
         print(proc)
