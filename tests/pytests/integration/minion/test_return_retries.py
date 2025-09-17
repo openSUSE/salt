@@ -5,6 +5,7 @@ import pytest
 from saltfactories.utils import random_string
 
 from tests.support.helpers import dedent
+import salt.utils.files
 
 
 @pytest.fixture(scope="function")
@@ -57,14 +58,13 @@ def test_publish_retry(salt_master, salt_minion_retry, salt_cli, salt_run_cli):
 
 @pytest.mark.slow_test
 @pytest.mark.flaky(max_runs=4)
-def test_pillar_timeout(salt_master_factory):
-    cmd = (
-        sys.executable
-        + ' -c "import time; time.sleep(4.8); print(\'{\\"foo\\": \\"bar\\"}\');"'
-    ).strip()
+def test_pillar_timeout(salt_master_factory, tmp_path):
+    with salt.utils.files.fopen(tmp_path / "script.py", "w") as fp:
+        fp.write('print(\'{"foo": "bar"}\');\n')
+
     master_overrides = {
         "ext_pillar": [
-            {"cmd_json": cmd},
+            {"cmd_json": f"{sys.executable} {tmp_path / 'script.py'}"},
         ],
         "auto_accept": True,
         "worker_threads": 3,
@@ -110,7 +110,11 @@ def test_pillar_timeout(salt_master_factory):
     sls_tempfile = master.state_tree.base.temp_file(
         "{}.sls".format(sls_name), sls_contents
     )
-    with master.started(), minion1.started(), minion2.started(), minion3.started(), minion4.started(), sls_tempfile:
+    with master.started(), minion1.started(), minion2.started(), minion3.started(), minion4.started(), (
+        sls_tempfile
+    ):
+        with salt.utils.files.fopen(tmp_path / "script.py", "w") as fp:
+            fp.write('import time; time.sleep(6); print(\'{"foo": "bang"}\');\n')
         proc = cli.run("state.sls", sls_name, minion_tgt="*")
         # At least one minion should have a Pillar timeout
         print(proc)
