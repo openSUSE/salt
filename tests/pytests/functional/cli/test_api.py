@@ -17,7 +17,7 @@ def test_start_shutdown(monkeypatch, tmp_path):
         # testing environment will fail if we use default pidfile
         # overwrite sys.argv so salt-api does not use testing args
         monkeypatch.setattr(
-            "sys.argv", [sys.argv[0], "--pid-file", pid_file, "--log-file", log_file, "-d"]
+            "sys.argv", [sys.argv[0], "--pid-file", pid_file, "--log-file", log_file]
         )
         try:
             api.start()
