@@ -157,7 +157,7 @@ SSH_PY_CODE='import base64;
 if [ -n "$DEBUG" ]
     then set -x
 fi
-PYTHON_CMDS="/var/tmp/venv-salt-minion/bin/python python3.11 python3 /usr/libexec/platform-python python27 python2.7 python26 python2.6 python2 python"
+PYTHON_CMDS="/var/tmp/venv-salt-minion/bin/python {{PY3XX_CMD}}python3 /usr/libexec/platform-python python27 python2.7 python26 python2.6 python2 python"
 for py_cmd in $PYTHON_CMDS
 do
     if command -v "$py_cmd" >/dev/null 2>&1 && "$py_cmd" -c "import sys; sys.exit(not (sys.version_info >= (2, 6)));"
@@ -1533,6 +1533,7 @@ ARGS = {arguments}\n'''.format(
                 SSH_PY_CODE=py_code_enc,
                 HOST_PY_MAJOR=sys.version_info[0],
                 SET_PATH=self.set_path,
+                PY3XX_CMD=f"python3.{sys.version_info.minor} " if sys.version_info >= (3, 11) else "",
             )
         else:
             cmd = saltwinshell.gen_shim(py_code_enc)
