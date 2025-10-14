@@ -18,20 +18,19 @@ log = logging.getLogger(__name__)
 @attr.s
 class TestsHttpClient:
     address = attr.ib()
+    io_loop = attr.ib(repr=False)
     headers = attr.ib(default=None)
     client = attr.ib(init=False, repr=False)
 
     @client.default
     def _client_default(self):
-        return AsyncHTTPClient()
+        return AsyncHTTPClient(self.io_loop)
 
     async def fetch(self, path, **kwargs):
         if "headers" not in kwargs and self.headers:
             kwargs["headers"] = self.headers.copy()
         try:
-            response = await self.client.fetch(
-                "{}{}".format(self.address, path), **kwargs
-            )
+            response = await self.client.fetch(f"{self.address}{path}", **kwargs)
             return self._decode_body(response)
         except HTTPError as exc:
             exc.response = self._decode_body(exc.response)
@@ -51,6 +50,7 @@ class TestsHttpClient:
 
 @attr.s
 class TestsTornadoHttpServer:
+    io_loop = attr.ib(repr=False)
     app = attr.ib()
     port = attr.ib(repr=False)
     protocol = attr.ib(default="http", repr=False)
@@ -73,7 +73,7 @@ class TestsTornadoHttpServer:
 
     @address.default
     def _address_default(self):
-        return "{}://127.0.0.1:{}".format(self.protocol, self.port)
+        return f"{self.protocol}://127.0.0.1:{self.port}"
 
     @server.default
     def _server_default(self):
@@ -84,7 +84,7 @@ class TestsTornadoHttpServer:
     @client.default
     def _client_default(self):
         return TestsHttpClient(
-            address=self.address, headers=self.client_headers
+            address=self.address, io_loop=self.io_loop, headers=self.client_headers
         )
 
     def __enter__(self):
@@ -92,6 +92,10 @@ class TestsTornadoHttpServer:
 
     def __exit__(self, *_):
         self.server.stop()
+        try:
+            self.io_loop.run_sync(self.server.close_all_connections, timeout=10)
+        except IOLoopTimeoutError:
+            pass
         self.client.client.close()
 
 

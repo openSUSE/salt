@@ -34,7 +34,7 @@ def client_headers(auth_token, content_type_map):
 @pytest.fixture
 def http_server(io_loop, app, client_headers, netapi_port):
     with netapi.TestsTornadoHttpServer(
-       app=app, port=netapi_port, client_headers=client_headers
+       io_loop=io_loop, app=app, port=netapi_port, client_headers=client_headers
     ) as server:
         yield server
 
