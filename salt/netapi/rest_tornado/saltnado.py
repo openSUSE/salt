@@ -403,6 +403,10 @@ class BaseSaltAPIHandler(tornado.web.RequestHandler):  # pylint: disable=W0223
         ("application/x-yaml", salt.utils.yaml.safe_dump),
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._auto_finish = False
+
     def _verify_client(self, low):
         """
         Verify that the client is in fact one we have
@@ -659,6 +663,7 @@ class SaltAuthHandler(BaseSaltAPIHandler):  # pylint: disable=W0223
         ret = {"status": "401 Unauthorized", "return": "Please log in"}
 
         self.write(self.serialize(ret))
+        self.finish()
 
     # TODO: make asynchronous? Underlying library isn't... and we ARE making disk calls :(
     def post(self):  # pylint: disable=arguments-differ
@@ -785,6 +790,7 @@ class SaltAuthHandler(BaseSaltAPIHandler):  # pylint: disable=W0223
         }
 
         self.write(self.serialize(ret))
+        self.finish()
 
 
 class SaltAPIHandler(BaseSaltAPIHandler):  # pylint: disable=W0223
@@ -828,6 +834,7 @@ class SaltAPIHandler(BaseSaltAPIHandler):  # pylint: disable=W0223
         """
         ret = {"clients": list(self.saltclients.keys()), "return": "Welcome"}
         self.write(self.serialize(ret))
+        self.finish()
 
     @tornado.gen.coroutine
     def post(self):  # pylint: disable=arguments-differ
@@ -1790,6 +1797,7 @@ class WebhookSaltAPIHandler(SaltAPIHandler):  # pylint: disable=W0223
         )
 
         self.write(self.serialize({"success": ret}))
+        self.finish()
 
 
 def _check_cors_origin(origin, allowed_origins):
