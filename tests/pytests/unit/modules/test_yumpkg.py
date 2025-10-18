@@ -5,7 +5,7 @@ import pytest
 
 import salt.modules.cmdmod as cmdmod
 import salt.modules.pkg_resource as pkg_resource
-import salt.modules.rpm_lowpkg as rpm
+import salt.modules.rpm_lowpkg as rpm_lowpkg
 import salt.modules.yumpkg as yumpkg
 import salt.utils.platform
 from salt.exceptions import CommandExecutionError, SaltInvocationError
@@ -1050,7 +1050,7 @@ def test_remove_with_epoch():
     )
     salt_mock = {
         "cmd.run_all": cmd_mock,
-        "lowpkg.version_cmp": rpm.version_cmp,
+        "lowpkg.version_cmp": rpm_lowpkg.version_cmp,
         "pkg_resource.parse_targets": MagicMock(
             return_value=({name: installed}, "repository")
         ),
@@ -1095,7 +1095,7 @@ def test_remove_with_epoch_and_arch_info():
     )
     salt_mock = {
         "cmd.run_all": cmd_mock,
-        "lowpkg.version_cmp": rpm.version_cmp,
+        "lowpkg.version_cmp": rpm_lowpkg.version_cmp,
         "pkg_resource.parse_targets": MagicMock(
             return_value=({name_and_arch: installed}, "repository")
         ),
@@ -1137,7 +1137,7 @@ def test_remove_with_wildcard():
     )
     salt_mock = {
         "cmd.run_all": cmd_mock,
-        "lowpkg.version_cmp": rpm.version_cmp,
+        "lowpkg.version_cmp": rpm_lowpkg.version_cmp,
         "pkg_resource.parse_targets": MagicMock(
             return_value=({name: installed}, "repository")
         ),
@@ -1177,7 +1177,7 @@ def test_install_with_epoch():
     )
     salt_mock = {
         "cmd.run_all": cmd_mock,
-        "lowpkg.version_cmp": rpm.version_cmp,
+        "lowpkg.version_cmp": rpm_lowpkg.version_cmp,
         "pkg_resource.parse_targets": MagicMock(
             return_value=({name: new}, "repository")
         ),
@@ -1230,7 +1230,7 @@ def test_install_error_reporting():
     )
     salt_mock = {
         "cmd.run_all": cmdmod.run_all,
-        "lowpkg.version_cmp": rpm.version_cmp,
+        "lowpkg.version_cmp": rpm_lowpkg.version_cmp,
         "pkg_resource.parse_targets": MagicMock(
             return_value=({name: new}, "repository")
         ),
@@ -1264,7 +1264,7 @@ def test_remove_not_installed():
     )
     salt_mock = {
         "cmd.run_all": cmd_mock,
-        "lowpkg.version_cmp": rpm.version_cmp,
+        "lowpkg.version_cmp": rpm_lowpkg.version_cmp,
         "pkg_resource.parse_targets": MagicMock(
             return_value=({name: None}, "repository")
         ),
@@ -2140,7 +2140,7 @@ def test_59705_version_as_accidental_float_should_become_text(
         {
             "cmd.run": MagicMock(return_value=""),
             "cmd.run_all": cmd_mock,
-            "lowpkg.version_cmp": rpm.version_cmp,
+            "lowpkg.version_cmp": rpm_lowpkg.version_cmp,
             "pkg_resource.parse_targets": fake_parse,
             "pkg_resource.format_pkg_list": pkg_resource.format_pkg_list,
         },
