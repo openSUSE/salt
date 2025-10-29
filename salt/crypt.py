@@ -243,7 +243,7 @@ def sign_message(privkey_path, message, passphrase=None):
         md = EVP.MessageDigest("sha1")
         md.update(salt.utils.stringutils.to_bytes(message))
         digest = md.final()
-        return key.sign(digest)
+        return key.sign(digest, algo="sha1")
     else:
         signer = PKCS1_v1_5.new(key)
         return signer.sign(SHA.new(salt.utils.stringutils.to_bytes(message)))
@@ -262,7 +262,7 @@ def verify_signature(pubkey_path, message, signature):
         md.update(salt.utils.stringutils.to_bytes(message))
         digest = md.final()
         try:
-            return pubkey.verify(digest, signature)
+            return pubkey.verify(digest, signature, algo="sha1")
         except RSA.RSAError as exc:
             log.debug("Signature verification failed: %s", exc.args[0])
             return False
