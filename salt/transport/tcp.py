@@ -597,7 +597,10 @@ class MessageClient:
         if self._closing:
             return
         self._closing = True
-        self.io_loop.add_timeout(1, self.check_close)
+        try:
+            self.io_loop.add_timeout(1, self.check_close)
+        except RuntimeError:
+            pass
 
     @tornado.gen.coroutine
     def check_close(self):
@@ -607,7 +610,10 @@ class MessageClient:
             self._closing = False
             self._closed = True
         else:
-            self.io_loop.add_timeout(1, self.check_close)
+            try:
+                self.io_loop.add_timeout(1, self.check_close)
+            except RuntimeError:
+                pass
 
     # pylint: disable=W1701
     def __del__(self):

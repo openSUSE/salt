@@ -619,8 +619,11 @@ def query(
         except (socket.herror, OSError, socket.timeout, socket.gaierror) as exc:
             if status is True:
                 ret["status"] = 0
-            ret["error"] = str(exc)
-            log.debug("Cannot perform 'http.query': %s - %s", url_full, ret["error"])
+            if not raise_error:
+                ret["body"] = None
+            else:
+                ret["error"] = str(exc)
+                log.debug("Cannot perform 'http.query': %s - %s", url_full, ret["error"])
             return ret
 
         if stream is True or handle is True:
