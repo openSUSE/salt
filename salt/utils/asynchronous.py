@@ -11,6 +11,8 @@ import threading
 import tornado.concurrent
 import tornado.ioloop
 
+from salt import USE_VENDORED_TORNADO
+
 log = logging.getLogger(__name__)
 
 
@@ -23,12 +25,18 @@ def current_ioloop(io_loop):
         orig_loop = tornado.ioloop.IOLoop.current()
     except RuntimeError:
         orig_loop = None
-    asyncio.set_event_loop(io_loop.asyncio_loop)
+    if USE_VENDORED_TORNADO:
+        io_loop.make_current()
+    else:
+        asyncio.set_event_loop(io_loop.asyncio_loop)
     try:
         yield
     finally:
         if orig_loop:
-            asyncio.set_event_loop(orig_loop.asyncio_loop)
+            if USE_VENDORED_TORNADO:
+                orig_loop.make_current()
+            else:
+                asyncio.set_event_loop(orig_loop.asyncio_loop)
         else:
             asyncio.set_event_loop(None)
 
@@ -57,10 +65,13 @@ class SyncWrapper:
         close_methods=None,
         loop_kwarg=None,
     ):
-        self.asyncio_loop = asyncio.new_event_loop()
-        self.io_loop = tornado.ioloop.IOLoop(
-            asyncio_loop=self.asyncio_loop, make_current=False
-        )
+        if USE_VENDORED_TORNADO:
+            self.io_loop = tornado.ioloop.IOLoop()
+        else:
+            self.asyncio_loop = asyncio.new_event_loop()
+            self.io_loop = tornado.ioloop.IOLoop(
+                asyncio_loop=self.asyncio_loop, make_current=False
+            )
         if args is None:
             args = []
         if kwargs is None:
@@ -117,7 +128,8 @@ class SyncWrapper:
         except (KeyError, RuntimeError):
             pass
         try:
-            self.asyncio_loop.close()
+            if hasattr(self, "asyncio_loop"):
+                self.asyncio_loop.close()
         except (KeyError, RuntimeError):
             pass
 
@@ -129,6 +141,10 @@ class SyncWrapper:
 
     def _wrap(self, key):
         def wrap(*args, **kwargs):
+            if USE_VENDORED_TORNADO:
+                return self.io_loop.run_sync(
+                    lambda: getattr(self.obj, key)(*args, **kwargs)
+                )
             try:
                 asyncio.get_running_loop()
             except RuntimeError:
