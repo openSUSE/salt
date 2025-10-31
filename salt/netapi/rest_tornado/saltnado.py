@@ -1797,6 +1797,7 @@ class WebhookSaltAPIHandler(SaltAPIHandler):  # pylint: disable=W0223
         )
 
         self.write(self.serialize({"success": ret}))
+        self.finish()
 
 
 def _check_cors_origin(origin, allowed_origins):
