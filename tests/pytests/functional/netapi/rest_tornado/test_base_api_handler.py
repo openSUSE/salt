@@ -27,6 +27,7 @@ class StubHandler(saltnado.BaseSaltAPIHandler):  # pylint: disable=abstract-meth
             ret_dict[attr] = getattr(self, attr)
 
         self.write(self.serialize(ret_dict))
+        self.finish()
 
 
 @pytest.fixture
@@ -37,7 +38,7 @@ def app_urls():
     ]
 
 
-async def test_accept_content_type(http_client, content_type_map, subtests):
+async def test_accept_content_type(http_client, content_type_map, subtests, io_loop):
     """
     Test the base handler's accept picking
     """
@@ -94,7 +95,7 @@ async def test_token(http_client):
 
     # send a token as a cookie
     response = await http_client.fetch(
-        "/", headers={"Cookie": "{}=foo".format(saltnado.AUTH_COOKIE_NAME)}
+        "/", headers={"Cookie": f"{saltnado.AUTH_COOKIE_NAME}=foo"}
     )
     token = salt.utils.json.loads(response.body)["token"]
     assert token == "foo"
@@ -104,7 +105,7 @@ async def test_token(http_client):
         "/",
         headers={
             saltnado.AUTH_TOKEN_HEADER: "foo",
-            "Cookie": "{}=bar".format(saltnado.AUTH_COOKIE_NAME),
+            "Cookie": f"{saltnado.AUTH_COOKIE_NAME}=bar",
         },
     )
     token = salt.utils.json.loads(response.body)["token"]
@@ -367,7 +368,7 @@ async def test_cors_preflight_request(http_client, app):
     assert response.code == 204
 
 
-async def test_cors_origin_url_with_arguments(app, http_client):
+async def test_cors_origin_url_with_arguments(io_loop, app, http_client):
     """
     Check that preflight requests works with url with components
     like jobs or minions endpoints.
