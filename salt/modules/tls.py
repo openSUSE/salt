@@ -1603,12 +1603,13 @@ def create_pkcs12(ca_name, CN, passphrase="", cacert_path=None, replace=False):
     if not replace and os.path.exists(p12_path):
         return 'Certificate "{}" already exists'.format(CN)
 
-    # FIXME: error handling for load_pem_x509_certificate()
     try:
         with salt.utils.files.fopen(ca_cert_path, "rb") as fhr:
             ca_cert = cryptography.x509.load_pem_x509_certificate(fhr.read())
     except OSError:
         return 'There is no CA named "{}"'.format(ca_name)
+    except ValueError as e:
+        return f'Could not load CA {ca_cert_path}: {e}'
 
     try:
         with salt.utils.files.fopen(cert_path, "rb") as fhr:
@@ -1620,6 +1621,8 @@ def create_pkcs12(ca_name, CN, passphrase="", cacert_path=None, replace=False):
             )
     except OSError:
         return 'There is no certificate that matches the CN "{}"'.format(CN)
+    except ValueError as e:
+        return f'Could not load certificate {cert_path}: {e}'
 
     if passphrase:
         encryption_algorithm = cryptography_serialization.BestAvailableEncryption(
