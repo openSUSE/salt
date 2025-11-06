@@ -101,6 +101,11 @@ try:
 except ImportError:
     HAS_WIN_FUNCTIONS = False
 
+from salt import USE_VENDORED_TORNADO
+if USE_VENDORED_TORNADO:
+    from salt.ext.tornado.stack_context import ExceptionStackContext
+else:
+    from contextlib import nullcontext as ExceptionStackContext
 
 log = logging.getLogger(__name__)
 
@@ -1675,9 +1680,10 @@ class Minion(MinionBase):
 
                 timeout_handler = handle_timeout
 
-            # pylint: disable=unexpected-keyword-arg
-            self._send_req_async(load, timeout)
-            # pylint: enable=unexpected-keyword-arg
+            with ExceptionStackContext(timeout_handler):
+                # pylint: disable=unexpected-keyword-arg
+                self._send_req_async(load, timeout)
+                # pylint: enable=unexpected-keyword-arg
         return True
 
     @tornado.gen.coroutine
@@ -2251,11 +2257,12 @@ class Minion(MinionBase):
                 timeout_handler()
                 return ""
         else:
-            # pylint: disable=unexpected-keyword-arg
-            ret_val = self._send_req_async(
-                load, timeout=timeout
-            )
-            # pylint: enable=unexpected-keyword-arg
+            with ExceptionStackContext(timeout_handler):
+                # pylint: disable=unexpected-keyword-arg
+                ret_val = self._send_req_async(
+                    load, timeout=timeout
+                )
+                # pylint: enable=unexpected-keyword-arg
 
         log.trace("ret_val = %s", ret_val)  # pylint: disable=no-member
         return ret_val
@@ -2341,11 +2348,12 @@ class Minion(MinionBase):
                 timeout_handler()
                 return ""
         else:
-            # pylint: disable=unexpected-keyword-arg
-            ret_val = self._send_req_async(
-                load, timeout=timeout
-            )
-            # pylint: enable=unexpected-keyword-arg
+            with ExceptionStackContext(timeout_handler):
+                # pylint: disable=unexpected-keyword-arg
+                ret_val = self._send_req_async(
+                    load, timeout=timeout
+                )
+                # pylint: enable=unexpected-keyword-arg
 
         log.trace("ret_val = %s", ret_val)  # pylint: disable=no-member
         return ret_val
@@ -3270,18 +3278,19 @@ class Syndic(Minion):
             log.warning("Unable to forward pub data: %s", args[1])
             return True
 
-        self.local.pub_async(
-            data["tgt"],
-            data["fun"],
-            data["arg"],
-            data["tgt_type"],
-            data["ret"],
-            data["jid"],
-            data["to"],
-            io_loop=self.io_loop,
-            callback=lambda _: None,
-            **kwargs
-        )
+        with ExceptionStackContext(timeout_handler):
+            self.local.pub_async(
+                data["tgt"],
+                data["fun"],
+                data["arg"],
+                data["tgt_type"],
+                data["ret"],
+                data["jid"],
+                data["to"],
+                io_loop=self.io_loop,
+                callback=lambda _: None,
+                **kwargs
+            )
 
     def _send_req_sync(self, load, timeout):
         if self.opts["minion_sign_messages"]:

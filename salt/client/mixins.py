@@ -29,6 +29,12 @@ import salt.utils.state
 import salt.utils.user
 import salt.utils.versions
 
+from salt import USE_VENDORED_TORNADO
+if USE_VENDORED_TORNADO:
+    from salt.ext.tornado.stack_context import StackContext
+else:
+    from contextlib import nullcontext as StackContext
+
 log = logging.getLogger(__name__)
 
 CLIENT_INTERNAL_KEYWORDS = frozenset(
@@ -378,26 +384,27 @@ class SyncClientMixin(ClientStateMixin):
                 data["fun_args"] = list(args) + ([kwargs] if kwargs else [])
                 func_globals["__jid_event__"].fire_event(data, "new")
 
-                func = self.functions[fun]
-                try:
-                    data["return"] = func(*args, **kwargs)
-                except TypeError as exc:
-                    data[
-                        "return"
-                    ] = "\nPassed invalid arguments: {}\n\nUsage:\n{}".format(
-                        exc, func.__doc__
-                    )
-                try:
-                    data["success"] = self.context.get("retcode", 0) == 0
+                with StackContext(self.functions.context_dict.clone):
+                    func = self.functions[fun]
+                    try:
+                        data["return"] = func(*args, **kwargs)
+                    except TypeError as exc:
+                        data[
+                            "return"
+                        ] = "\nPassed invalid arguments: {}\n\nUsage:\n{}".format(
+                            exc, func.__doc__
+                        )
+                    try:
+                        data["success"] = self.context.get("retcode", 0) == 0
 
-                except AttributeError:
-                    # Assume a True result if no context attribute
-                    data["success"] = True
-                if isinstance(data["return"], dict) and "data" in data["return"]:
-                    # some functions can return boolean values
-                    data["success"] = salt.utils.state.check_result(
-                        data["return"]["data"]
-                    )
+                    except AttributeError:
+                        # Assume a True result if no context attribute
+                        data["success"] = True
+                    if isinstance(data["return"], dict) and "data" in data["return"]:
+                        # some functions can return boolean values
+                        data["success"] = salt.utils.state.check_result(
+                            data["return"]["data"]
+                        )
 
             except (Exception, SystemExit) as ex:  # pylint: disable=broad-except
                 if isinstance(ex, salt.exceptions.NotImplemented):

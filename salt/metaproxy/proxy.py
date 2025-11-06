@@ -52,6 +52,12 @@ from salt.minion import ProxyMinion
 from salt.utils.event import tagify
 from salt.utils.process import SignalHandlingProcess, default_signals
 
+from salt import USE_VENDORED_TORNADO
+if USE_VENDORED_TORNADO:
+    from salt.ext.tornado.stack_context import StackContext
+else:
+    from contextlib import nullcontext as StackContext
+
 log = logging.getLogger(__name__)
 
 
@@ -380,10 +386,11 @@ def target(cls, minion_instance, opts, data, connected):
                 opts["cachedir"], uid=uid
             )
 
-    if isinstance(data["fun"], tuple) or isinstance(data["fun"], list):
-        ProxyMinion._thread_multi_return(minion_instance, opts, data)
-    else:
-        ProxyMinion._thread_return(minion_instance, opts, data)
+    with StackContext(minion_instance.ctx):
+        if isinstance(data["fun"], tuple) or isinstance(data["fun"], list):
+            ProxyMinion._thread_multi_return(minion_instance, opts, data)
+        else:
+            ProxyMinion._thread_return(minion_instance, opts, data)
 
 
 def thread_return(cls, minion_instance, opts, data):
