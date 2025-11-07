@@ -1,7 +1,7 @@
 import multiprocessing
 import time
 
-import salt.ext.tornado.gen
+import tornado.gen
 import salt.transport.tcp
 
 
@@ -47,7 +47,7 @@ async def test_pub_channel(master_opts, minion_opts, io_loop):
     start = time.monotonic()
     try:
         while not publishes:
-            await salt.ext.tornado.gen.sleep(0.3)
+            await tornado.gen.sleep(0.3)
             if time.monotonic() - start > 30:
                 assert False, "Message not published after 30 seconds"
     finally:

@@ -16,6 +16,8 @@ import tornado.ioloop
 
 import salt.utils.asynchronous as asynchronous
 
+from salt import USE_VENDORED_TORNADO
+
 class _LoopProbe:
     """
     Minimal async helper whose coroutine calls ``asyncio.get_event_loop``
@@ -87,7 +89,11 @@ def test_helpers():
     """
     Test that the helper classes do what we expect within a regular asynchronous env
     """
-    io_loop = tornado.ioloop.IOLoop(make_current=False)
+    if USE_VENDORED_TORNADO:
+        io_loop = tornado.ioloop.IOLoop(make_current=False)
+    else:
+        asyncio_loop = asyncio.new_event_loop()
+        io_loop = tornado.ioloop.IOLoop(asyncio_loop=asyncio_loop, make_current=False)
     ret = io_loop.run_sync(lambda: HelperA().sleep())
     assert ret is True
 

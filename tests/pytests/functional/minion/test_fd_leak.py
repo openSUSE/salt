@@ -28,7 +28,7 @@
 import psutil
 import pytest
 
-import salt.ext.tornado.gen
+import tornado.gen
 import salt.minion
 
 # Thresholds for the heuristic described in the module docstring.
@@ -93,13 +93,13 @@ def test_minion_connection_failure_no_fd_leak(io_loop, minion_opts):
     async def run_monitoring():
         manager.io_loop.spawn_callback(manager._connect_minion, minion)
 
-        await salt.ext.tornado.gen.sleep(_SETTLE_SEC)
+        await tornado.gen.sleep(_SETTLE_SEC)
         initial_fds = proc.num_fds()
         prev_fds = initial_fds
         consecutive_increases = 0
 
         for i in range(_MONITOR_CYCLES):
-            await salt.ext.tornado.gen.sleep(_CYCLE_SEC)
+            await tornado.gen.sleep(_CYCLE_SEC)
             current_fds = proc.num_fds()
 
             if current_fds > initial_fds + _FD_LEAK_HARD_CAP_ABOVE_BASELINE:

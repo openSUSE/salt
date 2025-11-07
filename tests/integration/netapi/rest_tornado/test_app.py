@@ -5,11 +5,11 @@ import time
 import pytest
 
 import salt.auth
-import salt.ext.tornado.escape
-import salt.ext.tornado.web
+import tornado.escape
+import tornado.web
 import salt.utils.json
 import salt.utils.stringutils
-from salt.ext.tornado.testing import AsyncHTTPTestCase
+from tornado.testing import AsyncHTTPTestCase
 from salt.netapi.rest_tornado import saltnado
 from tests.support.helpers import TstSuiteLoggingHandler, patched_environ
 from tests.support.mixins import AdaptedConfigurationTestCaseMixin
@@ -96,7 +96,7 @@ class SaltnadoIntegrationTestsBase(
             del self.patched_environ
 
     def build_tornado_app(self, urls):
-        application = salt.ext.tornado.web.Application(urls, debug=True)
+        application = tornado.web.Application(urls, debug=True)
 
         application.auth = self.auth
         application.opts = self.opts
@@ -112,7 +112,7 @@ class SaltnadoIntegrationTestsBase(
             if response.headers.get("Content-Type") == "application/json":
                 response._body = response.body.decode("utf-8")
             else:
-                response._body = salt.ext.tornado.escape.native_str(response.body)
+                response._body = tornado.escape.native_str(response.body)
         return response
 
     def fetch(self, path, **kwargs):

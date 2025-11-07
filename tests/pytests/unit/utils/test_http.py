@@ -172,9 +172,9 @@ def test_query_tornado_httperror_no_response():
     This happens on connection-level failures such as a connect timeout (HTTP 599)
     where no HTTP response is ever received from the server.
     """
-    import salt.ext.tornado.httpclient
+    import tornado.httpclient
 
-    http_error = salt.ext.tornado.httpclient.HTTPError(599, "Timeout while connecting")
+    http_error = tornado.httpclient.HTTPError(599, "Timeout while connecting")
     assert http_error.response is None
 
     mock_client = MagicMock()

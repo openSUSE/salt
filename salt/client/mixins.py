@@ -14,7 +14,6 @@ from collections.abc import Mapping, MutableMapping
 import salt._logging
 import salt.channel.client
 import salt.exceptions
-import salt.ext.tornado.stack_context
 import salt.minion
 import salt.output
 import salt.utils.args
@@ -29,6 +28,12 @@ import salt.utils.process
 import salt.utils.state
 import salt.utils.user
 import salt.utils.versions
+
+from salt import USE_VENDORED_TORNADO
+if USE_VENDORED_TORNADO:
+    from salt.ext.tornado.stack_context import StackContext
+else:
+    from contextlib import nullcontext as StackContext
 
 log = logging.getLogger(__name__)
 
@@ -379,10 +384,7 @@ class SyncClientMixin(ClientStateMixin):
                 data["fun_args"] = list(args) + ([kwargs] if kwargs else [])
                 func_globals["__jid_event__"].fire_event(data, "new")
 
-                # Initialize a context for executing the method.
-                with salt.ext.tornado.stack_context.StackContext(
-                    self.functions.context_dict.clone
-                ):
+                with StackContext(self.functions.context_dict.clone):
                     func = self.functions[fun]
                     try:
                         data["return"] = func(*args, **kwargs)
@@ -394,6 +396,7 @@ class SyncClientMixin(ClientStateMixin):
                         )
                     try:
                         data["success"] = self.context.get("retcode", 0) == 0
+
                     except AttributeError:
                         # Assume a True result if no context attribute
                         data["success"] = True
@@ -402,6 +405,7 @@ class SyncClientMixin(ClientStateMixin):
                         data["success"] = salt.utils.state.check_result(
                             data["return"]["data"]
                         )
+
             except (Exception, SystemExit) as ex:  # pylint: disable=broad-except
                 if isinstance(ex, salt.exceptions.NotImplemented):
                     data["return"] = str(ex)

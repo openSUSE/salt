@@ -5,7 +5,7 @@ import pytest
 
 import salt.transport.ipc
 import salt.utils.platform
-from salt.ext.tornado import locks
+from tornado import locks
 
 pytestmark = [
     # Windows does not support POSIX IPC

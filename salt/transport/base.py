@@ -1,8 +1,8 @@
 import traceback
 import warnings
 
-import salt.ext.tornado.concurrent
-import salt.ext.tornado.gen
+import tornado.concurrent
+import tornado.gen
 
 TRANSPORTS = (
     "zeromq",
@@ -145,7 +145,7 @@ class RequestClient(Transport):
     def __init__(self, opts, io_loop, **kwargs):
         super().__init__()
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def send(self, load, timeout=60):
         """
         Send a request message and return the reply from the server.
@@ -166,7 +166,7 @@ class RequestClient(Transport):
         IOLoop thread.
         """
         self.close()
-        fut = salt.ext.tornado.concurrent.Future()
+        fut = tornado.concurrent.Future()
         fut.set_result(None)
         return fut
 
@@ -265,7 +265,7 @@ class PublishClient(Transport):
         """
         raise NotImplementedError
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def connect(  # pylint: disable=arguments-differ
         self, publish_port, connect_callback=None, disconnect_callback=None
     ):
