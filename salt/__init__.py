@@ -64,7 +64,7 @@ if sys.platform == "win32":
     _ssl.SSLContext._load_windows_store_certs = _salt_safe_load_windows_store_certs
     del _ssl, _salt_safe_load_windows_store_certs
 
-USE_VENDORED_TORNADO = True
+USE_VENDORED_TORNADO = sys.version_info < (3,12)
 
 
 class TornadoImporter:

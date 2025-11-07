@@ -84,7 +84,7 @@ def test_batch_start_on_batch_presence_ping_timeout(batch):
     future = tornado.gen.Future()
     future.set_result({})
     with patch.object(batch, "events_channel", MagicMock()), patch(
-        "salt.ext.tornado.gen.sleep", return_value=future
+        "tornado.gen.sleep", return_value=future
     ), patch.object(batch, "io_loop", MagicMock()), patch.object(
         batch, "start_batch", return_value=future
     ) as start_batch_mock:
@@ -114,7 +114,7 @@ def test_batch_start_on_gather_job_timeout(batch):
     future_ret.set_result({"minions": ["foo", "bar"]})
     batch.batch_presence_ping_timeout = None
     with patch.object(batch, "events_channel", MagicMock()), patch(
-        "salt.ext.tornado.gen.sleep", return_value=future
+        "tornado.gen.sleep", return_value=future
     ), patch.object(batch, "io_loop", MagicMock()), patch.object(
         batch, "start_batch", return_value=future
     ), patch.object(

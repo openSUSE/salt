@@ -9,8 +9,8 @@ import pytest
 
 import salt.client
 import salt.config
-import salt.ext.tornado.gen
-import salt.ext.tornado.ioloop
+import tornado.gen
+import tornado.ioloop
 import salt.utils.platform
 from salt import client
 from salt.exceptions import (
@@ -411,14 +411,14 @@ def test_pub_async_default_timeout(master_opts):
             with patch(
                 "salt.channel.client.AsyncReqChannel.factory"
             ) as mock_channel_factory:
-                import salt.ext.tornado.gen
+                import tornado.gen
 
                 mock_channel = MagicMock()
                 mock_channel.__enter__ = MagicMock(return_value=mock_channel)
                 mock_channel.__exit__ = MagicMock(return_value=False)
 
                 # Mock the async send to return a completed Future
-                future = salt.ext.tornado.gen.maybe_future(
+                future = tornado.gen.maybe_future(
                     {"load": {"jid": "test_jid", "minions": ["minion1"]}}
                 )
                 mock_channel.send = MagicMock(return_value=future)
@@ -426,7 +426,7 @@ def test_pub_async_default_timeout(master_opts):
 
                 # Mock the event system
                 local_client.event.connect_pub = MagicMock(
-                    return_value=salt.ext.tornado.gen.maybe_future(True)
+                    return_value=tornado.gen.maybe_future(True)
                 )
 
                 # Mock _prep_pub to capture the timeout value
@@ -458,14 +458,14 @@ def test_pub_async_explicit_timeout(master_opts):
             with patch(
                 "salt.channel.client.AsyncReqChannel.factory"
             ) as mock_channel_factory:
-                import salt.ext.tornado.gen
+                import tornado.gen
 
                 mock_channel = MagicMock()
                 mock_channel.__enter__ = MagicMock(return_value=mock_channel)
                 mock_channel.__exit__ = MagicMock(return_value=False)
 
                 # Mock the async send to return a completed Future
-                future = salt.ext.tornado.gen.maybe_future(
+                future = tornado.gen.maybe_future(
                     {"load": {"jid": "test_jid", "minions": ["minion1"]}}
                 )
                 mock_channel.send = MagicMock(return_value=future)
@@ -473,7 +473,7 @@ def test_pub_async_explicit_timeout(master_opts):
 
                 # Mock the event system
                 local_client.event.connect_pub = MagicMock(
-                    return_value=salt.ext.tornado.gen.maybe_future(True)
+                    return_value=tornado.gen.maybe_future(True)
                 )
 
                 # Mock _prep_pub to capture the timeout value
@@ -532,10 +532,10 @@ def test_pub_async_uses_publish_timeout_from_config(master_opts):
     with client.LocalClient(mopts=master_opts) as local_client:
         captured = {}
 
-        @salt.ext.tornado.gen.coroutine
+        @tornado.gen.coroutine
         def mock_send(payload, timeout=None):
             captured["timeout"] = timeout
-            raise salt.ext.tornado.gen.Return(
+            raise tornado.gen.Return(
                 {"load": {"jid": "test_jid", "minions": ["m1"]}}
             )
 
@@ -548,7 +548,7 @@ def test_pub_async_uses_publish_timeout_from_config(master_opts):
             "salt.channel.client.AsyncReqChannel.factory", return_value=mock_channel
         ):
             local_client.event.connect_pub = MagicMock(return_value=True)
-            io_loop = salt.ext.tornado.ioloop.IOLoop()
+            io_loop = tornado.ioloop.IOLoop()
             io_loop.run_sync(lambda: local_client.pub_async("*", "test.ping"))
 
         assert captured["timeout"] == 30
@@ -597,14 +597,14 @@ def test_run_job_async_passes_none_to_pub_async_when_no_timeout(master_opts):
     """
     captured = {}
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def fake_pub_async(*args, **kwargs):
         captured["timeout"] = kwargs.get("timeout")
-        raise salt.ext.tornado.gen.Return({"jid": "1234", "minions": ["m1"]})
+        raise tornado.gen.Return({"jid": "1234", "minions": ["m1"]})
 
     with client.LocalClient(mopts=master_opts) as local_client:
         with patch.object(local_client, "pub_async", side_effect=fake_pub_async):
-            io_loop = salt.ext.tornado.ioloop.IOLoop()
+            io_loop = tornado.ioloop.IOLoop()
             io_loop.run_sync(lambda: local_client.run_job_async("*", "test.ping"))
 
     assert captured["timeout"] is None
@@ -617,14 +617,14 @@ def test_run_job_async_passes_explicit_timeout_to_pub_async(master_opts):
     """
     captured = {}
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def fake_pub_async(*args, **kwargs):
         captured["timeout"] = kwargs.get("timeout")
-        raise salt.ext.tornado.gen.Return({"jid": "1234", "minions": ["m1"]})
+        raise tornado.gen.Return({"jid": "1234", "minions": ["m1"]})
 
     with client.LocalClient(mopts=master_opts) as local_client:
         with patch.object(local_client, "pub_async", side_effect=fake_pub_async):
-            io_loop = salt.ext.tornado.ioloop.IOLoop()
+            io_loop = tornado.ioloop.IOLoop()
             io_loop.run_sync(
                 lambda: local_client.run_job_async("*", "test.ping", timeout=30)
             )
