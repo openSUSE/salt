@@ -24,7 +24,7 @@ import yaml
 
 import salt
 import salt.exceptions
-import salt.ext.tornado as tornado
+import tornado
 import salt.utils.files
 import salt.utils.hashutils
 import salt.utils.json
@@ -450,8 +450,7 @@ def get_tops(extra_mods="", so_mods=""):
     for mod in [m for m in extra_mods.split(",") if m]:
         if mod not in locals() and mod not in globals():
             try:
-                locals()[mod] = __import__(mod)
-                moddir, modname = os.path.split(locals()[mod].__file__)
+                moddir, modname = os.path.split(__import__(mod).__file__)
                 base, _ = os.path.splitext(modname)
                 if base == "__init__":
                     tops.append(moddir)
@@ -464,8 +463,7 @@ def get_tops(extra_mods="", so_mods=""):
 
     for mod in [m for m in so_mods.split(",") if m]:
         try:
-            locals()[mod] = __import__(mod)
-            tops.append(locals()[mod].__file__)
+            tops.append(__import__(mod).__file__)
         except ImportError as err:
             log.error('Unable to import so-module "%s"', mod, exc_info=True)
 

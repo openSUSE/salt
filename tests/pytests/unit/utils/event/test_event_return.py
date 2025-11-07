@@ -1,7 +1,7 @@
 import pytest
 from pytestshellutils.utils.processes import terminate_process
 
-import salt.ext.tornado.ioloop
+import tornado.ioloop
 import salt.utils.event
 import salt.utils.stringutils
 

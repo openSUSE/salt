@@ -63,8 +63,8 @@ from collections.abc import MutableMapping
 import salt.channel.client
 import salt.config
 import salt.defaults.exitcodes
-import salt.ext.tornado.ioloop
-import salt.ext.tornado.iostream
+import tornado.ioloop
+import tornado.iostream
 import salt.payload
 import salt.transport.ipc
 import salt.utils.asynchronous
@@ -237,7 +237,7 @@ class SaltEvent:
             self.io_loop = io_loop
             self._run_io_loop_sync = False
         else:
-            self.io_loop = salt.ext.tornado.ioloop.IOLoop()
+            self.io_loop = tornado.ioloop.IOLoop()
             self._run_io_loop_sync = True
         self.cpub = False
         self.cpush = False
@@ -376,7 +376,7 @@ class SaltEvent:
                 try:
                     self.subscriber.connect(timeout=timeout)
                     self.cpub = True
-                except salt.ext.tornado.iostream.StreamClosedError:
+                except tornado.iostream.StreamClosedError:
                     log.error("Encountered StreamClosedException")
                 except OSError as exc:
                     if exc.errno != errno.ENOENT:
@@ -431,7 +431,7 @@ class SaltEvent:
                 try:
                     self.pusher.connect(timeout=timeout)
                     self.cpush = True
-                except salt.ext.tornado.iostream.StreamClosedError as exc:
+                except tornado.iostream.StreamClosedError as exc:
                     log.debug("Unable to connect pusher: %s", exc)
                 except Exception as exc:  # pylint: disable=broad-except
                     log.error(
@@ -589,7 +589,7 @@ class SaltEvent:
                 ret = {"data": data, "tag": mtag}
             except KeyboardInterrupt:
                 return {"tag": "salt/event/exit", "data": {}}
-            except salt.ext.tornado.iostream.StreamClosedError:
+            except tornado.iostream.StreamClosedError:
                 if self.raise_errors:
                     raise
                 else:
@@ -686,7 +686,7 @@ class SaltEvent:
                         try:
                             ret = self._get_event(wait, tag, match_func, no_block)
                             break
-                        except salt.ext.tornado.iostream.StreamClosedError:
+                        except tornado.iostream.StreamClosedError:
                             self.close_pub()
                             self.connect_pub(timeout=wait)
                             continue
@@ -742,7 +742,7 @@ class SaltEvent:
                 continue
             yield data
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def fire_event_async(self, data, tag, cb=None, timeout=1000):
         """
         Send a single event into the publisher with payload dict "data" and
@@ -1109,7 +1109,7 @@ class AsyncEventPublisher:
         default_minion_sock_dir = self.opts["sock_dir"]
         self.opts.update(opts)
 
-        self.io_loop = io_loop or salt.ext.tornado.ioloop.IOLoop.current()
+        self.io_loop = io_loop or tornado.ioloop.IOLoop.current()
         self._closing = False
         self.publisher = None
         self.puller = None
@@ -1227,7 +1227,7 @@ class EventPublisher(salt.utils.process.SignalHandlingProcess):
             )
             os.nice(self.opts["event_publisher_niceness"])
 
-        self.io_loop = salt.ext.tornado.ioloop.IOLoop()
+        self.io_loop = tornado.ioloop.IOLoop()
         with salt.utils.asynchronous.current_ioloop(self.io_loop):
             if self.opts["ipc_mode"] == "tcp":
                 epub_uri = int(self.opts["tcp_master_pub_port"])
@@ -1290,7 +1290,11 @@ class EventPublisher(salt.utils.process.SignalHandlingProcess):
             self.puller.close()
             self.puller = None
         if self.io_loop is not None:
-            self.io_loop.close()
+            try:
+                self.io_loop.stop()
+                self.io_loop.close()
+            except RuntimeError:
+                pass
             self.io_loop = None
 
     def _handle_signals(self, signum, sigframe):

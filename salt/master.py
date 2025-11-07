@@ -17,6 +17,8 @@ import sys
 import threading
 import time
 
+import tornado.gen
+
 import salt.acl
 import salt.auth
 import salt.channel.server
@@ -27,7 +29,6 @@ import salt.daemons.masterapi
 import salt.defaults.exitcodes
 import salt.engines
 import salt.exceptions
-import salt.ext.tornado.gen
 import salt.key
 import salt.minion
 import salt.payload
@@ -1002,7 +1003,7 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
         """
         Bind to the local port
         """
-        self.io_loop = salt.ext.tornado.ioloop.IOLoop()
+        self.io_loop = tornado.ioloop.IOLoop()
         self.io_loop.make_current()
         for req_channel in self.req_channels:
             req_channel.post_fork(
@@ -1014,7 +1015,7 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
             # Tornado knows what to do
             pass
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def _handle_payload(self, payload):
         """
         The _handle_payload method is the key method used to figure out what
@@ -1047,7 +1048,7 @@ class MWorker(salt.utils.process.SignalHandlingProcess):
             ret = self._handle_aes(load)
         else:
             ret = self._handle_clear(load)
-        raise salt.ext.tornado.gen.Return(ret)
+        raise tornado.gen.Return(ret)
 
     def _post_stats(self, start, cmd):
         """
@@ -2137,7 +2138,7 @@ class ClearFuncs(TransportMethods):
             lambda: self._prep_jid(clear_load, {}),
             batch_load,
         )
-        ioloop = salt.ext.tornado.ioloop.IOLoop.current()
+        ioloop = tornado.ioloop.IOLoop.current()
         ioloop.add_callback(batch.start)
 
         return {

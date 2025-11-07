@@ -19,7 +19,7 @@ import pytest
 from pytestshellutils.utils import ports
 from saltfactories.utils import random_string
 
-import salt.ext.tornado.ioloop
+import tornado.ioloop
 import salt.utils.files
 import salt.utils.platform
 from salt.serializers import yaml
@@ -622,7 +622,7 @@ def pytest_pyfunc_call(pyfuncitem):
     try:
         loop = funcargs["io_loop"]
     except KeyError:
-        loop = salt.ext.tornado.ioloop.IOLoop.current()
+        loop = tornado.ioloop.IOLoop.current()
 
     __tracebackhide__ = True
 
@@ -637,7 +637,7 @@ def io_loop():
     """
     Create new io loop for each test, and tear it down after.
     """
-    loop = salt.ext.tornado.ioloop.IOLoop()
+    loop = tornado.ioloop.IOLoop()
     loop.make_current()
     try:
         yield loop

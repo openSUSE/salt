@@ -4,7 +4,7 @@ Integration tests for Ruby Gem module
 
 import pytest
 
-from salt.ext.tornado.httpclient import HTTPClient
+from tornado.httpclient import HTTPClient
 from tests.support.case import ModuleCase
 
 
