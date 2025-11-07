@@ -2,7 +2,7 @@ import urllib.parse
 
 import pytest
 
-from salt.ext.tornado.httpclient import HTTPError
+from tornado.httpclient import HTTPError
 
 
 @pytest.mark.netapi_client_data(["local"])

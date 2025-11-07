@@ -8,8 +8,8 @@ import pytest
 import zmq.eventloop.ioloop
 
 import salt.config
-import salt.ext.tornado.ioloop
-import salt.ext.tornado.iostream
+import tornado.ioloop
+import tornado.iostream
 import salt.utils.event
 import salt.utils.stringutils
 from salt.exceptions import SaltDeserializationError
@@ -304,12 +304,12 @@ def test_connect_pull_should_debug_log_on_StreamClosedError():
             salt.utils.event.log, "debug", autospec=True
         ) as mock_log_debug:
             mock_pusher.connect.side_effect = (
-                salt.ext.tornado.iostream.StreamClosedError
+                tornado.iostream.StreamClosedError
             )
             event.connect_pull()
             call = mock_log_debug.mock_calls[0]
             assert call.args[0] == "Unable to connect pusher: %s"
-            assert isinstance(call.args[1], salt.ext.tornado.iostream.StreamClosedError)
+            assert isinstance(call.args[1], tornado.iostream.StreamClosedError)
             assert call.args[1].args[0] == "Stream is closed"
 
 
@@ -329,7 +329,7 @@ def test_connect_pull_should_error_log_on_other_errors(error):
                 call = mock_log_error.mock_calls[0]
                 assert call.args[0] == "Unable to connect pusher: %s"
                 assert not isinstance(
-                    call.args[1], salt.ext.tornado.iostream.StreamClosedError
+                    call.args[1], tornado.iostream.StreamClosedError
                 )
 
 
@@ -456,7 +456,7 @@ def test_event_single_timeout_tries(sock_dir):
     write_calls_count = 0
     real_stream_write = None
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def write_mock(pack):
         nonlocal write_calls_count
         nonlocal real_stream_write
@@ -464,7 +464,7 @@ def test_event_single_timeout_tries(sock_dir):
         if write_calls_count > 3:
             yield real_stream_write(pack)
         else:
-            raise salt.ext.tornado.iostream.StreamClosedError()
+            raise tornado.iostream.StreamClosedError()
 
     with eventpublisher_process(str(sock_dir)), salt.utils.event.MasterEvent(
         str(sock_dir), listen=True
@@ -480,7 +480,7 @@ def test_event_single_timeout_tries(sock_dir):
         ), patch.object(
             me.pusher,
             "connect",
-            side_effect=salt.ext.tornado.iostream.StreamClosedError,
+            side_effect=tornado.iostream.StreamClosedError,
         ), patch.object(
             me.pusher.stream,
             "write",

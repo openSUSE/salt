@@ -12,9 +12,9 @@ from pytestshellutils.utils.processes import terminate_process
 import salt.channel.server
 import salt.crypt
 import salt.exceptions
-import salt.ext.tornado.gen
-import salt.ext.tornado.ioloop
-import salt.ext.tornado.iostream
+import tornado.gen
+import tornado.ioloop
+import tornado.iostream
 import salt.master
 import salt.payload
 import salt.utils.msgpack
@@ -108,9 +108,9 @@ class Collector(salt.utils.process.SignalHandlingProcess):
                     time.sleep(1)
                 else:
                     break
-            self.sock = salt.ext.tornado.iostream.IOStream(sock)
+            self.sock = tornado.iostream.IOStream(sock)
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def _recv(self):
         if self.transport == "zeromq":
             # test_zeromq_filtering requires catching the
@@ -130,23 +130,23 @@ class Collector(salt.utils.process.SignalHandlingProcess):
                         log.debug(
                             "Publish received for not this minion: %s", message_target
                         )
-                        raise salt.ext.tornado.gen.Return(None)
+                        raise tornado.gen.Return(None)
                     serial_payload = salt.payload.loads(messages[1])
                 else:
                     raise Exception("Invalid number of messages")
-                raise salt.ext.tornado.gen.Return(serial_payload)
+                raise tornado.gen.Return(serial_payload)
             except (zmq.ZMQError, salt.exceptions.SaltDeserializationError):
                 raise RecvError("ZMQ Error")
         else:
             for msg in self.unpacker:
-                raise salt.ext.tornado.gen.Return(msg["body"])
+                raise tornado.gen.Return(msg["body"])
             byts = yield self.sock.read_bytes(8096, partial=True)
             self.unpacker.feed(byts)
             for msg in self.unpacker:
-                raise salt.ext.tornado.gen.Return(msg["body"])
+                raise tornado.gen.Return(msg["body"])
             raise RecvError("TCP Error")
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def _run(self, loop):
         try:
             self._setup_listener()
@@ -196,7 +196,7 @@ class Collector(salt.utils.process.SignalHandlingProcess):
         Gather results until then number of seconds specified by timeout passes
         without receiving a message
         """
-        loop = salt.ext.tornado.ioloop.IOLoop()
+        loop = tornado.ioloop.IOLoop()
         loop.add_callback(self._run, loop)
         loop.start()
 

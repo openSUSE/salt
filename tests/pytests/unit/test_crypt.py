@@ -5,7 +5,7 @@ import pytest
 
 import salt.crypt as crypt
 import salt.exceptions
-import salt.ext.tornado.gen
+import tornado.gen
 from tests.support.mock import mock_open, patch
 
 
@@ -438,7 +438,7 @@ async def test_authenticate_caps_retry_loop_with_auth_retries_69442(
 
     call_count = 0
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def mock_sign_in(*args, **kwargs):
         nonlocal call_count
         call_count += 1
@@ -500,7 +500,7 @@ async def test_authenticate_default_does_not_cap_retry_loop_69442(minion_root, i
     # any other plausible small cap a regression might introduce.
     call_limit = 25
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def mock_sign_in(*args, **kwargs):
         nonlocal call_count
         call_count += 1

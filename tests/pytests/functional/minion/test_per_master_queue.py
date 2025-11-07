@@ -10,7 +10,7 @@ import copy
 import os
 import time
 
-import salt.ext.tornado.ioloop
+import tornado.ioloop
 import salt.minion
 import salt.utils.files
 import salt.utils.state
@@ -29,7 +29,7 @@ def _make_minion(opts):
     The constructor runs the stale-lock cleanup, which is what we want to
     exercise here.
     """
-    io_loop = salt.ext.tornado.ioloop.IOLoop()
+    io_loop = tornado.ioloop.IOLoop()
     minion = salt.minion.Minion(opts, jid_queue=[], io_loop=io_loop)
     return minion
 

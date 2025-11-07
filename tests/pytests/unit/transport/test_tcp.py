@@ -10,8 +10,8 @@ from pytestshellutils.utils import ports
 
 import salt.channel.server
 import salt.exceptions
-import salt.ext.tornado
-import salt.ext.tornado.concurrent
+import tornado
+import tornado.concurrent
 import salt.transport.tcp
 import salt.utils.platform
 from tests.support.mock import MagicMock, PropertyMock, patch
@@ -35,9 +35,9 @@ def fake_crypto():
 
 @pytest.fixture
 def fake_authd():
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def return_nothing():
-        raise salt.ext.tornado.gen.Return()
+        raise tornado.gen.Return()
 
     with patch(
         "salt.crypt.AsyncAuth.authenticated", new_callable=PropertyMock
@@ -107,7 +107,7 @@ def test_message_client_cleanup_on_close(client_socket, temp_salt_master):
     """
     test message client cleanup on close
     """
-    orig_loop = salt.ext.tornado.ioloop.IOLoop()
+    orig_loop = tornado.ioloop.IOLoop()
     orig_loop.make_current()
 
     opts = dict(temp_salt_master.config.copy(), transport="tcp")
@@ -263,7 +263,7 @@ def test_tcp_pub_server_channel_publish_filtering_str_list(temp_salt_master):
 
 @pytest.fixture(scope="function")
 def salt_message_client():
-    io_loop_mock = MagicMock(spec=salt.ext.tornado.ioloop.IOLoop)
+    io_loop_mock = MagicMock(spec=tornado.ioloop.IOLoop)
     io_loop_mock.call_later.side_effect = lambda *args, **kwargs: (args, kwargs)
 
     client = salt.transport.tcp.MessageClient(
@@ -368,7 +368,7 @@ def test_timeout_message_unknown_future(salt_message_client):
     # if we do have the actual future stored under the id, but it's none
     # we shouldn't fail as well
     message_id = 1
-    future = salt.ext.tornado.concurrent.Future()
+    future = tornado.concurrent.Future()
     future.attempts = 1
     future.tries = 1
     salt_message_client.send_future_map[message_id] = future
@@ -389,16 +389,16 @@ def xtest_client_reconnect_backoff(client_socket):
         client.close()
         assert t == 5
         return
-        # return salt.ext.tornado.gen.sleep()
+        # return tornado.gen.sleep()
 
-    @salt.ext.tornado.gen.coroutine
+    @tornado.gen.coroutine
     def connect(*args, **kwargs):
         raise Exception("err")
 
     client._tcp_client.connect = connect
 
     try:
-        with patch("salt.ext.tornado.gen.sleep", side_effect=_sleep):
+        with patch("tornado.gen.sleep", side_effect=_sleep):
             client.io_loop.run_sync(client.connect)
     finally:
         client.close()
@@ -483,7 +483,7 @@ def test_presence_events_callback_passed(temp_salt_master, salt_message_client):
 def test_presence_removed_on_stream_closed():
     opts = {"presence_events": True}
 
-    io_loop_mock = MagicMock(spec=salt.ext.tornado.ioloop.IOLoop)
+    io_loop_mock = MagicMock(spec=tornado.ioloop.IOLoop)
 
     with patch("salt.master.AESFuncs.__init__", return_value=None):
         server = salt.transport.tcp.PubServer(opts, io_loop=io_loop_mock)
@@ -491,12 +491,12 @@ def test_presence_removed_on_stream_closed():
         server.remove_presence_callback = MagicMock()
 
     client = salt.transport.tcp.Subscriber(
-        salt.ext.tornado.iostream.IOStream, "1.2.3.4"
+        tornado.iostream.IOStream, "1.2.3.4"
     )
     client._closing = True
     server.clients = {client}
 
-    io_loop = salt.ext.tornado.ioloop.IOLoop.current()
+    io_loop = tornado.ioloop.IOLoop.current()
     package = {
         "topic_lst": [],
         "payload": "test-payload",
@@ -504,8 +504,8 @@ def test_presence_removed_on_stream_closed():
 
     with patch("salt.transport.frame.frame_msg", return_value="framed-payload"):
         with patch(
-            "salt.ext.tornado.iostream.BaseIOStream.write",
-            side_effect=salt.ext.tornado.iostream.StreamClosedError(),
+            "tornado.iostream.BaseIOStream.write",
+            side_effect=tornado.iostream.StreamClosedError(),
         ):
             io_loop.run_sync(functools.partial(server.publish_payload, package, None))
 
@@ -549,10 +549,10 @@ async def test_pub_server__stream_read(master_opts, io_loop):
         def read_bytes(self, *args, **kwargs):
             if self.messages:
                 msg = self.messages.pop(0)
-                future = salt.ext.tornado.concurrent.Future()
+                future = tornado.concurrent.Future()
                 future.set_result(msg)
                 return future
-            raise salt.ext.tornado.iostream.StreamClosedError()
+            raise tornado.iostream.StreamClosedError()
 
     client = MagicMock()
     client.stream = Stream(messages)
@@ -568,7 +568,7 @@ async def test_pub_server__stream_read_exception(master_opts, io_loop):
     client.stream.read_bytes = MagicMock(
         side_effect=[
             Exception("Something went wrong"),
-            salt.ext.tornado.iostream.StreamClosedError(),
+            tornado.iostream.StreamClosedError(),
         ]
     )
     client.address = "client address"
@@ -596,10 +596,10 @@ async def test_salt_message_server(master_opts):
         def read_bytes(self, *args, **kwargs):
             if self.messages:
                 msg = self.messages.pop(0)
-                future = salt.ext.tornado.concurrent.Future()
+                future = tornado.concurrent.Future()
                 future.set_result(msg)
                 return future
-            raise salt.ext.tornado.iostream.StreamClosedError()
+            raise tornado.iostream.StreamClosedError()
 
     stream = Stream(messages)
     address = "client address"
@@ -607,7 +607,7 @@ async def test_salt_message_server(master_opts):
     await server.handle_stream(stream, address)
 
     # Let loop iterate so callback gets called
-    await salt.ext.tornado.gen.sleep(0.01)
+    await tornado.gen.sleep(0.01)
 
     assert received
     assert [msg] == received
@@ -643,17 +643,17 @@ async def test_salt_message_server_recreates_unpacker_on_disconnect(monkeypatch)
         def read_bytes(self, *args, **kwargs):
             if self.reads:
                 self.reads -= 1
-                future = salt.ext.tornado.concurrent.Future()
+                future = tornado.concurrent.Future()
                 future.set_result(b"x")
                 return future
-            raise salt.ext.tornado.iostream.StreamClosedError()
+            raise tornado.iostream.StreamClosedError()
 
         def close(self):
             return None
 
     stream = Stream(reads=1)
     await server.handle_stream(stream, "client-1")
-    await salt.ext.tornado.gen.sleep(0.01)
+    await tornado.gen.sleep(0.01)
     gc.collect()
 
     assert TrackingUnpacker.created == 2  # initial + reset on disconnect
@@ -661,7 +661,7 @@ async def test_salt_message_server_recreates_unpacker_on_disconnect(monkeypatch)
 
     stream = Stream(reads=1)
     await server.handle_stream(stream, "client-2")
-    await salt.ext.tornado.gen.sleep(0.01)
+    await tornado.gen.sleep(0.01)
     gc.collect()
 
     # second connection: initial + reset again
@@ -710,7 +710,7 @@ async def test_salt_message_server_resets_unpacker_on_general_exception(monkeypa
         def read_bytes(self, *args, **kwargs):
             self.calls += 1
             if self.calls == 1:
-                future = salt.ext.tornado.concurrent.Future()
+                future = tornado.concurrent.Future()
                 future.set_result(chunk)
                 return future
             raise RuntimeError("boom")
@@ -721,7 +721,7 @@ async def test_salt_message_server_resets_unpacker_on_general_exception(monkeypa
     try:
         stream = FailingStream()
         await server.handle_stream(stream, "failing-client")
-        await salt.ext.tornado.gen.sleep(0.01)
+        await tornado.gen.sleep(0.01)
         gc.collect()
         assert stream.closed
         # initial creation + reset on exception
@@ -790,7 +790,7 @@ async def test_salt_message_server_exception(master_opts, io_loop):
 async def test_message_client_stream_return_exception(minion_opts, io_loop):
     msg = {"foo": "bar"}
     payload = salt.transport.frame.frame_msg(msg)
-    future = salt.ext.tornado.concurrent.Future()
+    future = tornado.concurrent.Future()
     future.set_result(payload)
     client = salt.transport.tcp.MessageClient(
         minion_opts,
@@ -805,9 +805,9 @@ async def test_message_client_stream_return_exception(minion_opts, io_loop):
     ]
     try:
         io_loop.add_callback(client._stream_return)
-        await salt.ext.tornado.gen.sleep(0.01)
+        await tornado.gen.sleep(0.01)
         client.close()
-        await salt.ext.tornado.gen.sleep(0.01)
+        await tornado.gen.sleep(0.01)
         assert client._stream is None
     finally:
         client.close()
@@ -823,7 +823,7 @@ async def test_pub_server_publish_payload(master_opts, io_loop):
     server = salt.transport.tcp.PubServer(master_opts, io_loop=io_loop)
     package = {"foo": "bar"}
     topic_list = ["meh"]
-    future = salt.ext.tornado.concurrent.Future()
+    future = tornado.concurrent.Future()
     future.set_result(None)
     client = MagicMock()
     client.stream = MagicMock()
@@ -841,7 +841,7 @@ async def test_pub_server_publish_payload_closed_stream(master_opts, io_loop):
     client = MagicMock()
     client.stream = MagicMock()
     client.stream.write.side_effect = [
-        salt.ext.tornado.iostream.StreamClosedError("mock")
+        tornado.iostream.StreamClosedError("mock")
     ]
     client.id_ = "meh"
     server.clients = {client}
