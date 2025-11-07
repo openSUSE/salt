@@ -16,7 +16,7 @@ import tempfile
 import time
 import urllib.parse
 
-import salt.ext.tornado.gen
+import tornado.gen
 import salt.utils.path
 import salt.utils.platform
 import salt.utils.stringutils
@@ -441,7 +441,7 @@ async def await_lock(path, lock_fn=None, timeout=5, sleep=0.1, time_start=None):
                         )
                     )
                 log.trace("Lock file %s exists, sleeping %f seconds", lock_fn, sleep)
-                await salt.ext.tornado.gen.sleep(sleep)
+                await tornado.gen.sleep(sleep)
             else:
                 # Write the lock file
                 with os.fdopen(fh_, "w"):

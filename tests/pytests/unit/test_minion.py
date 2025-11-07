@@ -9,9 +9,9 @@ import uuid
 
 import pytest
 
-import salt.ext.tornado
-import salt.ext.tornado.gen
-import salt.ext.tornado.testing
+import tornado
+import tornado.gen
+import tornado.testing
 import salt.minion
 import salt.modules.test as test_mod
 import salt.syspaths
@@ -33,10 +33,10 @@ from tests.support.mock import MagicMock, patch
 log = logging.getLogger(__name__)
 
 
-@salt.ext.tornado.gen.coroutine
+@tornado.gen.coroutine
 def _noop_destroy_async_for_test(*args, **kwargs):
     """Tornado coroutine for MagicMock side_effect when stubbing Minion.destroy_async."""
-    yield salt.ext.tornado.gen.sleep(0)
+    yield tornado.gen.sleep(0)
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def connect_master_mock():
             self.calls = 0
             self.exc = Exception
 
-        @salt.ext.tornado.gen.coroutine
+        @tornado.gen.coroutine
         def __call__(self, *args, **kwargs):
             self.calls += 1
             if self.calls == 1:
@@ -100,7 +100,7 @@ def test_minion_load_grains_default(minion_opts):
     [
         (
             "salt.channel.client.AsyncReqChannel.factory",
-            lambda load, timeout, tries: salt.ext.tornado.gen.maybe_future(tries),
+            lambda load, timeout, tries: tornado.gen.maybe_future(tries),
         ),
         (
             "salt.channel.client.ReqChannel.factory",
@@ -305,7 +305,7 @@ def test_handle_decoded_payload_jid_match_in_jid_queue(minion_opts):
     minion = salt.minion.Minion(
         minion_opts,
         jid_queue=copy.copy(mock_jid_queue),
-        io_loop=salt.ext.tornado.ioloop.IOLoop(),
+        io_loop=tornado.ioloop.IOLoop(),
     )
     try:
         ret = minion._handle_decoded_payload(mock_data).result()
@@ -334,7 +334,7 @@ def test_handle_decoded_payload_jid_queue_addition(minion_opts):
         minion = salt.minion.Minion(
             minion_opts,
             jid_queue=copy.copy(mock_jid_queue),
-            io_loop=salt.ext.tornado.ioloop.IOLoop(),
+            io_loop=tornado.ioloop.IOLoop(),
         )
         try:
 
@@ -371,7 +371,7 @@ def test_handle_decoded_payload_jid_queue_reduced_minion_jid_queue_hwm(minion_op
         minion = salt.minion.Minion(
             minion_opts,
             jid_queue=copy.copy(mock_jid_queue),
-            io_loop=salt.ext.tornado.ioloop.IOLoop(),
+            io_loop=tornado.ioloop.IOLoop(),
         )
         try:
 
@@ -434,7 +434,7 @@ def test_process_count_max(minion_opts):
         minion_opts["cachedir"] = "/tmp/salt_test_cache"
         minion_opts["master"] = "master-a"
 
-        io_loop = salt.ext.tornado.ioloop.IOLoop()
+        io_loop = tornado.ioloop.IOLoop()
         minion = salt.minion.Minion(minion_opts, jid_queue=[], io_loop=io_loop)
         try:
             # up until process_count_max: processes are started normally
@@ -521,7 +521,7 @@ def test_queue_job_preserves_master_jid_69386(minion_opts):
             "payload (#69386 regression)"
         ),
     ):
-        io_loop = salt.ext.tornado.ioloop.IOLoop()
+        io_loop = tornado.ioloop.IOLoop()
         minion = salt.minion.Minion(minion_opts, jid_queue=[], io_loop=io_loop)
         try:
             minion._queue_job(payload)
@@ -595,7 +595,7 @@ async def test_beacons_before_connect(minion_opts):
         MagicMock(return_value=True),
     ):
         minion_opts["beacons_before_connect"] = True
-        io_loop = salt.ext.tornado.ioloop.IOLoop()
+        io_loop = tornado.ioloop.IOLoop()
         io_loop.make_current()
         minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
         try:
@@ -628,7 +628,7 @@ async def test_scheduler_before_connect(minion_opts):
         MagicMock(return_value=True),
     ):
         minion_opts["scheduler_before_connect"] = True
-        io_loop = salt.ext.tornado.ioloop.IOLoop()
+        io_loop = tornado.ioloop.IOLoop()
         io_loop.make_current()
         minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
         try:
@@ -659,7 +659,7 @@ def test_minion_module_refresh(minion_opts):
         try:
             minion = salt.minion.Minion(
                 minion_opts,
-                io_loop=salt.ext.tornado.ioloop.IOLoop(),
+                io_loop=tornado.ioloop.IOLoop(),
             )
             minion.schedule = salt.utils.schedule.Schedule(
                 minion_opts, {}, returners={}
@@ -687,7 +687,7 @@ def test_minion_module_refresh_beacons_refresh(minion_opts):
         try:
             minion = salt.minion.Minion(
                 minion_opts,
-                io_loop=salt.ext.tornado.ioloop.IOLoop(),
+                io_loop=tornado.ioloop.IOLoop(),
             )
             minion.schedule = salt.utils.schedule.Schedule(
                 minion_opts, {}, returners={}
@@ -717,7 +717,7 @@ def test_beacons_refresh_preserves_interval_map(minion_opts):
         try:
             minion = salt.minion.Minion(
                 minion_opts,
-                io_loop=salt.ext.tornado.ioloop.IOLoop(),
+                io_loop=tornado.ioloop.IOLoop(),
             )
             minion.schedule = salt.utils.schedule.Schedule(
                 minion_opts, {}, returners={}
@@ -763,7 +763,7 @@ def test_beacons_refresh_closes_old_beacons(minion_opts):
         try:
             minion = salt.minion.Minion(
                 minion_opts,
-                io_loop=salt.ext.tornado.ioloop.IOLoop.current(),
+                io_loop=tornado.ioloop.IOLoop.current(),
             )
             minion.schedule = salt.utils.schedule.Schedule(
                 minion_opts, {}, returners={}
@@ -799,7 +799,7 @@ async def test_when_ping_interval_is_set_the_callback_should_be_added_to_periodi
         MagicMock(return_value=True),
     ):
         minion_opts["ping_interval"] = 10
-        io_loop = salt.ext.tornado.ioloop.IOLoop()
+        io_loop = tornado.ioloop.IOLoop()
         io_loop.make_current()
         minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
         try:
@@ -821,7 +821,7 @@ def test_when_passed_start_event_grains(minion_opts):
     # provide mock opts an os grain since we'll look for it later.
     minion_opts["grains"]["os"] = "linux"
     minion_opts["start_event_grains"] = ["os"]
-    io_loop = salt.ext.tornado.ioloop.IOLoop()
+    io_loop = tornado.ioloop.IOLoop()
     io_loop.make_current()
     minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
     try:
@@ -840,7 +840,7 @@ def test_when_passed_start_event_grains(minion_opts):
 
 @pytest.mark.slow_test
 def test_when_not_passed_start_event_grains(minion_opts):
-    io_loop = salt.ext.tornado.ioloop.IOLoop()
+    io_loop = tornado.ioloop.IOLoop()
     io_loop.make_current()
     minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
     try:
@@ -857,7 +857,7 @@ def test_when_not_passed_start_event_grains(minion_opts):
 @pytest.mark.slow_test
 def test_when_other_events_fired_and_start_event_grains_are_set(minion_opts):
     minion_opts["start_event_grains"] = ["os"]
-    io_loop = salt.ext.tornado.ioloop.IOLoop()
+    io_loop = tornado.ioloop.IOLoop()
     io_loop.make_current()
     minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
     try:
@@ -881,7 +881,7 @@ def test_return_pub_handles_send_req_timeout(minion_opts):
     must raise SaltReqTimeoutError (not the bare TimeoutError builtin) so
     that _return_pub's except clause fires correctly.
     """
-    io_loop = salt.ext.tornado.ioloop.IOLoop()
+    io_loop = tornado.ioloop.IOLoop()
     io_loop.make_current()
     minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
     try:
@@ -1020,7 +1020,7 @@ def test_gen_modules_executors(minion_opts):
     """
     Ensure gen_modules is called with the correct arguments #54429
     """
-    io_loop = salt.ext.tornado.ioloop.IOLoop()
+    io_loop = tornado.ioloop.IOLoop()
     io_loop.make_current()
     minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
 
@@ -1054,7 +1054,7 @@ def test_minion_manage_schedule(minion_opts):
         "salt.utils.process.SignalHandlingProcess.join",
         MagicMock(return_value=True),
     ):
-        io_loop = salt.ext.tornado.ioloop.IOLoop()
+        io_loop = tornado.ioloop.IOLoop()
         io_loop.make_current()
 
         with patch("salt.utils.schedule.clean_proc_dir", MagicMock(return_value=None)):
@@ -1114,7 +1114,7 @@ def test_minion_manage_beacons(minion_opts):
         try:
             minion_opts["beacons"] = {}
 
-            io_loop = salt.ext.tornado.ioloop.IOLoop()
+            io_loop = tornado.ioloop.IOLoop()
             io_loop.make_current()
 
             mock_functions = {"test.ping": None}
@@ -1292,7 +1292,7 @@ def test_eval_master_single_master_closes_pub_channel_on_failure_68901(minion_op
             self.closed = 0
             created.append(self)
 
-        @salt.ext.tornado.gen.coroutine
+        @tornado.gen.coroutine
         def connect(self):
             # Non-SaltClientError on purpose: prior to the fix, this leaks
             # the channel because the single-master path only closes
@@ -1308,7 +1308,7 @@ def test_eval_master_single_master_closes_pub_channel_on_failure_68901(minion_op
     def mock_resolve_dns(opts, fallback=True):
         return {"master_ip": "127.0.0.1", "master_uri": "tcp://127.0.0.1:4506"}
 
-    io_loop = salt.ext.tornado.ioloop.IOLoop()
+    io_loop = tornado.ioloop.IOLoop()
     try:
         with patch("salt.minion.resolve_dns", mock_resolve_dns), patch(
             "salt.channel.client.AsyncPubChannel.factory", mock_channel_factory
@@ -1346,7 +1346,7 @@ def test_minion_grains_refresh_pre_exec_false(minion_opts):
         minion = salt.minion.Minion(
             minion_opts,
             jid_queue=None,
-            io_loop=salt.ext.tornado.ioloop.IOLoop(),
+            io_loop=tornado.ioloop.IOLoop(),
             load_grains=False,
         )
         try:
@@ -1369,7 +1369,7 @@ def test_minion_grains_refresh_pre_exec_true(minion_opts):
         minion = salt.minion.Minion(
             minion_opts,
             jid_queue=None,
-            io_loop=salt.ext.tornado.ioloop.IOLoop(),
+            io_loop=tornado.ioloop.IOLoop(),
             load_grains=False,
         )
         try:
@@ -1552,7 +1552,10 @@ async def test_minion_manager_async_stop(io_loop, minion_opts, tmp_path):
     assert mm.event is not None
 
     # Check io_loop is running
-    assert mm.io_loop._running
+    if hasattr(mm.io_loop, "asyncio_loop"):
+        assert mm.io_loop.asyncio_loop.is_running()
+    else:
+        assert mm.io_loop._running
 
     # Set up values for event to send
     load = {"key": "value"}
@@ -1573,12 +1576,12 @@ async def test_minion_manager_async_stop(io_loop, minion_opts, tmp_path):
             ret = event.get_event(tag="test_event", wait=0.3)
             if ret:
                 break
-            await salt.ext.tornado.gen.sleep(0.3)
+            await tornado.gen.sleep(0.3)
     assert "key" in ret
     assert ret["key"] == "value"
 
     # Sleep to allow stop_async to complete
-    await salt.ext.tornado.gen.sleep(5)
+    await tornado.gen.sleep(5)
 
     # Ensure stop_async has been called (async teardown per minion)
     minion.destroy_async.assert_called_once()
@@ -1593,10 +1596,10 @@ def _run_eval_master(opts):
     (where the random_master warning lives) without touching the network:
     DNS resolution is stubbed and the pub channel connects immediately.
     """
-    io_loop = salt.ext.tornado.ioloop.IOLoop()
+    io_loop = tornado.ioloop.IOLoop()
     minion = salt.minion.MinionBase(opts)
     mock_channel = MagicMock()
-    mock_channel.connect.return_value = salt.ext.tornado.gen.maybe_future(None)
+    mock_channel.connect.return_value = tornado.gen.maybe_future(None)
     mock_channel.auth.gen_token.return_value = b"token"
     try:
         with patch(

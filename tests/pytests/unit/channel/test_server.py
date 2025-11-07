@@ -15,7 +15,7 @@ import salt.utils.files
 import salt.utils.stringutils
 from salt.master import SMaster
 
-import salt.ext.tornado.gen
+import tornado.gen
 from tests.support.mock import MagicMock, patch
 
 @pytest.fixture
@@ -364,7 +364,7 @@ def test__auth_cmd_stats_passing(auth_master_opts):
         time.sleep(0.03)
         return fake_ret
 
-    future = salt.ext.tornado.gen.Future()
+    future = tornado.gen.Future()
     future.set_result({})
 
     with patch.object(req_server_channel, "_auth", _auth_mock):

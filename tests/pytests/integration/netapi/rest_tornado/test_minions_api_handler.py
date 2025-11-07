@@ -1,7 +1,7 @@
 import pytest
 
 import salt.utils.json
-from salt.ext.tornado.httpclient import HTTPError
+from tornado.httpclient import HTTPError
 from salt.netapi.rest_tornado import saltnado
 
 
