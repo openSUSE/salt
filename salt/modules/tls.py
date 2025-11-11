@@ -104,6 +104,7 @@ import logging
 import math
 import os
 import re
+import sys
 import time
 from datetime import datetime
 
@@ -1594,6 +1595,9 @@ def create_pkcs12(ca_name, CN, passphrase="", cacert_path=None, replace=False):
 
         salt '*' tls.create_pkcs12 test localhost
     """
+    # Necessary for OSes with older cryptography module
+    compat_mode = sys.version_info < (3,12)
+
     set_ca_path(cacert_path)
     p12_path = f"{cert_base_path()}/{ca_name}/certs/{CN}.p12"
     ca_cert_path = f"{cert_base_path()}/{ca_name}/{ca_name}_ca_cert.crt"
@@ -1605,7 +1609,12 @@ def create_pkcs12(ca_name, CN, passphrase="", cacert_path=None, replace=False):
 
     try:
         with salt.utils.files.fopen(ca_cert_path, "rb") as fhr:
-            ca_cert = cryptography.x509.load_pem_x509_certificate(fhr.read())
+            if compat_mode:
+                ca_cert = OpenSSL.crypto.load_certificate(
+                    OpenSSL.crypto.FILETYPE_PEM, fhr.read()
+                )
+            else:
+                ca_cert = cryptography.x509.load_pem_x509_certificate(fhr.read())
     except OSError:
         return 'There is no CA named "{}"'.format(ca_name)
     except ValueError as e:
@@ -1613,34 +1622,58 @@ def create_pkcs12(ca_name, CN, passphrase="", cacert_path=None, replace=False):
 
     try:
         with salt.utils.files.fopen(cert_path, "rb") as fhr:
-            cert = cryptography.x509.load_pem_x509_certificate(fhr.read())
+            if compat_mode:
+                cert = OpenSSL.crypto.load_certificate(
+                    OpenSSL.crypto.FILETYPE_PEM, fhr.read()
+                )
+            else:
+                cert = cryptography.x509.load_pem_x509_certificate(fhr.read())
         with salt.utils.files.fopen(priv_key_path, "rb") as fhr:
-            key = cryptography_serialization.load_pem_private_key(
-                fhr.read(),
-                password=None,
-            )
+            if compat_mode:
+                key = OpenSSL.crypto.load_privatekey(
+                    OpenSSL.crypto.FILETYPE_PEM, fhr.read()
+                )
+            else:
+                key = cryptography_serialization.load_pem_private_key(
+                    fhr.read(),
+                    password=None,
+                )
     except OSError:
         return 'There is no certificate that matches the CN "{}"'.format(CN)
     except ValueError as e:
         return f'Could not load certificate {cert_path}: {e}'
 
-    if passphrase:
-        encryption_algorithm = cryptography_serialization.BestAvailableEncryption(
-            salt.utils.stringutils.to_bytes(passphrase)
-        )
+    if compat_mode:
+        pkcs12 = OpenSSL.crypto.PKCS12()
+
+        pkcs12.set_certificate(cert)
+        pkcs12.set_ca_certificates([ca_cert])
+        pkcs12.set_privatekey(key)
+
+        with salt.utils.files.fopen(
+            "{}/{}/certs/{}.p12".format(cert_base_path(), ca_name, CN), "wb"
+        ) as ofile:
+            ofile.write(
+                pkcs12.export(passphrase=salt.utils.stringutils.to_bytes(passphrase))
+            )
     else:
-        encryption_algorithm = cryptography_serialization.NoEncryption()
+        if passphrase:
+            encryption_algorithm = cryptography_serialization.BestAvailableEncryption(
+                salt.utils.stringutils.to_bytes(passphrase)
+            )
+        else:
+            encryption_algorithm = cryptography_serialization.NoEncryption()
 
-    pkcs12 = cryptography_pkcs12.serialize_key_and_certificates(
-        name=salt.utils.stringutils.to_bytes(CN),
-        key=key,
-        cert=cert,
-        cas=[ca_cert],
-        encryption_algorithm=encryption_algorithm,
-    )
+        pkcs12 = cryptography_pkcs12.serialize_key_and_certificates(
+            name=salt.utils.stringutils.to_bytes(CN),
+            key=key,
+            cert=cert,
+            cas=[ca_cert],
+            encryption_algorithm=encryption_algorithm,
+        )
 
-    with salt.utils.files.fopen(p12_path, "wb") as ofile:
-        ofile.write(pkcs12)
+        with salt.utils.files.fopen(p12_path, "wb") as ofile:
+            ofile.write(pkcs12)
 
     return 'Created PKCS#12 Certificate for "{0}": "{1}/{2}/certs/{0}.p12"'.format(
         CN,
