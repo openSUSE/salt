@@ -104,6 +104,7 @@ import logging
 import math
 import os
 import re
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -1842,6 +1843,9 @@ def create_pkcs12(ca_name, CN, passphrase="", cacert_path=None, replace=False):
 
         salt '*' tls.create_pkcs12 test localhost
     """
+    # Necessary for OSes with older cryptography module
+    compat_mode = sys.version_info < (3,12)
+
     set_ca_path(cacert_path)
     if not replace and os.path.exists(f"{cert_base_path()}/{ca_name}/certs/{CN}.p12"):
         return f'Certificate "{CN}" already exists'
@@ -1850,9 +1854,12 @@ def create_pkcs12(ca_name, CN, passphrase="", cacert_path=None, replace=False):
         with salt.utils.files.fopen(
             "{0}/{1}/{1}_ca_cert.crt".format(cert_base_path(), ca_name)
         ) as fhr:
-            ca_cert = OpenSSL.crypto.load_certificate(
-                OpenSSL.crypto.FILETYPE_PEM, fhr.read()
-            )
+            if compat_mode:
+                ca_cert = OpenSSL.crypto.load_certificate(
+                    OpenSSL.crypto.FILETYPE_PEM, fhr.read()
+                )
+            else:
+                ca_cert = cryptography.x509.load_pem_x509_certificate(fhr.read())
     except OSError:
         return f'There is no CA named "{ca_name}"'
 
@@ -1860,31 +1867,49 @@ def create_pkcs12(ca_name, CN, passphrase="", cacert_path=None, replace=False):
         with salt.utils.files.fopen(
             f"{cert_base_path()}/{ca_name}/certs/{CN}.crt"
         ) as fhr:
-            cert = OpenSSL.crypto.load_certificate(
-                OpenSSL.crypto.FILETYPE_PEM, fhr.read()
-            )
+            if compat_mode:
+                cert = OpenSSL.crypto.load_certificate(
+                    OpenSSL.crypto.FILETYPE_PEM, fhr.read()
+                )
+            else:
+                cert = cryptography.x509.load_pem_x509_certificate(fhr.read())
         with salt.utils.files.fopen(
             f"{cert_base_path()}/{ca_name}/certs/{CN}.key"
         ) as fhr:
-            key = OpenSSL.crypto.load_privatekey(
-                OpenSSL.crypto.FILETYPE_PEM, fhr.read()
-            )
+            if compat_mode:
+                key = OpenSSL.crypto.load_privatekey(
+                    OpenSSL.crypto.FILETYPE_PEM, fhr.read()
+                )
+            else:
+                key = cryptography_serialization.load_pem_private_key(
+                    fhr.read(),
+                    password=None,
+                )
     except OSError:
         return f'There is no certificate that matches the CN "{CN}"'
 
-    p12_data = pkcs12.serialize_key_and_certificates(
-        name=salt.utils.stringutils.to_bytes(CN),
-        key=key.to_cryptography_key(),
-        cert=cert.to_cryptography(),
-        cas=[ca_cert.to_cryptography()],
-        encryption_algorithm=(
-            serialization.BestAvailableEncryption(
-                salt.utils.stringutils.to_bytes(passphrase)
-            )
-            if passphrase
-            else serialization.NoEncryption()
-        ),
-    )
+    if compat_mode:
+        pkcs12 = OpenSSL.crypto.PKCS12()
+
+        pkcs12.set_certificate(cert)
+        pkcs12.set_ca_certificates([ca_cert])
+        pkcs12.set_privatekey(key)
+
+        p12_data = pkcs12.export(passphrase=salt.utils.stringutils.to_bytes(passphrase))
+    else:
+        p12_data = pkcs12.serialize_key_and_certificates(
+            name=salt.utils.stringutils.to_bytes(CN),
+            key=key.to_cryptography_key(),
+            cert=cert.to_cryptography(),
+            cas=[ca_cert.to_cryptography()],
+            encryption_algorithm=(
+                serialization.BestAvailableEncryption(
+                    salt.utils.stringutils.to_bytes(passphrase)
+                )
+                if passphrase
+                else serialization.NoEncryption()
+            ),
+        )
 
     with salt.utils.files.fopen(
         f"{cert_base_path()}/{ca_name}/certs/{CN}.p12", "wb"
