@@ -51,3 +51,21 @@ def test_session_ca_bundle():
     with patch_os:
         ret = salt.utils.http.session(ca_bundle=fpath)
     assert ret.verify == fpath
+
+
+def test_query_tornado_httperror_no_response():
+    """
+    Tests that http.query handles a Tornado HTTPError where exc.response is None.
+    This happens on connection-level failures such as a connect timeout (HTTP 599)
+    where no HTTP response is ever received from the server.
+    """
+    import tornado.httpclient
+
+    http_error = tornado.httpclient.HTTPError(599, "Timeout while connecting")
+    assert http_error.response is None
+
+    mock_client = MagicMock()
+    mock_client.fetch.side_effect = http_error
+    # http.query() uses SyncWrapper as a context manager; ensure
+    # __enter__() returns the mock_client itself.
+    mock_client.__enter__.return_value = mock_client
