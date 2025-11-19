@@ -34,7 +34,7 @@ def test__auth_cmd_stats_passing(master_opts):
     with patch.object(req_server_channel, "_auth", _auth_mock):
         req_server_channel.payload_handler = MagicMock(return_value=future)
         req_server_channel.handle_message(
-            {"enc": "clear", "load": {"cmd": "_auth", "id": "minion"}}
+            {"enc": "clear", "load": {"cmd": "_auth", "id": "minion"}, "version": 3}
         )
         cur_time = time.time()
         req_server_channel.payload_handler.assert_called_once()
@@ -220,17 +220,15 @@ async def test_auth_version_downgrade_v3_to_v0(
     """
     REGRESSION TEST: CVE-2025-62349 - Auth Version Downgrade Attack
 
-    Test that a minion cannot downgrade from version 3 to version 0
-    to bypass security features like token validation.
+    Test that the master rejects authentication attempts using protocol version 0
+    when minimum_auth_version is set to 3.
 
-    EXPECTED BEHAVIOR:
-    - Master should reject authentication attempts with version < 3
-      from minions that previously authenticated with version 3
-    - Or enforce version 3+ security features regardless of claimed version
+    This prevents a malicious or compromised minion from using an older protocol
+    version to bypass security features introduced in version 3+ (token validation,
+    TTL checks, ID matching, session keys).
 
-    CURRENT BEHAVIOR (VULNERABLE):
-    - Test will FAIL - minion can successfully downgrade (vulnerability exists)
-    - After fix is implemented, this test will PASS
+    The test verifies that the minimum_auth_version enforcement works at the initial
+    authentication stage, preventing minions from establishing low-version sessions.
     """
     # Read minion public key
     with salt.utils.files.fopen(str(pki_dir / "minion" / "minion.pub"), "r") as fp:

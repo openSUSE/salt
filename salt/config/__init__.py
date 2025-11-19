@@ -1662,7 +1662,7 @@ DEFAULT_MASTER_OPTS = immutabletypes.freeze(
         "fileserver_interval": 3600,
         "request_server_aes_session": 0,
         "request_server_ttl": 0,
-        "minimum_auth_version": 0,
+        "minimum_auth_version": 3,
     }
 )
 
