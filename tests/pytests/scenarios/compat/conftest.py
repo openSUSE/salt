@@ -134,6 +134,8 @@ def salt_master(
         "log_level_logfile": "quiet",
         # We also want to scrutinize the key acceptance
         "open_mode": False,
+        # Allow older minion versions to connect (they don't support auth protocol v3)
+        "minimum_auth_version": 0,
     }
 
     # We need to copy the extension modules into the new master root_dir or
