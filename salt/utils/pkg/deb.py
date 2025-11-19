@@ -5,9 +5,7 @@ Common functions for working with deb packages
 import logging
 import os
 import re
-import weakref
 from collections import OrderedDict
-from typing import Generic, TypeVar, Union
 
 import salt.utils.files
 
@@ -18,10 +16,12 @@ _APT_SOURCES_LIST = "/etc/apt/sources.list"
 _APT_SOURCES_PARTSDIR = "/etc/apt/sources.list.d/"
 
 
-def string_to_bool(s):
+def string_to_bool_int(s):
     """
     Convert string representation of bool values to integer
     """
+    if isinstance(s, bool):
+        s = "yes" if s else "no"
     s = s.lower()
     if s in ("no", "false", "without", "off", "disable"):
         return 0
@@ -30,197 +30,132 @@ def string_to_bool(s):
     return -1
 
 
-class TagSection:
+class Deb822Section:
+    """
+    A deb822 section representation of single entry,
+    which could contain comments.
+    """
 
     def __init__(self, section):
-        self._data = section
-        self._re = re.compile(r"\A(\S+): (.*)")
+        """
+        Init new deb822 section object
+        """
+        if isinstance(section, Deb822Section):
+            self.tags = OrderedDict(section.tags)
+            self.header = section.header
+            self.footer = section.footer
+        else:
+            self.tags, self.header, self.footer = self._parse_section_string(section)
+        self._tag_map = {k.lower(): k for k in self.tags}
 
-    def __iter__(self):
-        lines = self._data.split("\n")
+    @staticmethod
+    def _parse_section_string(section_string):
+        """
+        Parse section string to comments and tags
+        """
+        header = []
+        footer = []
+        raw_data = []
+        tag_re = re.compile(r"\A(\S+):\s*(\S.*|)")
+        tags = OrderedDict()
+
+        for line in section_string.splitlines():
+            if line.startswith("#"):
+                if raw_data:
+                    footer.append(line)
+                else:
+                    header.append(line)
+            else:
+                raw_data.append(line)
+
         tag = None
         value = None
-        while lines:
-            line = lines.pop(0)
-            match = self._re.match(line)
+        for line in raw_data:
+            match = tag_re.match(line)
             if match:
                 if tag is not None:
-                    yield tag, value.strip()
+                    # Store previous found tag,
+                    # as the values could contain multiple lines
+                    tags[tag] = value.strip()
                 tag = match.group(1)
                 value = match.group(2)
             elif line == "" and tag is not None:
-                yield tag, value.strip()
+                tags[tag] = value.strip()
             else:
                 value = f"{value}\n{line}"
         if tag is not None:
-            yield tag, value.strip()
+            tags[tag] = value.strip()
 
-
-class Section:
-    """A single deb822 section, possibly with comments.
-
-    This represents a single deb822 section.
-    """
-
-    tags: OrderedDict
-    _case_mapping: dict
-    header: str
-    footer: str
-
-    def __init__(self, section):
-        if isinstance(section, Section):
-            self.tags = OrderedDict(section.tags)
-            self._case_mapping = {k.casefold(): k for k in self.tags}
-            self.header = section.header
-            self.footer = section.footer
-            return
-
-        comments = ["", ""]
-        in_section = False
-        trimmed_section = ""
-
-        for line in section.split("\n"):
-            if line.startswith("#"):
-                # remove the leading #
-                line = line[1:]
-                comments[in_section] += line + "\n"
-                continue
-
-            in_section = True
-            trimmed_section += line + "\n"
-
-        self.tags = OrderedDict(TagSection(trimmed_section))
-        self._case_mapping = {k.casefold(): k for k in self.tags}
-        self.header, self.footer = comments
+        return tags, header, footer
 
     def __getitem__(self, key):
-        """Get the value of a field."""
-        return self.tags[self._case_mapping.get(key.casefold(), key)]
+        """
+        Get the value of a tag
+        """
+        return self.tags[self._tag_map.get(key.lower(), key)]
 
     def __delitem__(self, key):
-        """Delete a field"""
-        del self.tags[self._case_mapping.get(key.casefold(), key)]
+        """
+        Delete the tag
+        """
+        _lc_key = key.lower()
+        del self.tags[self._tag_map.get(_lc_key, key)]
+        del self._tag_map[_lc_key]
 
     def __setitem__(self, key, val):
-        """Set the value of a field."""
-        if key.casefold() not in self._case_mapping:
-            self._case_mapping[key.casefold()] = key
-        self.tags[self._case_mapping[key.casefold()]] = val
+        """
+        Set the value of the tag
+        """
+        _lc_key = key.lower()
+        if _lc_key not in self._tag_map:
+            self._tag_map[_lc_key] = key
+        self.tags[key] = val
 
     def __bool__(self):
+        """
+        Represent as True if the section has any tag
+        """
         return bool(self.tags)
 
     def get(self, key, default=None):
+        """
+        Get the value of a tag or return default
+        """
         try:
             return self[key]
         except KeyError:
             return default
 
-    @staticmethod
-    def __comment_lines(content):
-        return (
-            "\n".join("#" + line for line in content.splitlines()) + "\n"
-            if content
-            else ""
-        )
-
     def __str__(self):
-        """Canonical string rendering of this section."""
+        """
+        Return the string representation of the section
+        """
         return (
-            self.__comment_lines(self.header)
+            "\n".join(self.header)
+            + ("\n" if self.header else "")
             + "".join(f"{k}: {v}\n" for k, v in self.tags.items())
-            + self.__comment_lines(self.footer)
+            + "\n".join(self.footer)
+            + ("\n" if self.footer else "")
         )
-
-
-class File:
-    """
-    Parse a given file object into a list of Section objects.
-    """
-
-    def __init__(self, fobj):
-        self.sections = []
-        section = ""
-        for line in fobj:
-            if not line.isspace():
-                # A line is part of the section if it has non-whitespace characters
-                section += line
-            elif section:
-                # Our line is just whitespace and we have gathered section content, so let's write out the section
-                self.sections.append(Section(section))
-                section = ""
-
-        # The final section may not be terminated by an empty line
-        if section:
-            self.sections.append(Section(section))
-
-    def __iter__(self):
-        return iter(self.sections)
-
-    def __str__(self):
-        return "\n".join(str(s) for s in self.sections)
-
-
-class SingleValueProperty(property):
-    def __init__(self, key, doc):
-        self.key = key
-        self.__doc__ = doc
-
-    def __get__(self, obj, objtype=None):
-        if obj is None:
-            return self
-        return obj.section.get(self.key, None)
-
-    def __set__(self, obj, value):
-        if value is None:
-            del obj.section[self.key]
-        else:
-            obj.section[self.key] = value
-
-
-class MultiValueProperty(property):
-    def __init__(self, key, doc):
-        self.key = key
-        self.__doc__ = doc
-
-    def __get__(self, obj, objtype=None):
-        if obj is None:
-            return self
-        return SourceEntry.mysplit(obj.section.get(self.key, ""))
-
-    def __set__(self, obj, values):
-        obj.section[self.key] = " ".join(values)
-
-
-class ExplodedEntryProperty(property, Generic[TypeVar("T")]):
-    def __init__(self, parent):
-        self.parent = parent
-
-    def __get__(
-        self,
-        obj,
-        objtype=None,
-    ):
-        if obj is None:
-            return self
-        return self.parent.__get__(obj.parent)
-
-    def __set__(self, obj, value):
-        obj.split_out()
-        self.parent.__set__(obj.parent, value)
-
-
-def DeprecatedProperty(prop):
-    """Wrapper to mark deprecated properties"""
-    return prop
-
-
-def _null_weakref():
-    """Behaves like an expired weakref.ref, returning None"""
-    return None
 
 
 class Deb822SourceEntry:
+    """
+    Source entry in deb822 format
+    """
+
+    _properties = {
+        "architectures": {"key": "Architectures", "multi": True},
+        "types": {"key": "Types", "multi": True},
+        "type": {"key": "Types", "multi": False, "deprecated": True},
+        "uris": {"key": "URIs", "multi": True},
+        "uri": {"key": "URIs", "multi": False, "deprecated": True},
+        "suites": {"key": "Suites", "multi": True},
+        "dist": {"key": "Suites", "multi": False, "deprecated": True},
+        "comps": {"key": "Components", "multi": True},
+        "signedby": {"key": "Signed-By", "multi": False},
+    }
+
     def __init__(
         self,
         section,
@@ -228,28 +163,48 @@ class Deb822SourceEntry:
         list=None,
     ):
         if section is None:
-            self.section = Section("")
+            self.section = Deb822Section("")
         elif isinstance(section, str):
-            self.section = Section(section)
+            self.section = Deb822Section(section)
         else:
             self.section = section
 
         self._line = str(self.section)
         self.file = file
-        self.template = None  # type DistInfo.Suite
-        self.may_merge = False
-        self._children = weakref.WeakSet()
 
-        if list:
-            self._list = weakref.ref(list)
+    def __getattr__(self, name):
+        """
+        Get the values to the section for specified keys
+        """
+        if name in self._properties:
+            if self._properties[name]["multi"]:
+                return SourceEntry.split_source_line(
+                    self.section.get(self._properties[name]["key"], "")
+                )
+            else:
+                return self.section.get(self._properties[name]["key"], None)
+
+    def __setattr__(self, name, value):
+        """
+        Pass the values to the section for specified keys
+        """
+        if name not in self._properties:
+            return super().__setattr__(name, value)
+
+        key = self._properties[name]["key"]
+        if value is None:
+            del self.section[key]
         else:
-            self._list = _null_weakref
-
-        self.signedby = self.section.tags.get("Signed-By", "")
+            if key == "Signed-By":
+                value = str(value)
+            self.section[key] = (
+                " ".join(value) if self._properties[name]["multi"] else value
+            )
 
     def __eq__(self, other):
-        #  FIXME: Implement plurals more correctly
-        """equal operator for two sources.list entries"""
+        """
+        Equal operator for deb822 source entries
+        """
         return (
             self.disabled == other.disabled
             and self.type == other.type
@@ -259,47 +214,57 @@ class Deb822SourceEntry:
             and self.comps == other.comps
         )
 
-    architectures = MultiValueProperty("Architectures", "The list of architectures")
-    types = MultiValueProperty("Types", "The list of types")
-    type = DeprecatedProperty(SingleValueProperty("Types", "The list of types"))
-    uris = MultiValueProperty("URIs", "URIs in the source")
-    uri = DeprecatedProperty(SingleValueProperty("URIs", "URIs in the source"))
-    suites = MultiValueProperty("Suites", "Suites in the source")
-    dist = DeprecatedProperty(SingleValueProperty("Suites", "Suites in the source"))
-    comps = MultiValueProperty("Components", "Components in the source")
-
     @property
     def comment(self):
-        """Legacy attribute describing the paragraph header."""
-        return self.section.header
+        """
+        Returns the header of the section
+        """
+        return "\n".join(self.section.header)
 
     @comment.setter
     def comment(self, comment):
-        """Legacy attribute describing the paragraph header."""
-        self.section.header = comment
+        """
+        Sets the header of the section
+        """
+        comments = comment.splitlines()
+        if not all(x.startswith("#") for x in comments):
+            comments = [f"#{x}" for x in comments]
+        self.section.header = comments
 
     @property
     def trusted(self):
-        """Return the value of the Trusted field"""
+        """
+        Return the value of the Trusted field
+        """
         try:
-            return string_to_bool(self.section["Trusted"])
+            return string_to_bool_int(self.section["Trusted"]) == 1
         except KeyError:
             return None
 
     @trusted.setter
     def trusted(self, value):
-        if value is None:
+        import traceback
+        log.critical("ST822: %s: %s | %s", type(value), value, "".join(traceback.format_stack()))
+        if isinstance(value, bool):
+            self.section["Trusted"] = "yes" if value else "no"
+        elif isinstance(value, int) and value in (0, 1):
+            self.section["Trusted"] = "yes" if value == 1 else "no"
+        elif isinstance(value, str):
+            self.section["Trusted"] = (
+                "yes" if string_to_bool_int(value) == 1 else "no"
+            )
+        else:
             try:
                 del self.section["Trusted"]
             except KeyError:
                 pass
-        else:
-            self.section["Trusted"] = "yes" if value else "no"
 
     @property
     def disabled(self):
-        """Check if Enabled: no is set."""
-        return not string_to_bool(self.section.get("Enabled", "yes"))
+        """
+        Return True if the source is enabled
+        """
+        return not string_to_bool_int(self.section.get("Enabled", "yes"))
 
     @disabled.setter
     def disabled(self, value):
@@ -313,280 +278,60 @@ class Deb822SourceEntry:
 
     @property
     def invalid(self):
-        """A section is invalid if it doesn't have proper entries."""
+        """
+        Return True if the source doesn't have proper attributes
+        """
         return not self.section
 
     @property
     def line(self):
-        """The entire (original) paragraph."""
+        """
+        Return the original string representation of the source entry
+        """
         return self._line
 
     def __str__(self):
-        return self.str().strip()
-
-    def str(self):
-        """Section as a string, newline terminated."""
-        return str(self.section)
-
-    def set_enabled(self, enabled):
-        """Deprecated (for deb822) accessor for .disabled"""
-        self.disabled = not enabled
-
-    def merge(self, other):
-        """Merge the two entries if they are compatible."""
-        if (
-            not self.may_merge
-            and self.template is None
-            and not all(child.template for child in self._children)
-        ):
-            return False
-        if self.file != other.file:
-            return False
-        if not isinstance(other, Deb822SourceEntry):
-            return False
-        if self.comment != other.comment and not any(
-            "Added by software-properties" in c for c in (self.comment, other.comment)
-        ):
-            return False
-
-        for tag in set(list(self.section.tags) + list(other.section.tags)):
-            if tag.lower() in (
-                "types",
-                "uris",
-                "suites",
-                "components",
-                "architectures",
-                "signed-by",
-            ):
-                continue
-            in_self = self.section.get(tag, None)
-            in_other = other.section.get(tag, None)
-            if in_self != in_other:
-                return False
-
-        if (
-            sum(
-                [
-                    set(self.types) != set(other.types),
-                    set(self.uris) != set(other.uris),
-                    set(self.suites) != set(other.suites),
-                    set(self.comps) != set(other.comps),
-                    set(self.architectures) != set(other.architectures),
-                ]
-            )
-            > 1
-        ):
-            return False
-
-        for typ in other.types:
-            if typ not in self.types:
-                self.types += [typ]
-
-        for uri in other.uris:
-            if uri not in self.uris:
-                self.uris += [uri]
-
-        for suite in other.suites:
-            if suite not in self.suites:
-                self.suites += [suite]
-
-        for component in other.comps:
-            if component not in self.comps:
-                self.comps += [component]
-
-        for arch in other.architectures:
-            if arch not in self.architectures:
-                self.architectures += [arch]
-
-        return True
-
-    def _reparent_children(self, to):
-        """If we end up being split, check if any of our children need to be reparented to the new parent."""
-        for child in self._children:
-            for typ in to.types:
-                for uri in to.uris:
-                    for suite in to.suites:
-                        if (child._type, child._uri, child._suite) == (
-                            typ,
-                            uri,
-                            suite,
-                        ):
-                            assert child.parent == self
-                            child._parent = weakref.ref(to)
-
-
-class ExplodedDeb822SourceEntry:
-    """This represents a bit of a deb822 paragraph corresponding to a legacy sources.list entry"""
-
-    # Mostly we use slots to prevent accidentally assigning unproxied attributes
-    __slots__ = ["_parent", "_type", "_uri", "_suite", "template", "__weakref__"]
-
-    def __init__(self, parent, typ, uri, suite):
-        self._parent = weakref.ref(parent)
-        self._type = typ
-        self._uri = uri
-        self._suite = suite
-        self.template = parent.template
-        parent._children.add(self)
-
-    @property
-    def parent(self):
-        if self._parent is not None:
-            parent = self._parent()
-            if parent is not None:
-                return parent
-        raise ValueError("The parent entry is no longer valid")
-
-    @property
-    def uri(self):
-        self.__check_valid()
-        return self._uri
-
-    @uri.setter
-    def uri(self, uri):
-        self.split_out()
-        self.parent.uris = [u if u != self._uri else uri for u in self.parent.uris]
-        self._uri = uri
-
-    @property
-    def types(self):
-        return [self.type]
-
-    @property
-    def suites(self):
-        return [self.dist]
-
-    @property
-    def uris(self):
-        return [self.uri]
-
-    @property
-    def type(self):
-        self.__check_valid()
-        return self._type
-
-    @type.setter
-    def type(self, typ):
-        self.split_out()
-        self.parent.types = [typ]
-        self._type = typ
-        self.__check_valid()
-        assert self._type == typ
-        assert self.parent.types == [self._type]
-
-    @property
-    def dist(self):
-        self.__check_valid()
-        return self._suite
-
-    @dist.setter
-    def dist(self, suite):
-        self.split_out()
-        self.parent.suites = [suite]
-        self._suite = suite
-        self.__check_valid()
-        assert self._suite == suite
-        assert self.parent.suites == [self._suite]
-
-    def __check_valid(self):
-        if self.parent._list() is None:
-            raise ValueError("The parent entry is dead")
-        for type in self.parent.types:
-            for uri in self.parent.uris:
-                for suite in self.parent.suites:
-                    if (type, uri, suite) == (self._type, self._uri, self._suite):
-                        return
-        raise ValueError(f"Could not find parent of {self}")
-
-    def split_out(self):
-        parent = self.parent
-        if (parent.types, parent.uris, parent.suites) == (
-            [self._type],
-            [self._uri],
-            [self._suite],
-        ):
-            return
-        sources_list = parent._list()
-        if sources_list is None:
-            raise ValueError("The parent entry is dead")
-
-        try:
-            index = sources_list.list.index(parent)
-        except ValueError as e:
-            raise ValueError(
-                f"Parent entry for partial deb822 {self} no longer valid"
-            ) from e
-
-        sources_list.remove(parent)
-
-        reparented = False
-        for type in reversed(parent.types):
-            for uri in reversed(parent.uris):
-                for suite in reversed(parent.suites):
-                    new = Deb822SourceEntry(
-                        section=Section(parent.section),
-                        file=parent.file,
-                        list=sources_list,
-                    )
-                    new.types = [type]
-                    new.uris = [uri]
-                    new.suites = [suite]
-                    new.may_merge = True
-
-                    parent._reparent_children(new)
-                    sources_list.list.insert(index, new)
-                    if (type, uri, suite) == (self._type, self._uri, self._suite):
-                        self._parent = weakref.ref(new)
-                        reparented = True
-        if not reparented:
-            raise ValueError(f"Could not find parent of {self}")
-
-    def __repr__(self):
-        return f"<child {self._type} {self._uri} {self._suite} of {self._parent}"
-
-    architectures = ExplodedEntryProperty(Deb822SourceEntry.architectures)
-    comps = ExplodedEntryProperty(Deb822SourceEntry.comps)
-    invalid = ExplodedEntryProperty(Deb822SourceEntry.invalid)
-    disabled = ExplodedEntryProperty(Deb822SourceEntry.disabled)
-    trusted = ExplodedEntryProperty(Deb822SourceEntry.trusted)
-    comment = ExplodedEntryProperty(Deb822SourceEntry.comment)
+        """
+        Return the string representation of the entry
+        """
+        return str(self.section).strip()
 
     def set_enabled(self, enabled):
-        """Set the source to enabled."""
+        """
+        Opposite to .disabled
+        """
         self.disabled = not enabled
-
-    @property
-    def file(self):
-        """Return the file."""
-        return self.parent.file
 
 
 class SourceEntry:
-    """single sources.list entry"""
+    """
+    Distinct sources.list entry
+    """
 
     def __init__(self, line, file=None):
-        self.invalid = False  # is the source entry valid
-        self.disabled = False  # is it disabled ('#' in front)
-        self.type = ""  # what type (deb, deb-src)
-        self.architectures = []  # architectures
-        self.signedby = ""  # signed-by
-        self.trusted = None  # Trusted
-        self.uri = ""  # base-uri
-        self.dist = ""  # distribution (dapper, edgy, etc)
-        self.comps = []  # list of available componetns (may empty)
-        self.comment = ""  # (optional) comment
-        self.line = line  # the original sources.list line
+        self.invalid = False
+        self.disabled = False  # identified as disabled if commented
+        self.type = ""  # type of the source (deb, deb-src)
+        self.architectures = []
+        self._signedby = ""
+        self._trusted = None
+        self.uri = ""
+        self.dist = ""  # distribution name
+        self.comps = []  # list of available componetns (or empty)
+        self.comment = ""  # comment (optional)
+        self.line = line  # the original sources.list entry
         if file is None:
             file = _APT_SOURCES_LIST
         if file.endswith(".sources"):
             raise ValueError("Classic SourceEntry cannot be written to .sources file")
         self.file = file  # the file that the entry is located in
-        self._parse_sources(line)
-        self.template = None  # type DistInfo.Suite
+        self.parse(line)
         self.children = []
 
     def __eq__(self, other):
-        """equal operator for two sources.list entries"""
+        """
+        Equal operator for two classic sources.list entries
+        """
         return (
             self.disabled == other.disabled
             and self.type == other.type
@@ -596,9 +341,10 @@ class SourceEntry:
         )
 
     @staticmethod
-    def mysplit(line):
-        """a split() implementation that understands the sources.list
-        format better and takes [] into account (for e.g. cdroms)"""
+    def split_source_line(line):
+        """
+        Splits the entries of sources.list format
+        """
         line = line.strip()
         pieces = []
         tmp = ""
@@ -634,20 +380,43 @@ class SourceEntry:
         return pieces
 
     def parse(self, line):
-        """parse a given sources.list (textual) line and break it up
-        into the field we have"""
-        return self._parse_sources(line)
+        """
+        Parse lines from sources files
+        """
+        self.disabled, self.invalid, self.comment, repo_line = _invalid(line)
+        if self.invalid:
+            return False
+        if repo_line[1].startswith("["):
+            repo_line = [x for x in (line.strip("[]") for line in repo_line) if x]
+            opts = _get_opts(self.line)
+            if "arch" in opts:
+                self.architectures.extend(opts["arch"]["value"])
+            if "signedby" in opts:
+                self.signedby = opts["signedby"]["value"]
+            if "trusted" in opts:
+                self.trusted = opts["trusted"]["value"]
+            for opt in opts.values():
+                opt = opt["full"]
+                if opt:
+                    try:
+                        repo_line.pop(repo_line.index(opt))
+                    except ValueError:
+                        repo_line.pop(repo_line.index(f"[{opt}]"))
+        self.type = repo_line[0]
+        self.uri = repo_line[1]
+        self.dist = repo_line[2]
+        self.comps = repo_line[3:]
+        return True
 
     def __str__(self):
-        """debug helper"""
-        return self.str().strip()
-
-    def str(self):
-        return self.repo_line()
+        """
+        Return string representation
+        """
+        return self.repo_line().strip()
 
     def repo_line(self):
         """
-        Return the repo line for the sources file
+        Return the line of the entry for the sources file
         """
         repo_line = []
         if self.invalid:
@@ -667,6 +436,13 @@ class SourceEntry:
                 opts["signedby"] = {}
             opts["signedby"]["full"] = f"signed-by={self.signedby}"
             opts["signedby"]["value"] = self.signedby
+        if self._trusted:
+            if "trusted" not in opts:
+                opts["trusted"] = {}
+            opts["trusted"]["value"] = "yes" if self._trusted else "no"
+            opts["trusted"]["full"] = f"trusted={opts['trusted']['value']}"
+        if "trusted" in opts and opts["trusted"]["value"] == "no":
+            del opts["trusted"]
 
         ordered_opts = []
         for opt in opts.values():
@@ -681,53 +457,34 @@ class SourceEntry:
             repo_line.append(f"#{self.comment}")
         return " ".join(repo_line) + "\n"
 
-    def _parse_sources(self, line):
-        """
-        Parse lines from sources files
-        """
-        self.disabled, self.invalid, self.comment, repo_line = _invalid(line)
-        if self.invalid:
-            return False
-        if repo_line[1].startswith("["):
-            repo_line = [x for x in (line.strip("[]") for line in repo_line) if x]
-            opts = _get_opts(self.line)
-            if "arch" in opts:
-                self.architectures.extend(opts["arch"]["value"])
-            if "signedby" in opts:
-                self.signedby = opts["signedby"]["value"]
-            for opt in opts.values():
-                opt = opt["full"]
-                if opt:
-                    try:
-                        repo_line.pop(repo_line.index(opt))
-                    except ValueError:
-                        repo_line.pop(repo_line.index(f"[{opt}]"))
-        self.type = repo_line[0]
-        self.uri = repo_line[1]
-        self.dist = repo_line[2]
-        self.comps = repo_line[3:]
-        return True
-
     @property
     def types(self):
-        """deb822 compatible accessor for the type"""
+        """
+        Deb822 compatible attribute for the type
+        """
         return [self.type]
 
     @property
     def uris(self):
-        """deb822 compatible accessor for the uri"""
+        """
+        Deb822 compatible attribute for the uri
+        """
         return [self.uri]
 
     @property
     def suites(self):
-        """deb822 compatible accessor for the suite"""
+        """
+        Deb822 compatible attribute for the suite
+        """
         if self.dist:
             return [self.dist]
         return []
 
     @suites.setter
     def suites(self, suites):
-        """deb822 compatible setter for the suite"""
+        """
+        Deb822 compatible setter for the suite
+        """
         if len(suites) > 1:
             raise ValueError("Only one suite is possible for non deb822 source entry")
         if suites:
@@ -737,22 +494,52 @@ class SourceEntry:
             self.dist = ""
             assert self.dist == ""
 
+    @property
+    def signedby(self):
+        """
+        Deb822 compatible attribute for the signedby
+        """
+        return self._signedby
 
-AnySourceEntry = Union[SourceEntry, Deb822SourceEntry]
-AnyExplodedSourceEntry = Union[
-    SourceEntry, Deb822SourceEntry, ExplodedDeb822SourceEntry
-]
+    @signedby.setter
+    def signedby(self, signedby):
+        """
+        Deb822 compatible setter for the signedy
+        """
+        self._signedby = str(signedby)
+
+    @property
+    def trusted(self):
+        """
+        Deb822 compatible attribute for the trusted
+        """
+        return self._trusted
+
+    @trusted.setter
+    def trusted(self, trusted):
+        """
+        Deb822 compatible setter for the trusted
+        """
+        if isinstance(trusted, bool):
+            self._trusted = trusted
+        elif isinstance(trusted, int) and trusted in (0, 1):
+            self._trusted = trusted == 1
+        elif isinstance(trusted, str):
+            self._trusted = string_to_bool_int(trusted) == 1
+        else:
+            self._trusted = None
 
 
 class SourcesList:
-    """represents the full sources.list + sources.list.d file"""
+    """
+    Represents the full sources.list + sources.list.d files
+    including deb822 .sources files
+    """
 
     def __init__(
         self,
-        deb822=True,
     ):
         self.list = []  # the actual SourceEntries Type
-        self.deb822 = deb822
         self.refresh()
 
     def refresh(self):
@@ -766,19 +553,18 @@ class SourcesList:
         partsdir = _APT_SOURCES_PARTSDIR
         if os.path.isdir(partsdir):
             for file in os.listdir(partsdir):
-                if (self.deb822 and file.endswith(".sources")) or file.endswith(
-                    ".list"
-                ):
+                if file.endswith(".sources") or file.endswith(".list"):
                     self.load(os.path.join(partsdir, file))
 
     def __iter__(self):
-        """simple iterator to go over self.list, returns SourceEntry
-        types"""
+        """
+        Iterate over self.list with SourceEntry elements
+        """
         yield from self.list
 
     def __find(self, *predicates, **attrs):
         uri = attrs.pop("uri", None)
-        for source in self.exploded_list():
+        for source in self.list:
             if uri and source.uri and uri.rstrip("/") != source.uri.rstrip("/"):
                 continue
             if all(getattr(source, key) == attrs[key] for key in attrs) and all(
@@ -853,7 +639,7 @@ class SourcesList:
                     source.disabled = False
                     return source
 
-        new_entry: AnySourceEntry
+        new_entry = None
         if file is None:
             file = _APT_SOURCES_LIST
         if file.endswith(".sources"):
@@ -896,48 +682,52 @@ class SourcesList:
         return new_entry
 
     def remove(self, source_entry):
-        """remove the specified entry from the sources.list"""
-        if isinstance(source_entry, ExplodedDeb822SourceEntry):
-            source_entry.split_out()
-            source_entry = source_entry.parent
+        """
+        Remove the entry from the sources.list
+        """
         self.list.remove(source_entry)
 
-    def load(self, file):
-        """(re)load the current sources"""
+    def load_deb822_sections(self, file_obj):
+        """
+        Return Deb822 sections from .sources file object
+        """
+        sections = []
+        section = ""
+        for line in file_obj:
+            if not line.isspace():
+                # Consider not empty line as a part of a section
+                section += line
+            elif section:
+                # Add a new section on getting first space line
+                sections.append(Deb822Section(section))
+                section = ""
+
+        # Create the last section if we still have data for it
+        if section:
+            sections.append(Deb822Section(section))
+
+        return sections
+
+    def load(self, file_path):
+        """
+        Load the sources from the file
+        """
         try:
-            with salt.utils.files.fopen(file) as f:
-                if file.endswith(".sources"):
-                    for section in File(f):
-                        self.list.append(Deb822SourceEntry(section, file, list=self))
+            with salt.utils.files.fopen(file_path) as f:
+                if file_path.endswith(".sources"):
+                    for section in self.load_deb822_sections(f):
+                        self.list.append(
+                            Deb822SourceEntry(section, file_path, list=self)
+                        )
                 else:
                     for line in f:
-                        source = SourceEntry(line, file)
+                        source = SourceEntry(line, file_path)
                         self.list.append(source)
         except Exception as exc:  # pylint: disable=broad-except
-            logging.warning(f"could not parse source file '{file}': {exc}\n")
+            log.error("Could not parse source file '%s'", file_path, exc_info=True)
 
     def index(self, entry):
-        if isinstance(entry, ExplodedDeb822SourceEntry):
-            return self.list.index(entry.parent)
         return self.list.index(entry)
-
-    def merge(self):
-        """Merge consecutive entries that have been split back together."""
-        merged = True
-        while merged:
-            i = 0
-            merged = False
-            while i + 1 < len(self.list):
-                entry = self.list[i]
-                if isinstance(entry, Deb822SourceEntry):
-                    j = i + 1
-                    while j < len(self.list):
-                        if entry.merge(self.list[j]):
-                            del self.list[j]
-                            merged = True
-                        else:
-                            j += 1
-                i += 1
 
     def save(self):
         """save the current sources"""
@@ -958,42 +748,16 @@ class SourcesList:
                 pass
             return
 
-        self.merge()
         files = {}
         for source in self.list:
             if source.file not in files:
                 files[source.file] = []
             elif isinstance(source, Deb822SourceEntry):
                 files[source.file].append("\n")
-            files[source.file].append(source.str())
+            files[source.file].append(str(source) + "\n")
         for file in files:
             with salt.utils.files.fopen(file, "w") as f:
                 f.write("".join(files[file]))
-
-    def exploded_list(self):
-        """Present an exploded view of the list where each entry corresponds exactly to a Release file.
-
-        A release file is uniquely identified by the triplet (type, uri, suite). Old style entries
-        always referred to a single release file, but deb822 entries allow multiple values for each
-        of those fields.
-        """
-        res: list[AnyExplodedSourceEntry] = []
-        for entry in self.list:
-            if isinstance(entry, SourceEntry):
-                res.append(entry)
-            elif (
-                len(entry.types) == 1
-                and len(entry.uris) == 1
-                and len(entry.suites) == 1
-            ):
-                res.append(entry)
-            else:
-                for typ in entry.types:
-                    for uri in entry.uris:
-                        for sui in entry.suites:
-                            res.append(ExplodedDeb822SourceEntry(entry, typ, uri, sui))
-
-        return res
 
 
 def _invalid(line):
@@ -1066,6 +830,10 @@ def _get_opts(line):
             ret["signedby"] = {}
             ret["signedby"]["full"] = opt
             ret["signedby"]["value"] = opt.split("=", 1)[1]
+        elif opt.startswith("trusted"):
+            ret["trusted"] = {}
+            ret["trusted"]["full"] = opt
+            ret["trusted"]["value"] = opt.split("=", 1)[1]
         else:
             other_opt = opt.split("=", 1)[0]
             ret[other_opt] = {}
