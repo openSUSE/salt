@@ -1002,6 +1002,8 @@ VALID_OPTS = immutabletypes.freeze(
         "request_server_aes_session": int,
         "request_channel_timeout": int,
         "request_channel_tries": int,
+        # Minimum authentication protocol version to accept from minions
+        "minimum_auth_version": int,
     }
 )
 
@@ -1660,6 +1662,7 @@ DEFAULT_MASTER_OPTS = immutabletypes.freeze(
         "fileserver_interval": 3600,
         "request_server_aes_session": 0,
         "request_server_ttl": 0,
+        "minimum_auth_version": 0,
     }
 )
 
