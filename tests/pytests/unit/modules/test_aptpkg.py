@@ -1095,7 +1095,7 @@ def test__parse_source(case):
     importlib.reload(aptpkg)
 
     source = NoAptSourceEntry(case["line"])
-    ok = source._parse_sources(case["line"])
+    ok = source.parse(case["line"])
 
     assert ok is case["ok"]
     assert source.invalid is case["invalid"]
