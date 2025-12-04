@@ -84,8 +84,6 @@ import shutil
 import sys
 import tempfile
 
-import pkg_resources  # pylint: disable=3rd-party-module-not-gated
-
 import salt.utils.data
 import salt.utils.files
 import salt.utils.json
@@ -95,11 +93,6 @@ import salt.utils.stringutils
 import salt.utils.url
 import salt.utils.versions
 from salt.exceptions import CommandExecutionError, CommandNotFoundError
-
-try:
-    import pkg_resources
-except ImportError:
-    pkg_resources = None
 
 
 # This needs to be named logger so we don't shadow it in pip.install
@@ -120,12 +113,7 @@ def __virtual__():
     entire filesystem.  If it's not installed in a conventional location, the
     user is required to provide the location of pip each time it is used.
     """
-    if pkg_resources is None:
-        ret = False, 'Package dependency "pkg_resource" is missing'
-    else:
-        ret = "pip"
-
-    return ret
+    return "pip"
 
 
 def _pip_bin_env(cwd, bin_env):
@@ -1711,7 +1699,7 @@ def list_all_versions(
             versions = [
                 v for v in match.group(1).split(", ") if v and excludes.match(v)
             ]
-            versions.sort(key=pkg_resources.parse_version)
+            versions.sort(key=salt.utils.versions.parse)
             break
     if not versions:
         return None
