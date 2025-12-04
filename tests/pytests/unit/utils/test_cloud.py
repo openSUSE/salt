@@ -13,7 +13,6 @@ import tempfile
 import pytest
 
 import salt.utils.cloud as cloud
-import salt.utils.versions
 from salt.utils.cloud import __ssh_gateway_arguments as ssh_gateway_arguments
 from tests.support.mock import MagicMock, patch
 
