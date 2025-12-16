@@ -190,7 +190,7 @@ class _LDAPConnection:
         self.binddn = binddn
         self.bindpw = bindpw
 
-        if self.uri == "":
+        if self.uri is None or self.uri == "":
             self.uri = "ldap://{}:{}".format(self.server, self.port)
 
         try:
