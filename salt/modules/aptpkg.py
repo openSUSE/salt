@@ -46,12 +46,12 @@ from salt.exceptions import (
 from salt.modules.cmdmod import _parse_env
 from salt.utils.versions import warn_until_date
 from salt.utils.pkg.deb import (
-    Deb822SourceEntry,
     Deb822Section,
+    Deb822SourceEntry,
     SourceEntry,
     SourcesList,
-    string_to_bool,
     _invalid,
+    string_to_bool,
 )
 
 log = logging.getLogger(__name__)
