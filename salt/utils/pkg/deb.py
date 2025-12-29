@@ -787,10 +787,6 @@ def _get_opts(line):
             ret["signedby"] = {}
             ret["signedby"]["full"] = opt
             ret["signedby"]["value"] = opt.split("=", 1)[1]
-        elif opt.startswith("trusted"):
-            ret["trusted"] = {}
-            ret["trusted"]["full"] = opt
-            ret["trusted"]["value"] = opt.split("=", 1)[1]
         else:
             other_opt = opt.split("=", 1)[0]
             ret[other_opt] = {}
