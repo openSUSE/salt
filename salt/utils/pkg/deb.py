@@ -18,7 +18,7 @@ _APT_SOURCES_PARTSDIR = "/etc/apt/sources.list.d/"
 
 def string_to_bool(s):
     """
-    Convert string representation of bool values to integer
+    Convert string representation of bool values to bool
     """
     if isinstance(s, bool):
         return s
