@@ -77,8 +77,7 @@ class Deb822Section:
                     # Store previous found tag,
                     # as the values could contain multiple lines
                     tags[tag] = value.strip()
-                tag = match.group(1)
-                value = match.group(2)
+                tag, value = match.groups()
             elif line == "" and tag is not None:
                 tags[tag] = value.strip()
             else:
