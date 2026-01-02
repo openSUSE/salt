@@ -192,6 +192,7 @@ class MockSourceEntry:
         self.uri = uri
         self.uris = [uri]
         self.type = source_type
+        self.types = [source_type]
         self.line = line
         self.invalid = invalid
         self.file = file
@@ -201,7 +202,6 @@ class MockSourceEntry:
         self.comps = []
         self.architectures = []
         self.signedby = ""
-        self.types = []
 
     def mysplit(self, line):
         return line.split()
@@ -935,33 +935,30 @@ def test_mod_repo_match(tmp_path):
         aptpkg.__salt__,
         {"config.option": MagicMock(), "no_proxy": MagicMock(return_value=False)},
     ):
-        with patch("salt.modules.aptpkg.refresh_db", MagicMock(return_value={})):
-            with patch("salt.utils.data.is_true", MagicMock(return_value=True)):
-                with patch("salt.modules.aptpkg.SourceEntry", MagicMock(), create=True):
-                    with patch(
-                        "salt.modules.aptpkg.SourcesList",
-                        MagicMock(return_value=mock_source_list),
-                        create=True,
-                    ):
-                        with patch(
-                            "salt.modules.aptpkg._split_repo_str",
-                            MagicMock(
-                                return_value={
-                                    "type": "deb",
-                                    "architectures": [],
-                                    "uri": "http://cdn-aws.deb.debian.org/debian/",
-                                    "dist": "stretch",
-                                    "comps": ["main"],
-                                    "signedby": "",
-                                }
-                            ),
-                        ):
-                            source_line_no_slash = (
-                                "deb http://cdn-aws.deb.debian.org/debian"
-                                " stretch main"
-                            )
-                            repo = aptpkg.mod_repo(source_line_no_slash, enabled=False)
-                            assert repo[source_line_no_slash]["uri"] == source_uri
+        with patch("salt.modules.aptpkg.refresh_db", MagicMock(return_value={})), patch(
+            "salt.utils.data.is_true", MagicMock(return_value=True)
+        ), patch("salt.modules.aptpkg.SourceEntry", MagicMock(), create=True), patch(
+            "salt.modules.aptpkg.SourcesList",
+            MagicMock(return_value=mock_source_list),
+            create=True,
+        ), patch(
+            "salt.modules.aptpkg._split_repo_str",
+            MagicMock(
+                return_value={
+                    "type": "deb",
+                    "architectures": [],
+                    "uri": "http://cdn-aws.deb.debian.org/debian/",
+                    "dist": "stretch",
+                    "comps": ["main"],
+                    "signedby": "",
+                }
+            ),
+        ):
+            source_line_no_slash = (
+                "deb http://cdn-aws.deb.debian.org/debian stretch main"
+            )
+            repo = aptpkg.mod_repo(source_line_no_slash, enabled=False)
+            assert repo[source_line_no_slash]["uri"] == source_uri
 
 
 def test_list_downloaded():
