@@ -1,10 +1,6 @@
-import glob
 import logging
 import os
 import pathlib
-import shutil
-import sys
-import sysconfig
 
 import _pytest._version
 import attr
@@ -12,7 +8,6 @@ import pytest
 import requests
 
 import salt.utils.files
-from tests.conftest import CODE_DIR
 
 PYTEST_GE_7 = getattr(_pytest._version, "version_tuple", (-1, -1)) >= (7, 0)
 
