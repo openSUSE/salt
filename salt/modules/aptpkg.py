@@ -2664,6 +2664,7 @@ def mod_repo(repo, saltenv="base", aptkey=True, **kwargs):
     if "comments" in kwargs:
         kwargs["comments"] = salt.utils.pkg.deb.combine_comments(kwargs["comments"])
 
+    repo_source_entry = SourceEntry(repo)
     if not mod_source:
         if not aptkey and not (
             kwargs["signedby"] or string_to_bool(kwargs.get("trusted", "no"))
