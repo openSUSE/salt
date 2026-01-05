@@ -5,7 +5,6 @@
     versionadded:: 2017.7.0
 """
 
-
 import copy
 import importlib
 import logging
@@ -23,7 +22,7 @@ from salt.exceptions import (
     CommandNotFoundError,
     SaltInvocationError,
 )
-from tests.support.mock import MagicMock, Mock, call, patch
+from tests.support.mock import MagicMock, Mock, call, mock_open, patch
 
 log = logging.getLogger(__name__)
 
@@ -1227,7 +1226,7 @@ def test_expand_repo_def_cdrom():
 
     # Valid source
     repo = "# deb cdrom:[Debian GNU/Linux 11.4.0 _Bullseye_ - Official amd64 NETINST 20220709-10:31]/ bullseye main\n"
-    sanitized = aptpkg.expand_repo_def(os_name="debian", repo=repo, file=source_file)
+    sanitized = aptpkg._expand_repo_def(os_name="debian", repo=repo, file=source_file)
     log.warning("SAN: %s", sanitized)
 
     assert isinstance(sanitized, dict)
@@ -1238,7 +1237,7 @@ def test_expand_repo_def_cdrom():
 
     # Pass the architecture and make sure it is added the the line attribute
     repo = "deb http://cdn-aws.deb.debian.org/debian/ stretch main\n"
-    sanitized = aptpkg.expand_repo_def(
+    sanitized = aptpkg._expand_repo_def(
         os_name="debian", repo=repo, file=source_file, architectures="amd64"
     )
 
@@ -1492,31 +1491,25 @@ SERVICE:cups-daemon,390,/usr/sbin/cupsd
         ]
 
 
-@pytest.fixture
-def _test_sourceslist_multiple_comps_fs(fs):
-    fs.create_dir("/etc/apt/sources.list.d")
-    fs.create_file(
-        "/etc/apt/sources.list",
-        contents="deb http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
-    )
-    yield
-
-
-@pytest.mark.usefixtures("_test_sourceslist_multiple_comps_fs")
 def test_sourceslist_multiple_comps():
     """
     Test SourcesList when repo has multiple comps
     """
-    sources = aptpkg.SourcesList()
-    for source in sources:
-        assert source.type == "deb"
-        assert source.uri == "http://archive.ubuntu.com/ubuntu/"
-        assert source.comps == ["main", "restricted"]
-        assert source.dist == "focal-updates"
+    repo_line = "deb http://archive.ubuntu.com/ubuntu/ focal-updates main restricted"
+    with patch("salt.utils.files.fopen", mock_open(read_data=repo_line)), patch(
+        "pathlib.Path.is_file", side_effect=[True, False]
+    ):
+        sources = aptpkg.SourcesList()
+        for source in sources:
+            assert source.type == "deb"
+            assert source.uri == "http://archive.ubuntu.com/ubuntu/"
+            assert source.comps == ["main", "restricted"]
+            assert source.dist == "focal-updates"
 
 
-@pytest.fixture(
-    params=(
+@pytest.mark.parametrize(
+    "repo_line",
+    [
         "deb [ arch=amd64 ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64 ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64 test=one ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
@@ -1524,14 +1517,8 @@ def test_sourceslist_multiple_comps():
         "deb [ arch=amd64,armel test=one ] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [ arch=amd64,armel test=one] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
         "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ focal-updates main restricted",
-    )
+    ],
 )
-def repo_line(request, fs):
-    fs.create_dir("/etc/apt/sources.list.d")
-    fs.create_file("/etc/apt/sources.list", contents=request.param)
-    yield request.param
-
-
 def test_sourceslist_architectures(repo_line):
     """
     Test SourcesList when architectures is in repo
