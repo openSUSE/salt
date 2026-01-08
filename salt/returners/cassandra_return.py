@@ -53,7 +53,7 @@ def __virtual__():
     if not HAS_PYCASSA:
         return False, "Could not import cassandra returner; pycassa is not installed."
     warn_until_date(
-        "20260101",
+        "20270101",
         "The cassandra returner is broken and deprecated, and will be removed"
         " after {date}. Use the cassandra_cql returner instead",
     )
