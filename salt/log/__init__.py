@@ -24,7 +24,7 @@ from salt.log.setup import (
 from salt.utils.versions import warn_until_date
 
 warn_until_date(
-    "20260101",
+    "20270101",
     "Please stop using '{name}' and instead use 'salt._logging'. "
     "'{name}' will go away after {{date}}.".format(name=__name__),
     stacklevel=3,
