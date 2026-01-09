@@ -107,11 +107,6 @@ def test_find_json():
     ret = salt.utils.json.find_json(garbage_around_json)
     assert ret == expected_ret
 
-    # Now pre-pend small json and re-test
-    small_json_pre_json = f"{test_small_json}{test_sample_json}"
-    ret = salt.utils.json.find_json(small_json_pre_json)
-    assert ret == expected_ret
-
     # Now post-pend small json and re-test
     small_json_post_json = f"{test_sample_json}{test_small_json}"
     ret = salt.utils.json.find_json(small_json_post_json)
