@@ -1,10 +1,6 @@
-import glob
 import logging
 import os
 import pathlib
-import shutil
-import sys
-import sysconfig
 
 import _pytest._version
 import attr
@@ -12,7 +8,6 @@ import pytest
 import requests
 
 import salt.utils.files
-from tests.conftest import CODE_DIR
 
 PYTEST_GE_7 = getattr(_pytest._version, "version_tuple", (-1, -1)) >= (7, 0)
 
@@ -39,12 +34,12 @@ def pkgrepo(states, grains):
 
 
 @pytest.mark.requires_salt_states("pkgrepo.managed")
-def test_adding_repo_file(pkgrepo, tmp_path):
+def test_adding_repo_file(pkgrepo, repo_uri, tmp_path):
     """
     test adding a repo file using pkgrepo.managed
     """
     repo_file = str(tmp_path / "stable-binary.list")
-    repo_content = "deb http://www.deb-multimedia.org stable main"
+    repo_content = f"deb {repo_uri} stable main"
     ret = pkgrepo.managed(name=repo_content, file=repo_file, clean_file=True)
     with salt.utils.files.fopen(repo_file, "r") as fp:
         file_content = fp.read()
@@ -52,30 +47,24 @@ def test_adding_repo_file(pkgrepo, tmp_path):
 
 
 @pytest.mark.requires_salt_states("pkgrepo.managed")
-def test_adding_repo_file_arch(pkgrepo, tmp_path, subtests):
+def test_adding_repo_file_arch(pkgrepo, repo_uri, tmp_path, subtests):
     """
     test adding a repo file using pkgrepo.managed
     and setting architecture
     """
     repo_file = str(tmp_path / "stable-binary.list")
-    repo_content = "deb [arch=amd64  ] http://www.deb-multimedia.org stable main"
+    repo_content = f"deb [arch=amd64  ] {repo_uri} stable main"
     pkgrepo.managed(name=repo_content, file=repo_file, clean_file=True)
     with salt.utils.files.fopen(repo_file, "r") as fp:
         file_content = fp.read()
-        assert (
-            file_content.strip()
-            == "deb [arch=amd64] http://www.deb-multimedia.org stable main"
-        )
+        assert file_content.strip() == f"deb [arch=amd64] {repo_uri} stable main"
     with subtests.test("With multiple archs"):
-        repo_content = (
-            "deb [arch=amd64,i386  ] http://www.deb-multimedia.org stable main"
-        )
+        repo_content = f"deb [arch=amd64,i386  ] {repo_uri} stable main"
         pkgrepo.managed(name=repo_content, file=repo_file, clean_file=True)
         with salt.utils.files.fopen(repo_file, "r") as fp:
             file_content = fp.read()
             assert (
-                file_content.strip()
-                == "deb [arch=amd64,i386] http://www.deb-multimedia.org stable main"
+                file_content.strip() == f"deb [arch=amd64,i386] {repo_uri} stable main"
             )
 
 
@@ -97,98 +86,8 @@ def test_adding_repo_file_cdrom(pkgrepo, tmp_path):
         )
 
 
-def system_aptsources_ids(value):
-    return "{}(aptsources.sourceslist)".format(value.title())
-
-
-@pytest.fixture(
-    params=("with", "without"), ids=system_aptsources_ids, scope="module", autouse=True
-)
-def system_aptsources(request, grains):
-    sys_modules = list(sys.modules)
-    copied_paths = []
-    exc_kwargs = {}
-    if PYTEST_GE_7:
-        exc_kwargs["_use_item_location"] = True
-    if grains["os_family"] != "Debian":
-        raise pytest.skip.Exception(
-            "Test only for debian based platforms", **exc_kwargs
-        )
-    try:
-        try:
-            from aptsources import sourceslist  # pylint: disable=unused-import
-
-            if request.param == "without":
-                raise pytest.skip.Exception(
-                    "This test is meant to run without the system aptsources package, but it's "
-                    "available from '{}'.".format(sourceslist.__file__),
-                    **exc_kwargs
-                )
-            else:
-                # Run the test
-                yield request.param
-        except ImportError:
-            if request.param == "without":
-                # Run the test
-                yield
-            else:
-                copied_paths = []
-                py_version_keys = [
-                    "{}".format(*sys.version_info),
-                    "{}.{}".format(*sys.version_info),
-                ]
-                session_site_packages_dir = sysconfig.get_path(
-                    "purelib"
-                )  # note: platlib and purelib could differ
-                session_site_packages_dir = os.path.relpath(
-                    session_site_packages_dir, str(CODE_DIR)
-                )
-                for py_version in py_version_keys:
-                    dist_packages_path = "/usr/lib/python{}/dist-packages".format(
-                        py_version
-                    )
-                    if not os.path.isdir(dist_packages_path):
-                        continue
-                    for aptpkg in glob.glob(os.path.join(dist_packages_path, "*apt*")):
-                        src = os.path.realpath(aptpkg)
-                        dst = os.path.join(
-                            session_site_packages_dir, os.path.basename(src)
-                        )
-                        if os.path.exists(dst):
-                            log.info(
-                                "Not overwritting already existing %s with %s", dst, src
-                            )
-                            continue
-                        log.info("Copying %s into %s", src, dst)
-                        copied_paths.append(dst)
-                        if os.path.isdir(src):
-                            shutil.copytree(src, dst)
-                        else:
-                            shutil.copyfile(src, dst)
-                if not copied_paths:
-                    raise pytest.skip.Exception(
-                        "aptsources.sourceslist python module not found", **exc_kwargs
-                    )
-                # Run the test
-                yield request.param
-    finally:
-        for path in copied_paths:
-            log.info("Deleting %r", path)
-            if os.path.isdir(path):
-                shutil.rmtree(path, ignore_errors=True)
-            else:
-                os.unlink(path)
-        for name in list(sys.modules):
-            if name in sys_modules:
-                continue
-            if "apt" not in name:
-                continue
-            log.debug("Removing '%s' from 'sys.modules'", name)
-            sys.modules.pop(name)
-
-
 @pytest.fixture
-def ubuntu_state_tree(system_aptsources, state_tree, grains):
+def ubuntu_state_tree(state_tree, grains):
     if grains["os"] != "Ubuntu":
         pytest.skip(
             "Test only applicable to Ubuntu, not '{}'".format(grains["osfinger"])
@@ -378,7 +277,7 @@ def test_pkgrepo_with_architectures(pkgrepo, grains, sources_list_file, subtests
     )
 
     def _get_arch(arch):
-        return "[arch={}] ".format(arch) if arch else ""
+        return f"[arch={arch}] " if arch else ""
 
     def _run(arch=None, test=False):
         return pkgrepo.managed(
@@ -498,6 +397,11 @@ def test_pkgrepo_with_architectures(pkgrepo, grains, sources_list_file, subtests
         assert ret.result is True
 
 
+@pytest.fixture(scope="module")
+def repo_uri(grains):
+    yield "http://www.deb-multimedia.org"
+
+
 @pytest.fixture
 def trailing_slash_repo_file(grains):
     if grains["os_family"] != "Debian":
@@ -517,19 +421,21 @@ def trailing_slash_repo_file(grains):
 
 
 @pytest.mark.requires_salt_states("pkgrepo.managed", "pkgrepo.absent")
-def test_repo_present_absent_trailing_slash_uri(pkgrepo, trailing_slash_repo_file):
+def test_repo_present_absent_trailing_slash_uri(
+    pkgrepo, repo_uri, trailing_slash_repo_file
+):
     """
     test adding a repo with a trailing slash in the uri
     """
     # with the trailing slash
-    repo_content = "deb http://www.deb-multimedia.org/ stable main"
+    repo_content = f"deb {repo_uri}/ stable main"
     # initial creation
     ret = pkgrepo.managed(
         name=repo_content, file=trailing_slash_repo_file, refresh=False, clean_file=True
     )
     with salt.utils.files.fopen(trailing_slash_repo_file, "r") as fp:
         file_content = fp.read()
-    assert file_content.strip() == "deb http://www.deb-multimedia.org/ stable main"
+    assert file_content.strip() == f"deb {repo_uri}/ stable main"
     assert ret.changes
     # no changes
     ret = pkgrepo.managed(
@@ -542,19 +448,21 @@ def test_repo_present_absent_trailing_slash_uri(pkgrepo, trailing_slash_repo_fil
 
 
 @pytest.mark.requires_salt_states("pkgrepo.managed", "pkgrepo.absent")
-def test_repo_present_absent_no_trailing_slash_uri(pkgrepo, trailing_slash_repo_file):
+def test_repo_present_absent_no_trailing_slash_uri(
+    pkgrepo, repo_uri, trailing_slash_repo_file
+):
     """
     test adding a repo with a trailing slash in the uri
     """
     # without the trailing slash
-    repo_content = "deb http://www.deb-multimedia.org stable main"
+    repo_content = f"deb {repo_uri} stable main"
     # initial creation
     ret = pkgrepo.managed(
         name=repo_content, file=trailing_slash_repo_file, refresh=False, clean_file=True
     )
     with salt.utils.files.fopen(trailing_slash_repo_file, "r") as fp:
         file_content = fp.read()
-    assert file_content.strip() == "deb http://www.deb-multimedia.org stable main"
+    assert file_content.strip() == repo_content
     assert ret.changes
     # no changes
     ret = pkgrepo.managed(
@@ -568,33 +476,72 @@ def test_repo_present_absent_no_trailing_slash_uri(pkgrepo, trailing_slash_repo_
 
 @pytest.mark.requires_salt_states("pkgrepo.managed", "pkgrepo.absent")
 def test_repo_present_absent_no_trailing_slash_uri_add_slash(
-    pkgrepo, trailing_slash_repo_file
+    pkgrepo, repo_uri, trailing_slash_repo_file
 ):
     """
     test adding a repo without a trailing slash, and then running it
     again with a trailing slash.
     """
     # without the trailing slash
-    repo_content = "deb http://www.deb-multimedia.org stable main"
+    repo_content = f"deb {repo_uri} stable main"
     # initial creation
     ret = pkgrepo.managed(
         name=repo_content, file=trailing_slash_repo_file, refresh=False, clean_file=True
     )
     with salt.utils.files.fopen(trailing_slash_repo_file, "r") as fp:
         file_content = fp.read()
-    assert file_content.strip() == "deb http://www.deb-multimedia.org stable main"
+    assert file_content.strip() == repo_content
     assert ret.changes
     # now add a trailing slash in the name
-    repo_content = "deb http://www.deb-multimedia.org/ stable main"
+    repo_content = f"deb {repo_uri}/ stable main"
     ret = pkgrepo.managed(
         name=repo_content, file=trailing_slash_repo_file, refresh=False
     )
     with salt.utils.files.fopen(trailing_slash_repo_file, "r") as fp:
         file_content = fp.read()
-    assert file_content.strip() == "deb http://www.deb-multimedia.org/ stable main"
+    assert file_content.strip() == repo_content
     # absent
     ret = pkgrepo.absent(name=repo_content)
     assert ret.result
+
+
+@pytest.mark.requires_salt_states("pkgrepo.managed", "pkgrepo.absent")
+def test_repo_absent_trailing_slash_in_uri(
+    pkgrepo, repo_uri, subtests, trailing_slash_repo_file
+):
+    """
+    Test pkgrepo.absent with a URI containing a trailing slash
+
+    See https://github.com/saltstack/salt/issues/64286
+    """
+    repo_file = pathlib.Path(trailing_slash_repo_file)
+    repo_content = f"deb [arch=amd64] {repo_uri}/ stable main"
+
+    with subtests.test("Remove repo with trailing slash in URI"):
+        # Write contents to file with trailing slash in URI
+        repo_file.write_text(f"{repo_content}\n")
+        # Perform and validate removal
+        ret = pkgrepo.absent(name=repo_content)
+        assert ret.result
+        assert ret.changes
+        assert not repo_file.exists()
+        # A second run of the pkgrepo.absent state should be a no-op (i.e. no changes)
+        ret = pkgrepo.absent(name=repo_content)
+        assert ret.result
+        assert not ret.changes
+        assert not repo_file.exists()
+
+    with subtests.test("URI match with mismatched arch"):
+        # Create a repo file that matches the URI but contains no architecture.
+        # This should not be identified as a match for repo_content, and thus
+        # the result of a state should be a no-op.
+        repo_file.write_text(f"deb {repo_uri} stable main\n")
+        # Since this was a no-op, the state should have succeeded, made no
+        # changes, and left the repo file in place.
+        ret = pkgrepo.absent(name=repo_content)
+        assert ret.result
+        assert not ret.changes
+        assert repo_file.exists()
 
 
 @attr.s(kw_only=True)
@@ -804,3 +751,214 @@ def test_adding_repo_file_signedby_alt_file(pkgrepo, states, repo):
         assert file_content.endswith("\n")
     assert key_file.is_file()
     assert repo_content in ret.comment
+
+
+@pytest.fixture
+def deb822_repo_file(grains):
+    if grains["os_family"] != "Debian":
+        pytest.skip(
+            "Test only applicable to Debian flavors, not '{}'".format(
+                grains["osfinger"]
+            )
+        )
+    repo_file_path = "/etc/apt/sources.list.d/deb822-test.sources"
+    try:
+        yield repo_file_path
+    finally:
+        try:
+            os.unlink(repo_file_path)
+        except OSError:
+            pass
+
+
+@pytest.mark.requires_salt_states("pkgrepo.managed", "pkgrepo.absent")
+def test_repo_present_absent_deb822_repo_file(
+    pkgrepo, grains, deb822_repo_file, subtests
+):
+    """
+    test adding and managing a deb822 repo.
+    """
+    codename = grains["oscodename"]
+    repo_uri_main = "http://ftp.es.debian.org/debian"
+    repo_uri_alt = "http://ftp.cz.debian.org/debian"
+    aptkey = True if salt.utils.path.which("apt-key") else False
+    ext_attrs = ""
+    expected_ext_attrs = ""
+    if not aptkey:
+        ext_attrs = " [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg]"
+        expected_ext_attrs = (
+            "\nSigned-By: /usr/share/keyrings/elasticsearch-keyring.gpg"
+        )
+
+    # without the trailing slash
+    repo_content = f"deb{ext_attrs} {repo_uri_main} {codename} main"
+    expected_content = f"""Types: deb
+URIs: {repo_uri_main}
+Suites: {codename}
+Components: main{expected_ext_attrs}"""
+    with subtests.test("Create new deb822 repo source"):
+        # initial creation
+        ret = pkgrepo.managed(
+            name=repo_content, file=deb822_repo_file, refresh=False, clean_file=True
+        )
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert file_content.strip() == expected_content
+        assert ret.changes
+
+    # use trailing slash in the URI and add extra suites
+    repo_content = f"deb{ext_attrs} {repo_uri_main}/ {codename} main"
+    expected_content = f"""Types: deb
+URIs: {repo_uri_main}/
+Suites: {codename} {codename}-updates {codename}-backports
+Components: main{expected_ext_attrs}"""
+    with subtests.test("Add suites to deb822 repo source"):
+        ret = pkgrepo.managed(
+            name=repo_content,
+            file=deb822_repo_file,
+            refresh=False,
+            suites=[codename, f"{codename}-updates", f"{codename}-backports"],
+        )
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert file_content.strip() == expected_content
+        assert ret.changes
+
+    # use trailing slash in the URI and add extra components
+    repo_content = f"deb{ext_attrs} {repo_uri_main}/ {codename} main"
+    expected_content = f"""Types: deb
+URIs: {repo_uri_main}/
+Suites: {codename} {codename}-updates {codename}-backports
+Components: main contrib{expected_ext_attrs}"""
+    with subtests.test("Add comps to deb822 repo source"):
+        ret = pkgrepo.managed(
+            name=repo_content,
+            file=deb822_repo_file,
+            refresh=False,
+            comps="main,contrib",
+        )
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert file_content.strip() == expected_content
+        assert ret.changes
+
+    # use trailing slash in the URI and add extra type
+    repo_content = f"deb{ext_attrs} {repo_uri_main}/ {codename} main contrib"
+    expected_content = f"""Types: deb deb-src
+URIs: {repo_uri_main}/
+Suites: {codename} {codename}-updates {codename}-backports
+Components: main contrib{expected_ext_attrs}"""
+    with subtests.test("Add type to deb822 repo source"):
+        ret = pkgrepo.managed(
+            name=repo_content,
+            file=deb822_repo_file,
+            refresh=False,
+            types=["deb", "deb-src"],
+        )
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert file_content.strip() == expected_content
+        assert ret.changes
+
+    # do not use trailing slash in the URI and add extra URI
+    repo_content = f"deb{ext_attrs} {repo_uri_main} {codename} main contrib"
+    expected_content = f"""Types: deb deb-src
+URIs: {repo_uri_main} {repo_uri_alt}
+Suites: {codename} {codename}-updates {codename}-backports
+Components: main contrib{expected_ext_attrs}"""
+    with subtests.test("Add extra URI to deb822 repo source"):
+        ret = pkgrepo.managed(
+            name=repo_content,
+            file=deb822_repo_file,
+            refresh=False,
+            uris=[repo_uri_main, repo_uri_alt],
+        )
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert file_content.strip() == expected_content
+        assert ret.changes
+
+    # do not use trailing slash in the URI and remove suites
+    repo_content = f"deb{ext_attrs} {repo_uri_main} {codename} main contrib"
+    expected_content = f"""Types: deb deb-src
+URIs: {repo_uri_main} {repo_uri_alt}
+Suites: {codename}
+Components: main contrib{expected_ext_attrs}"""
+    with subtests.test("Remove suites from deb822 repo source"):
+        ret = pkgrepo.managed(
+            name=repo_content,
+            file=deb822_repo_file,
+            refresh=False,
+            suites=[codename],
+        )
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert file_content.strip() == expected_content
+        assert ret.changes
+
+    # Add one more repo source to the existing source file
+    repo_uri_main_sec = "http://ftp.cz.debian.org/debian-security"
+    repo_uri_alt_sec = "http://ftp.es.debian.org/debian-security"
+    repo_content_sec = (
+        f"deb{ext_attrs} {repo_uri_main_sec} {codename}-security main updates"
+    )
+    expected_content = f"""Types: deb deb-src
+URIs: {repo_uri_main} {repo_uri_alt}
+Suites: {codename}
+Components: main contrib{expected_ext_attrs}
+
+Types: deb
+URIs: {repo_uri_main_sec} {repo_uri_alt_sec}
+Suites: {codename}-security
+Components: main updates{expected_ext_attrs}"""
+    with subtests.test("Add extra deb822 repo source"):
+        ret = pkgrepo.managed(
+            name=repo_content_sec,
+            file=deb822_repo_file,
+            refresh=False,
+            uris=[repo_uri_main_sec, repo_uri_alt_sec],
+        )
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert file_content.strip() == expected_content
+        assert ret.changes
+
+    # Disable repo source and leave just alternative URI
+    repo_content_sec = (
+        f"deb{ext_attrs} {repo_uri_main_sec} {codename}-security main updates"
+    )
+    expected_content = f"""Types: deb deb-src
+URIs: {repo_uri_main} {repo_uri_alt}
+Suites: {codename}
+Components: main contrib{expected_ext_attrs}
+
+Types: deb
+URIs: {repo_uri_alt_sec}
+Suites: {codename}-security
+Components: main updates{expected_ext_attrs}
+Enabled: no"""
+    with subtests.test("Disable extra deb822 repo source"):
+        ret = pkgrepo.managed(
+            name=repo_content_sec,
+            file=deb822_repo_file,
+            refresh=False,
+            uris=[repo_uri_alt_sec],
+            disabled=True,
+        )
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert file_content.strip() == expected_content
+        assert ret.changes
+
+    # Remove repo source
+    expected_content = f"""Types: deb
+URIs: {repo_uri_alt_sec}
+Suites: {codename}-security
+Components: main updates{expected_ext_attrs}
+Enabled: no"""
+    with subtests.test("Remove deb822 repo source"):
+        ret = pkgrepo.absent(name=repo_content)
+        with salt.utils.files.fopen(deb822_repo_file, "r") as fp:
+            file_content = fp.read()
+        assert ret.result
+        assert file_content.strip() == expected_content

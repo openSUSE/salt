@@ -416,7 +416,8 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
             return ret
 
     repo = name
-    if __grains__["os"] in ("Ubuntu", "Mint"):
+
+    if __grains__["os_family"] == "Debian":
         if ppa is not None:
             # overload the name/repo value for PPAs cleanly
             # this allows us to have one code-path for PPAs
@@ -552,6 +553,23 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
             ret["comment"] = f"Package repo '{name}' already configured"
             return ret
 
+    if __grains__["os_family"] == "Debian":
+        if (
+            "uri" not in kwargs
+            and "uri" in sanitizedkwargs
+            and "uri" in pre
+            and pre["uri"] != sanitizedkwargs["uri"]
+        ):
+            kwargs["uri"] = sanitizedkwargs["uri"]
+        if (
+            "uris" not in kwargs
+            and "uris" in sanitizedkwargs
+            and "uris" in pre
+            and sanitizedkwargs["uris"]
+            and sanitizedkwargs["uris"][0] not in pre["uris"]
+        ):
+            kwargs["uris"] = sanitizedkwargs["uris"]
+
     if __opts__["test"]:
         ret["comment"] = (
             "Package repo '{}' would be configured. This may cause pkg "
@@ -623,6 +641,12 @@ def absent(name, **kwargs):
     name
         The name of the package repo, as it would be referred to when running
         the regular package manager commands.
+
+    .. note::
+        On apt-based systems this must be the complete source entry. For
+        example, if you include ``[arch=amd64]``, and a repo matching the
+        specified URI, dist, etc. exists _without_ an architecture, then no
+        changes will be made and the state will report a ``True`` result.
 
     **FEDORA/REDHAT-SPECIFIC OPTIONS**
 
@@ -705,6 +729,23 @@ def absent(name, **kwargs):
         ret["result"] = False
         ret["comment"] = f"Failed to configure repo '{name}': {exc}"
         return ret
+
+    if repo and (
+        __grains__["os_family"].lower() == "debian"
+        or __opts__.get("providers", {}).get("pkg") == "aptpkg"
+    ):
+        # On Debian/Ubuntu, pkg.get_repo will return a match for the repo
+        # even if the architectures do not match. However, changing get_repo
+        # breaks idempotency for pkgrepo.managed states. So, compare the
+        # architectures of the matched repo to the architectures specified in
+        # the repo string passed to this state. If the architectures do not
+        # match, then invalidate the match by setting repo to an empty dict.
+        import salt.modules.aptpkg
+
+        if set(salt.modules.aptpkg._split_repo_str(stripname)["architectures"]) != set(
+            repo["architectures"]
+        ):
+            repo = {}
 
     if not repo:
         ret["comment"] = f"Package repo {name} is absent"
