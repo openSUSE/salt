@@ -139,8 +139,8 @@ class HTTPHeaders(MutableMapping):
     """
 
     def __init__(self, *args, **kwargs):
-        self._dict = {}  # type: typing.Dict[str, str]
         self._as_list = {}  # type: typing.Dict[str, typing.List[str]]
+        self._combined_cache = {} # type: typing.Dict[str, str]
         self._last_key = None
         if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], HTTPHeaders):
             # Copy constructor
@@ -158,9 +158,7 @@ class HTTPHeaders(MutableMapping):
         norm_name = _normalized_headers[name]
         self._last_key = norm_name
         if norm_name in self:
-            self._dict[norm_name] = (
-                native_str(self[norm_name]) + "," + native_str(value)
-            )
+            self._combined_cache.pop(norm_name, None)
             self._as_list[norm_name].append(value)
         else:
             self[norm_name] = value
@@ -193,7 +191,7 @@ class HTTPHeaders(MutableMapping):
             # continuation of a multi-line header
             new_part = " " + line.lstrip(HTTP_WHITESPACE)
             self._as_list[self._last_key][-1] += new_part
-            self._dict[self._last_key] += new_part
+            self._combined_cache.pop(self._last_key, None)
         else:
             name, value = line.split(":", 1)
             self.add(name, value.strip(HTTP_WHITESPACE))
@@ -216,23 +214,33 @@ class HTTPHeaders(MutableMapping):
 
     def __setitem__(self, name, value):
         norm_name = _normalized_headers[name]
-        self._dict[norm_name] = value
+        self._combined_cache[norm_name] = value
         self._as_list[norm_name] = [value]
+
+    def __contains__(self, name):
+        # This is an important optimization to avoid the expensive concatenation
+        # in __getitem__ when it's not needed.
+        if not isinstance(name, str):
+            return False
+        return name in self._as_list
 
     def __getitem__(self, name):
         # type: (str) -> str
-        return self._dict[_normalized_headers[name]]
+        header = _normalized_headers[name]
+        if header not in self._combined_cache:
+            self._combined_cache[header] = ",".join(self._as_list[header])
+        return self._combined_cache[header]
 
     def __delitem__(self, name):
         norm_name = _normalized_headers[name]
-        del self._dict[norm_name]
+        del self._combined_cache[norm_name]
         del self._as_list[norm_name]
 
     def __len__(self):
-        return len(self._dict)
+        return len(self._as_list)
 
     def __iter__(self):
-        return iter(self._dict)
+        return iter(self._as_list)
 
     def copy(self):
         # defined in dict but not in MutableMapping.
@@ -894,19 +902,33 @@ def parse_response_start_line(line):
 # combinations of semicolons and double quotes.
 # It has also been modified to support valueless parameters as seen in
 # websocket extension negotiations.
+#
+# _parseparam has been further modified with the logic from
+# https://github.com/python/cpython/pull/136072/files
+# to avoid quadratic behavior when parsing semicolons in quoted strings.
+#
+# TODO: See if we can switch to email.message.Message for this functionality.
+# This is the suggested replacement for the cgi.py module now that cgi has
+# been removed from recent versions of Python.  We need to verify that
+# the email module is consistent with our existing behavior (and all relevant
 
 
 def _parseparam(s):
-    while s[:1] == ";":
-        s = s[1:]
-        end = s.find(";")
-        while end > 0 and (s.count('"', 0, end) - s.count('\\"', 0, end)) % 2:
-            end = s.find(";", end + 1)
+    start = 0
+    while s.find(";", start) == start:
+        start += 1
+        end = s.find(";", start)
+        ind, diff = start, 0
+        while end > 0:
+            diff += s.count('"', ind, end) - s.count('\\"', ind, end)
+            if diff % 2 == 0:
+                break
+            end, ind = ind, s.find(";", end + 1)
         if end < 0:
             end = len(s)
-        f = s[:end]
+        f = s[start:end]
         yield f.strip()
-        s = s[end:]
+        start = end
 
 
 def _parse_header(line):
