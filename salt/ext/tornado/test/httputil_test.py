@@ -391,6 +391,20 @@ Foo: even
         headers2 = HTTPHeaders.parse(str(headers))
         self.assertEquals(headers, headers2)
 
+    def test_linear_performance(self):
+        def f(n):
+            start = time.time()
+            headers = HTTPHeaders()
+            for i in range(n):
+                headers.add("X-Foo", "bar")
+            return time.time() - start
+
+        # This runs under 50ms on my laptop as of 2025-12-09.
+        d1 = f(10000)
+        d2 = f(100000)
+        if d2 / d1 > 20:
+            # d2 should be about 10x d1 but allow a wide margin for variability.
+            self.fail("HTTPHeaders.add() does not scale linearly: %s vs %s" % (d1, d2))
 
 class FormatTimestampTest(unittest.TestCase):
     # Make sure that all the input types are supported.
