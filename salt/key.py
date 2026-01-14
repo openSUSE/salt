@@ -491,16 +491,15 @@ class Key:
         ret = {}
         if "," in match and isinstance(match, str):
             match = match.split(",")
+        if not isinstance(match, list):
+            match = [match]
         for status, keys in matches.items():
+            if match == ["*"] and keys:
+                ret[status] = keys
+                continue
             for key in salt.utils.data.sorted_ignorecase(keys):
-                if isinstance(match, list):
-                    for match_item in match:
-                        if fnmatch.fnmatch(key, match_item):
-                            if status not in ret:
-                                ret[status] = []
-                            ret[status].append(key)
-                else:
-                    if fnmatch.fnmatch(key, match):
+                for match_item in match:
+                    if fnmatch.fnmatch(key, match_item):
                         if status not in ret:
                             ret[status] = []
                         ret[status].append(key)
@@ -543,12 +542,13 @@ class Key:
         for dir_ in key_dirs:
             if dir_ is None:
                 continue
-            ret[os.path.basename(dir_)] = []
+            base_dir = os.path.basename(dir_)
+            ret[base_dir] = []
             try:
                 for fn_ in salt.utils.data.sorted_ignorecase(os.listdir(dir_)):
                     if not fn_.startswith("."):
                         if os.path.isfile(os.path.join(dir_, fn_)):
-                            ret[os.path.basename(dir_)].append(
+                            ret[base_dir].append(
                                 salt.utils.stringutils.to_unicode(fn_)
                             )
             except OSError:
