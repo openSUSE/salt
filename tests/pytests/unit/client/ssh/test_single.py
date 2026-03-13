@@ -871,3 +871,21 @@ def test_ssh_single__cmd_str_sudo_passwd_user(opts):
     )
 
     assert expected in cmd
+
+
+def test_check_thin_dir_with_backslash_user(opts):
+    """
+    Test `thin_dir` path generation for the user with backslash in the name
+    """
+    single = ssh.Single(
+        opts,
+        opts["argv"],
+        "host.example.org",
+        "host.example.org",
+        user="exampledomain\\user",
+        mods={},
+        fsclient=None,
+        mine=False,
+    )
+    assert single.thin_dir == single.opts["thin_dir"]
+    assert ".exampledomain_user_" in single.thin_dir
