@@ -4,7 +4,7 @@
 
 
 from __future__ import absolute_import, division, print_function
-from salt.ext.tornado.httputil import url_concat, parse_multipart_form_data, HTTPHeaders, format_timestamp, HTTPServerRequest, parse_request_start_line, parse_cookie
+from salt.ext.tornado.httputil import url_concat, parse_multipart_form_data, HTTPHeaders, format_timestamp, HTTPServerRequest, parse_request_start_line, parse_cookie, ParseMultipartConfig
 from salt.ext.tornado.httputil import HTTPInputError
 from salt.ext.tornado.escape import utf8, native_str
 from salt.ext.tornado.log import gen_log
@@ -141,6 +141,8 @@ Foo
                      'a";";.txt',
                      'a\\"b.txt',
                      'a\\b.txt',
+                     'a b.txt',
+                     'a\tb.txt',
                      ]
         for filename in filenames:
             logging.debug("trying filename %r", filename)
@@ -157,6 +159,29 @@ Foo
             file = files["files"][0]
             self.assertEqual(file["filename"], filename)
             self.assertEqual(file["body"], b"Foo")
+
+    def test_invalid_chars(self):
+        filenames = [
+            "a\rb.txt",
+            "a\0b.txt",
+            "a\x08b.txt",
+        ]
+        for filename in filenames:
+            str_data = b'''\
+--1234
+Content-Disposition: form-data; name="files"; filename="%s"
+
+Foo
+--1234--''' % filename.replace(
+                "\\", "\\\\"
+            ).replace(
+                '"', '\\"'
+            )
+            data = utf8(str_data.replace(b"\n", b"\r\n"))
+            args, files = form_data_args()
+            with self.assertRaises(HTTPInputError) as cm:
+                parse_multipart_form_data(b"1234", data, args, files)
+            self.assertIn("Invalid header value", str(cm.exception))
 
     def test_boundary_starts_and_ends_with_quotes(self):
         data = b'''\
@@ -264,9 +289,44 @@ Foo
             return time.time() - start
 
         d1 = f(1_000)
+        # Note that headers larger than this are blocked by the default configuration.
         d2 = f(10_000)
         if d2 / d1 > 20:
             self.fail(f"Disposition param parsing is not linear: d1={d1} vs d2={d2}")
+
+    def test_multipart_config(self):
+        boundary = b"1234"
+        body = b"""--1234
+Content-Disposition: form-data; name="files"; filename="ab.txt"
+
+--1234--""".replace(
+            b"\n", b"\r\n"
+        )
+        config = ParseMultipartConfig()
+        args, files = form_data_args()
+        parse_multipart_form_data(boundary, body, args, files, config=config)
+        self.assertEqual(files["files"][0]["filename"], "ab.txt")
+
+        config_no_parts = ParseMultipartConfig(max_parts=0)
+        with self.assertRaises(HTTPInputError) as cm:
+            parse_multipart_form_data(
+                boundary, body, args, files, config=config_no_parts
+            )
+        self.assertIn("too many parts", str(cm.exception))
+
+        config_small_headers = ParseMultipartConfig(max_part_header_size=10)
+        with self.assertRaises(HTTPInputError) as cm:
+            parse_multipart_form_data(
+                boundary, body, args, files, config=config_small_headers
+            )
+        self.assertIn("header too large", str(cm.exception))
+
+        config_disabled = ParseMultipartConfig(enabled=False)
+        with self.assertRaises(HTTPInputError) as cm:
+            parse_multipart_form_data(
+                boundary, body, args, files, config=config_disabled
+            )
+        self.assertIn("multipart/form-data parsing is disabled", str(cm.exception))
 
 
 class HTTPHeadersTest(unittest.TestCase):
