@@ -16,7 +16,6 @@ import pytest
 
 import salt.modules.aptpkg as aptpkg
 import salt.modules.pkg_resource as pkg_resource
-import salt.utils.path
 from salt.exceptions import (
     CommandExecutionError,
     CommandNotFoundError,
@@ -1497,7 +1496,7 @@ def test_sourceslist_multiple_comps():
     """
     repo_line = "deb http://archive.ubuntu.com/ubuntu/ focal-updates main restricted"
     with patch("salt.utils.files.fopen", mock_open(read_data=repo_line)), patch(
-        "pathlib.Path.is_file", side_effect=[True, False]
+        "os.path.isdir", MagicMock(return_value=False)
     ):
         sources = aptpkg.SourcesList()
         for source in sources:
@@ -1523,15 +1522,16 @@ def test_sourceslist_architectures(repo_line):
     """
     Test SourcesList when architectures is in repo
     """
-    with patch("salt.utils.files.fopen", mock_open(read_data=repo_line)):
-        with patch("pathlib.Path.is_file", side_effect=[True, False]):
-            sources = aptpkg.SourcesList()
-            for source in sources:
-                assert source.type == "deb"
-                assert source.uri == "http://archive.ubuntu.com/ubuntu/"
-                assert source.comps == ["main", "restricted"]
-                assert source.dist == "focal-updates"
-                if "," in repo_line:
-                    assert source.architectures == ["amd64", "armel"]
-                else:
-                    assert source.architectures == ["amd64"]
+    with patch("salt.utils.files.fopen", mock_open(read_data=repo_line)), patch(
+        "os.path.isdir", MagicMock(return_value=False)
+    ):
+        sources = aptpkg.SourcesList()
+        for source in sources:
+            assert source.type == "deb"
+            assert source.uri == "http://archive.ubuntu.com/ubuntu/"
+            assert source.comps == ["main", "restricted"]
+            assert source.dist == "focal-updates"
+            if "," in repo_line:
+                assert source.architectures == ["amd64", "armel"]
+            else:
+                assert source.architectures == ["amd64"]
