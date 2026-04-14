@@ -2,6 +2,7 @@
 Integration tests for Ruby Gem module
 """
 
+import subprocess
 import pytest
 
 import salt.utils.platform
@@ -96,11 +97,22 @@ class GemModuleTest(ModuleCase):
         self.run_function("gem.uninstall", [self.GEM])
         self.assertFalse(self.run_function("gem.list", [self.GEM]))
 
+    def _get_ruby_version(self):
+        try:
+            output = subprocess.check_output(["ruby", "-v"]).decode("utf-8")
+            version_str = output.split()[1]
+            major_version = int(version_str.split('.')[0])
+            return major_version
+        except (IndexError, subprocess.CalledProcessError, FileNotFoundError):
+            return 0
+
     @pytest.mark.slow_test
     def test_list(self):
         """
         gem.list
         """
+        if self._get_ruby_version() < 3:
+            self.skipTest("Cannot install brass, skipping")
         self.run_function("gem.install", [" ".join(self.GEM_LIST)])
 
         all_ret = self.run_function("gem.list")
