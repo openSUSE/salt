@@ -1717,11 +1717,15 @@ def reap_stray_processes():
         if alive:
             # Give up
             for child in alive:
-                log.warning(
-                    "Process %s survived SIGKILL, giving up:\n%s",
-                    child,
-                    pprint.pformat(child.as_dict()),
-                )
+                try:
+                    log.warning(
+                        "Process %s survived SIGKILL, giving up:\n%s",
+                        child,
+                        pprint.pformat(child.as_dict()),
+                    )
+                except psutil.NoSuchProcess:
+                    # Process killed between the alive check and the log statement
+                    continue
 
 
 @pytest.fixture(scope="session")
