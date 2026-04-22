@@ -48,6 +48,38 @@ def _list_mounts():
     return ret
 
 
+def _get_canonical_device(device, blkid_info=None):
+    """
+    Return the canonical device name
+    """
+    if not device or not isinstance(device, str):
+        return device
+
+    if device.startswith("UUID="):
+        uuid = device.split("=")[1].strip('"').lower()
+        if blkid_info:
+            for dev, info in blkid_info.items():
+                if info.get("UUID", "").lower() == uuid:
+                    return os.path.realpath(dev)
+        path = os.path.join("/dev/disk/by-uuid", uuid)
+        if os.path.exists(path):
+            return os.path.realpath(path)
+    elif device.startswith("LABEL="):
+        label = device.split("=")[1].strip('"')
+        if blkid_info:
+            for dev, info in blkid_info.items():
+                if info.get("LABEL") == label:
+                    return os.path.realpath(dev)
+        path = os.path.join("/dev/disk/by-label", label)
+        if os.path.exists(path):
+            return os.path.realpath(path)
+
+    if device.startswith("/"):
+        return os.path.realpath(device)
+
+    return device
+
+
 def _active_mountinfo(ret):
     _list = _list_mounts()
     filename = "/proc/self/mountinfo"
@@ -362,7 +394,7 @@ class _fstab_entry:
         """
         return os.path.normcase(os.path.normpath(path))
 
-    def match(self, line):
+    def match(self, line, blkid_info=None, canonical=True):
         """
         Compare potentially partial criteria against line
         """
@@ -373,6 +405,14 @@ class _fstab_entry:
                 cr_opts = sorted(value.split(","))
                 if ex_opts != cr_opts:
                     return False
+            elif key == "device":
+                if entry[key] != value:
+                    if (
+                        not canonical
+                        or _get_canonical_device(entry[key], blkid_info)
+                        != _get_canonical_device(value, blkid_info)
+                    ):
+                        return False
             elif entry[key] != value:
                 return False
         return True
@@ -466,7 +506,7 @@ class _vfstab_entry:
         """
         return os.path.normcase(os.path.normpath(path))
 
-    def match(self, line):
+    def match(self, line, blkid_info=None, canonical=True):
         """
         Compare potentially partial criteria against line
         """
@@ -477,6 +517,14 @@ class _vfstab_entry:
                 cr_opts = sorted(value.split(","))
                 if ex_opts != cr_opts:
                     return False
+            elif key == "device":
+                if entry[key] != value:
+                    if (
+                        not canonical
+                        or _get_canonical_device(entry[key], blkid_info)
+                        != _get_canonical_device(value, blkid_info)
+                    ):
+                        return False
             elif entry[key] != value:
                 return False
         return True
@@ -631,7 +679,7 @@ class _FileSystemsEntry:
         """
         return os.path.normcase(os.path.normpath(path))
 
-    def match(self, fsys_view):
+    def match(self, fsys_view, blkid_info=None, canonical=True):
         """
         Compare potentially partial criteria against built filesystems entry dictionary
         """
@@ -643,6 +691,14 @@ class _FileSystemsEntry:
                     cr_opts = sorted(value.split(","))
                     if ex_opts != cr_opts:
                         return False
+                elif key in ("device", "dev"):
+                    if evalue_dict[key] != value:
+                        if (
+                            not canonical
+                            or _get_canonical_device(evalue_dict[key], blkid_info)
+                            != _get_canonical_device(value, blkid_info)
+                        ):
+                            return False
                 elif evalue_dict[key] != value:
                     return False
             else:
@@ -671,6 +727,9 @@ def fstab(config="/etc/fstab"):
     ret = {}
     if not os.path.isfile(config):
         return ret
+
+    blkid_info = __salt__["disk.blkid"]()
+
     with salt.utils.files.fopen(config) as ifile:
         for line in ifile:
             line = salt.utils.stringutils.to_unicode(line)
@@ -688,6 +747,26 @@ def fstab(config="/etc/fstab"):
                 entry["opts"] = entry["opts"].split(",")
                 while entry["name"] in ret:
                     entry["name"] += "_"
+
+                device = entry.get("device") or entry.get("dev")
+                entry["device_uuid"] = None
+                entry["device_label"] = None
+                entry["device_canonical"] = None
+
+                if device:
+                    if device.startswith("UUID="):
+                        entry["device_uuid"] = device.split("=")[1].strip('"').lower()
+                    elif device.startswith("LABEL="):
+                        entry["device_label"] = device.split("=")[1].strip('"')
+
+                    canonical = _get_canonical_device(device, blkid_info)
+                    entry["device_canonical"] = canonical
+                    if not entry["device_uuid"] and blkid_info.get(canonical):
+                        entry["device_uuid"] = (
+                            blkid_info[canonical].get("UUID", "").lower() or None
+                        )
+                    if not entry["device_label"] and blkid_info.get(canonical):
+                        entry["device_label"] = blkid_info[canonical].get("LABEL")
 
                 ret[entry.pop("name")] = entry
             except _fstab_entry.ParseError:
@@ -733,13 +812,14 @@ def rm_fstab(name, device, config="/etc/fstab"):
     else:
         criteria = _fstab_entry(name=name, device=device)
 
+    blkid_info = __salt__["disk.blkid"]()
     lines = []
     try:
         with salt.utils.files.fopen(config, "r") as ifile:
             for line in ifile:
                 line = salt.utils.stringutils.to_unicode(line)
                 try:
-                    if criteria.match(line):
+                    if criteria.match(line, blkid_info):
                         modified = True
                     else:
                         lines.append(line)
@@ -876,16 +956,20 @@ def set_fstab(
     if not os.path.isfile(config):
         raise CommandExecutionError('Bad config file "{}"'.format(config))
 
+    blkid_info = None
+    if "device" in match_on:
+        blkid_info = __salt__["disk.blkid"]()
+
     try:
         with salt.utils.files.fopen(config, "r") as ifile:
             for line in ifile:
                 line = salt.utils.stringutils.to_unicode(line)
                 try:
-                    if criteria.match(line):
+                    if criteria.match(line, blkid_info):
                         # Note: If ret isn't None here,
                         # we've matched multiple lines
                         ret = "present"
-                        if entry.match(line) or not_change:
+                        if entry.match(line, blkid_info, canonical=False) or not_change:
                             lines.append(line)
                         else:
                             ret = "change"
@@ -1006,16 +1090,20 @@ def set_vfstab(
     if not os.path.isfile(config):
         raise CommandExecutionError('Bad config file "{}"'.format(config))
 
+    blkid_info = None
+    if "device" in match_on:
+        blkid_info = __salt__["disk.blkid"]()
+
     try:
         with salt.utils.files.fopen(config, "r") as ifile:
             for line in ifile:
                 line = salt.utils.stringutils.to_unicode(line)
                 try:
-                    if criteria.match(line):
+                    if criteria.match(line, blkid_info):
                         # Note: If ret isn't None here,
                         # we've matched multiple lines
                         ret = "present"
-                        if entry.match(line) or not_change:
+                        if entry.match(line, blkid_info, canonical=False) or not_change:
                             lines.append(line)
                         else:
                             ret = "change"
@@ -1485,17 +1573,21 @@ def swaps():
                 "priority": "-",
             }
     elif __grains__["os"] != "OpenBSD":
+        blkid_info = __salt__["disk.blkid"]()
         with salt.utils.files.fopen("/proc/swaps") as fp_:
             for line in fp_:
                 line = salt.utils.stringutils.to_unicode(line)
                 if line.startswith("Filename"):
                     continue
                 comps = line.split()
-                ret[comps[0]] = {
+                device = comps[0]
+                ret[device] = {
                     "type": comps[1],
                     "size": comps[2],
                     "used": comps[3],
                     "priority": comps[4],
+                    "device_uuid": blkid_info.get(device, {}).get("UUID"),
+                    "device_label": blkid_info.get(device, {}).get("LABEL"),
                 }
     else:
         for line in __salt__["cmd.run_stdout"]("swapctl -kl").splitlines():
@@ -1888,13 +1980,17 @@ def set_filesystems(
     if not os.path.isfile(config):
         raise CommandExecutionError('Bad config file "{}"'.format(config))
 
+    blkid_info = None
+    if "dev" in match_on:
+        blkid_info = __salt__["disk.blkid"]()
+
     # read in block of filesystem, block starts with '/' till empty line
     try:
         fsys_filedict = _filesystems(config, False)
         for fsys_view in fsys_filedict.items():
-            if criteria.match(fsys_view):
+            if criteria.match(fsys_view, blkid_info):
                 ret = "present"
-                if entry_ip.match(fsys_view) or not_change:
+                if entry_ip.match(fsys_view, blkid_info, canonical=False) or not_change:
                     view_lines.append(fsys_view)
                 else:
                     ret = "change"
@@ -1947,12 +2043,13 @@ def rm_filesystems(name, device, config="/etc/filesystems"):
     if "AIX" not in __grains__["kernel"]:
         return modified
 
+    blkid_info = __salt__["disk.blkid"]()
     criteria = _FileSystemsEntry(name=name, dev=device)
     try:
         fsys_filedict = _filesystems(config, False)
         for fsys_view in fsys_filedict.items():
             try:
-                if criteria.match(fsys_view):
+                if criteria.match(fsys_view, blkid_info):
                     modified = True
                 else:
                     view_lines.append(fsys_view)
