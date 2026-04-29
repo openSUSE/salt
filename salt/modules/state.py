@@ -34,6 +34,7 @@ import salt.utils.msgpack
 import salt.utils.platform
 import salt.utils.state
 import salt.utils.stringutils
+import salt.utils.tarfileutil
 import salt.utils.url
 import salt.utils.versions
 from salt.exceptions import CommandExecutionError, SaltInvocationError
@@ -2344,7 +2345,7 @@ def pkg(pkg_path, pkg_sum, hash_type, test=None, **kwargs):
             return {}
         elif "..{}".format(os.sep) in salt.utils.stringutils.to_unicode(member.path):
             return {}
-    s_pkg.extractall(root)
+    salt.utils.tarfileutil.extractall(s_pkg, root)  # nosec B202
     s_pkg.close()
     lowstate_json = os.path.join(root, "lowstate.json")
     with salt.utils.files.fopen(lowstate_json, "r") as fp_:
