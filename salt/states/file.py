@@ -6413,7 +6413,7 @@ def append(
         .. versionadded:: 3008.0
 
         Output a unified diff of the old file and the new file.
-        Set this option to  ``False` to disable this.
+        Set this option to  ``False`` to disable this.
 
     Multi-line example:
 
@@ -6694,7 +6694,7 @@ def prepend(
         .. versionadded:: 3008.0
 
         Output a unified diff of the old file and the new file.
-        Set this option to  ``False` to disable this.
+        Set this option to  ``False`` to disable this.
 
     Multi-line example:
 
