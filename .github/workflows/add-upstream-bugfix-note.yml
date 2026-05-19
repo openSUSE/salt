@@ -13,6 +13,10 @@ on:
   pull_request:
     types: [closed]
 
+concurrency:
+  group: upstream-notes-push
+  cancel-in-progress: false
+
 jobs:
   manage-notes:
     if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true)
@@ -96,5 +100,23 @@ jobs:
       - name: Push notes
         if: env.URL != ''
         run: |
-          git push origin refs/notes/commits
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if git push origin refs/notes/commits; then
+              echo "Successfully pushed notes"
+              exit 0
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "Push failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+                git fetch origin refs/notes/*:refs/notes/* || true
+                sleep 2
+              else
+                echo "Failed to push notes after $MAX_RETRIES attempts"
+                exit 1
+              fi
+            fi
+          done
 
