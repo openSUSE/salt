@@ -52,9 +52,16 @@ jobs:
 
           SHA="${{ github.event.inputs.commit_sha }}"
           RESOLVED_SHA=$(git rev-parse "$SHA")
- 
-          echo "URL=$URL" >> $GITHUB_ENV
-          echo "COMMITS=$RESOLVED_SHA" >> $GITHUB_ENV
+
+          # Use heredoc delimiters to prevent env-file injection if URL contains newlines
+          {
+            echo "URL<<EOF"
+            echo "$URL"
+            echo "EOF"
+            echo "COMMITS<<EOF"
+            echo "$RESOLVED_SHA"
+            echo "EOF"
+          } >> $GITHUB_ENV
 
       - name: Process Merged PR
         if: github.event_name == 'push'
@@ -68,7 +75,6 @@ jobs:
 
           PUSH_SHA="${{ github.event.after }}"
 
-          # Find the PR associated with this commit
           PR_NUMBER=$(gh pr list --search "$PUSH_SHA" --state merged --json number --jq '.[0].number' || echo "")
 
           if [ -z "$PR_NUMBER" ]; then
@@ -78,23 +84,27 @@ jobs:
 
           echo "Found merged PR #$PR_NUMBER"
 
-          # Get PR body
           BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body')
 
           if [[ "$BODY" =~ (https://)?github\.com/saltstack/salt/pull/([0-9]+) ]]; then
             URL="${BASH_REMATCH[0]}"
             if [[ ! "$URL" =~ ^https:// ]]; then URL="https://$URL"; fi
-            echo "URL=$URL" >> $GITHUB_ENV
 
-            # Get commits from the PR
             COMMITS=$(gh pr view "$PR_NUMBER" --json commits --jq '.commits[].oid' | tr '\n' ' ')
 
             if [ -z "$COMMITS" ]; then
-              # Fallback to the push SHA if no commits found
               COMMITS="$PUSH_SHA"
             fi
 
-            echo "COMMITS=$COMMITS" >> $GITHUB_ENV
+            # Use heredoc delimiters to prevent env-file injection
+            {
+              echo "URL<<EOF"
+              echo "$URL"
+              echo "EOF"
+              echo "COMMITS<<EOF"
+              echo "$COMMITS"
+              echo "EOF"
+            } >> $GITHUB_ENV
           else
             echo "No upstream PR link found in PR #$PR_NUMBER description. Skipping notes."
             exit 0
