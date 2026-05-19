@@ -1,0 +1,100 @@
+name: Upstream Bug-fix Notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'The SHA of the commit in openSUSE/salt to add the note to (default: HEAD)'
+        required: false
+        default: 'HEAD'
+      upstream_ref:
+        description: 'The upstream Salt PR number or full link (e.g., 66240 or https://github.com/saltstack/salt/pull/66240)'
+        required: true
+  pull_request:
+    types: [closed]
+
+jobs:
+  manage-notes:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch existing notes
+        run: |
+          git fetch origin refs/notes/*:refs/notes/* || true
+
+      - name: Process Manual Input
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          REF="${{ github.event.inputs.upstream_ref }}"
+          if [[ "$REF" =~ ^[0-9]+$ ]]; then
+            URL="https://github.com/saltstack/salt/pull/$REF"
+          else
+            URL="$REF"
+          fi
+
+          SHA="${{ github.event.inputs.commit_sha }}"
+          RESOLVED_SHA=$(git rev-parse "$SHA")
+ 
+          echo "URL=$URL" >> $GITHUB_ENV
+          echo "COMMITS=$RESOLVED_SHA" >> $GITHUB_ENV
+
+      - name: Process Merged PR
+        if: github.event_name == 'pull_request'
+        run: |
+          BODY="${{ github.event.pull_request.body }}"
+          if [[ "$BODY" =~ (https://)?github\.com/saltstack/salt/pull/([0-9]+) ]]; then
+            URL="${BASH_REMATCH[0]}"
+            if [[ ! "$URL" =~ ^https:// ]]; then URL="https://$URL"; fi
+            echo "URL=$URL" >> $GITHUB_ENV
+
+            MERGE_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+            if [ -n "$MERGE_SHA" ] && [ "$MERGE_SHA" != "null" ]; then
+              echo "COMMITS=$MERGE_SHA" >> $GITHUB_ENV
+            else
+              COUNT=${{ github.event.pull_request.commits }}
+              echo "Rebase merge detected. Using last $COUNT commits from ${{ github.event.pull_request.base.ref }}"
+              git fetch origin ${{ github.event.pull_request.base.ref }}
+              COMMITS=$(git log origin/${{ github.event.pull_request.base.ref }} -n "$COUNT" --pretty=format:"%H" | tr '\n' ' ')
+              echo "COMMITS=$COMMITS" >> $GITHUB_ENV
+            fi
+          else
+            echo "No upstream PR link found in PR description. Skipping notes."
+            exit 0
+          fi
+
+      - name: Add Notes
+        if: env.URL != ''
+        run: |
+          for SHA in $COMMITS; do
+            echo "Adding note to $SHA: Upstream PR: $URL"
+ 
+            if ! git cat-file -e "$SHA" 2>/dev/null; then
+              echo "Warning: Commit $SHA not found. Skipping."
+              continue
+            fi
+
+            EXISTING_NOTE=$(git notes show "$SHA" 2>/dev/null || true)
+            if [[ "$EXISTING_NOTE" == *"$URL"* ]]; then
+              echo "Note already contains this URL for $SHA. Skipping."
+            else
+              git notes append -m "Upstream PR: $URL" "$SHA"
+            fi
+          done
+
+      - name: Push notes
+        if: env.URL != ''
+        run: |
+          git push origin refs/notes/commits
+
