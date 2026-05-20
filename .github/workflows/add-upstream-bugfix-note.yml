@@ -12,8 +12,7 @@ on:
         required: true
   push:
     branches:
-      - master
-      - '[0-9]+.[0-9]+'
+      - openSUSE/release/3006.0
 
 concurrency:
   group: upstream-notes-push
@@ -75,9 +74,9 @@ jobs:
 
           PUSH_SHA="${{ github.event.after }}"
 
-          PR_NUMBER=$(gh pr list --search "$PUSH_SHA" --state merged --json number --jq '.[0].number' || echo "")
+          PR_NUMBER=$(gh pr list --search "$PUSH_SHA" --state merged --json number --jq '.[0].number // empty' || echo "")
 
-          if [ -z "$PR_NUMBER" ]; then
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
             echo "No merged PR found for commit $PUSH_SHA. Skipping notes."
             exit 0
           fi
@@ -148,7 +147,18 @@ jobs:
               RETRY_COUNT=$((RETRY_COUNT + 1))
               if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
                 echo "Push failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
-                git fetch origin refs/notes/*:refs/notes/* || true
+                # When concurrent workflows race:
+                #   1. Workflow A adds note and pushes successfully
+                #   2. Workflow B adds note and push fails (non-fast-forward)
+                #   3. If we fetch with refs/notes/*:refs/notes/*, we overwrite our local.
+                #      ref with remote, discarding the note we just added in step 2.
+                #   4. Next push succeeds but loses note in workflow B.
+                # Instead, fetch without updating local ref, then merge both sets of notes.
+                git fetch origin refs/notes/commits
+                git notes merge -s cat_sort_uniq FETCH_HEAD || {
+                  echo "Notes merge failed"
+                  exit 1
+                }
                 sleep 2
               else
                 echo "Failed to push notes after $MAX_RETRIES attempts"
