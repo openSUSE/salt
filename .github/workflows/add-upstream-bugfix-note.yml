@@ -50,7 +50,25 @@ jobs:
           fi
 
           SHA="${{ github.event.inputs.commit_sha }}"
-          RESOLVED_SHA=$(git rev-parse "$SHA")
+
+          # actions/checkout@v4 only fetches the triggered ref's history
+          # In workflow_dispatch mode, if a user triggers from 'master' but
+          # provides a commit_sha from 'openSUSE/release/3006.0', that commit won't be available
+          # and git rev-parse will fail.
+          # Try to resolve first, and if it fails, fetch all branches to make the
+          # commit available.
+          if ! RESOLVED_SHA=$(git rev-parse --verify "$SHA" 2>/dev/null); then
+            echo "Commit $SHA not found locally. Attempting to fetch all branches..."
+            git fetch --all
+
+            if ! RESOLVED_SHA=$(git rev-parse --verify "$SHA" 2>/dev/null); then
+              echo "Error: Commit $SHA not found in repository after fetching all branches."
+              echo "Please verify the commit SHA exists and is pushed to the remote."
+              exit 1
+            fi
+          fi
+
+          echo "Resolved commit: $RESOLVED_SHA"
 
           # Use heredoc delimiters to prevent env-file injection if URL contains newlines
           {
