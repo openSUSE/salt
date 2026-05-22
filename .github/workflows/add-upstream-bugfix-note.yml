@@ -91,6 +91,7 @@ jobs:
           # This ensures git notes can be pushed regardless of whether the PR originated from a fork.
 
           PUSH_SHA="${{ github.event.after }}"
+          BEFORE_SHA="${{ github.event.before }}"
 
           # Use the commits→pulls API for reliable, deterministic PR resolution.
           # gh pr list --search uses GitHub's search index which may have indexing delays,
@@ -111,10 +112,20 @@ jobs:
             URL="${BASH_REMATCH[0]}"
             if [[ ! "$URL" =~ ^https:// ]]; then URL="https://$URL"; fi
 
-            COMMITS=$(gh pr view "$PR_NUMBER" --json commits --jq '.commits[].oid' | tr '\n' ' ')
+            # Detect merge strategy by checking if PUSH_SHA is a merge commit (has 2 parents)
+            # - Merge commit: annotate only the merge commit
+            # - Rebase/squash: annotate all commits added in this push (1 for squash, N for rebase)
+           PARENT_COUNT=$(git rev-list --parents -n 1 "$PUSH_SHA" | awk '{print NF-1}')
 
-            if [ -z "$COMMITS" ]; then
+            if [ "$PARENT_COUNT" -eq 2 ]; then
               COMMITS="$PUSH_SHA"
+            else
+              COMMITS=$(git log --reverse --pretty=format:"%H" "$BEFORE_SHA..$PUSH_SHA" | tr '\n' ' ')
+
+              # If this happens annotate at least the current HEAD after push.
+              if [ -z "$COMMITS" ]; then
+                COMMITS="$PUSH_SHA"
+              fi
             fi
 
             # Use heredoc delimiters to prevent env-file injection
