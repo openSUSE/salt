@@ -82,7 +82,7 @@ jobs:
             echo "COMMITS<<${DELIMITER}"
             echo "$RESOLVED_SHA"
             echo "${DELIMITER}"
-          } >> $GITHUB_ENV
+          } >> "$GITHUB_ENV"
 
       - name: Process Merged PR
         if: github.event_name == 'push'
@@ -123,7 +123,7 @@ jobs:
             # Detect merge strategy by checking if PUSH_SHA is a merge commit (has 2 parents)
             # - Merge commit: annotate only the merge commit
             # - Rebase/squash: annotate all commits added in this push (1 for squash, N for rebase)
-           PARENT_COUNT=$(git rev-list --parents -n 1 "$PUSH_SHA" | awk '{print NF-1}')
+            PARENT_COUNT=$(git rev-list --parents -n 1 "$PUSH_SHA" | awk '{print NF-1}')
 
             if [ "$PARENT_COUNT" -eq 2 ]; then
               COMMITS="$PUSH_SHA"
@@ -144,7 +144,7 @@ jobs:
               echo "COMMITS<<${DELIMITER}"
               echo "$COMMITS"
               echo "${DELIMITER}"
-            } >> $GITHUB_ENV
+            } >> "$GITHUB_ENV"
           else
             echo "No upstream PR link found in PR #$PR_NUMBER description. Skipping notes."
             exit 0
@@ -172,7 +172,7 @@ jobs:
             fi
           done
 
-          echo "NOTES_ADDED=$NOTES_ADDED" >> $GITHUB_ENV
+          echo "NOTES_ADDED=$NOTES_ADDED" >> "$GITHUB_ENV"
 
       - name: Push notes
         if: env.URL != '' && env.NOTES_ADDED == 'true'
