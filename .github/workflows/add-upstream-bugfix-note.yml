@@ -52,6 +52,13 @@ jobs:
             elif [[ ! "$URL" =~ ^https:// ]]; then
               URL="https://$URL"
             fi
+
+            if [[ ! "$URL" =~ ^https://github\.com/saltstack/salt/pull/[0-9]+$ ]]; then
+              echo "Error: upstream_ref must be a PR number or a valid saltstack/salt PR URL."
+              echo "Got: $URL"
+              echo "Expected format: https://github.com/saltstack/salt/pull/<number>"
+              exit 1
+            fi
           fi
 
           SHA="${{ github.event.inputs.commit_sha }}"
