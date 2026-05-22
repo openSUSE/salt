@@ -47,6 +47,11 @@ jobs:
             URL="https://github.com/saltstack/salt/pull/$REF"
           else
             URL="$REF"
+            if [[ "$URL" =~ ^http:// ]]; then
+              URL="https://${URL#http://}"
+            elif [[ ! "$URL" =~ ^https:// ]]; then
+              URL="https://$URL"
+            fi
           fi
 
           SHA="${{ github.event.inputs.commit_sha }}"
@@ -128,11 +133,15 @@ jobs:
             if [ "$PARENT_COUNT" -eq 2 ]; then
               COMMITS="$PUSH_SHA"
             else
-              COMMITS=$(git log --reverse --pretty=format:"%H" "$BEFORE_SHA..$PUSH_SHA" | tr '\n' ' ')
-
-              # If this happens annotate at least the current HEAD after push.
-              if [ -z "$COMMITS" ]; then
+              # The all-zero SHA indicates no previous commit
+              if [[ "$BEFORE_SHA" =~ ^0+$ ]] || ! git cat-file -e "$BEFORE_SHA" 2>/dev/null; then
                 COMMITS="$PUSH_SHA"
+              else
+                COMMITS=$(git log --reverse --pretty=format:"%H" "$BEFORE_SHA..$PUSH_SHA" | tr '\n' ' ')
+
+                if [ -z "$COMMITS" ]; then
+                  COMMITS="$PUSH_SHA"
+                fi
               fi
             fi
 
