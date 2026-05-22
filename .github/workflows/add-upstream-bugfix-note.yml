@@ -92,9 +92,13 @@ jobs:
 
           PUSH_SHA="${{ github.event.after }}"
 
-          PR_NUMBER=$(gh pr list --search "$PUSH_SHA" --state merged --json number --jq '.[0].number // empty' || echo "")
+          # Use the commits→pulls API for reliable, deterministic PR resolution.
+          # gh pr list --search uses GitHub's search index which may have indexing delays,
+          # while this API endpoint provides a direct lookup for commits associated with PRs.
+          PR_NUMBER=$(gh api "repos/${{ github.repository }}/commits/$PUSH_SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null)][0].number // empty' || echo "")
 
-          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+          if [ -z "$PR_NUMBER" ]; then
             echo "No merged PR found for commit $PUSH_SHA. Skipping notes."
             exit 0
           fi
