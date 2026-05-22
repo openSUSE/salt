@@ -70,14 +70,18 @@ jobs:
 
           echo "Resolved commit: $RESOLVED_SHA"
 
-          # Use heredoc delimiters to prevent env-file injection if URL contains newlines
+          # Use unique random delimiters to prevent env-file injection.
+          # A fixed delimiter (EOF) is vulnerable if the value contains a line equal to "EOF",
+          # which would close the heredoc early and allow variable injection.
+          # Generate random delimiters per write to make collision practically impossible.
+          DELIMITER="ghadelimiter_${RANDOM}_${RANDOM}_${RANDOM}"
           {
-            echo "URL<<EOF"
+            echo "URL<<${DELIMITER}"
             echo "$URL"
-            echo "EOF"
-            echo "COMMITS<<EOF"
+            echo "${DELIMITER}"
+            echo "COMMITS<<${DELIMITER}"
             echo "$RESOLVED_SHA"
-            echo "EOF"
+            echo "${DELIMITER}"
           } >> $GITHUB_ENV
 
       - name: Process Merged PR
@@ -128,14 +132,14 @@ jobs:
               fi
             fi
 
-            # Use heredoc delimiters to prevent env-file injection
+            DELIMITER="ghadelimiter_${RANDOM}_${RANDOM}_${RANDOM}"
             {
-              echo "URL<<EOF"
+              echo "URL<<${DELIMITER}"
               echo "$URL"
-              echo "EOF"
-              echo "COMMITS<<EOF"
+              echo "${DELIMITER}"
+              echo "COMMITS<<${DELIMITER}"
               echo "$COMMITS"
-              echo "EOF"
+              echo "${DELIMITER}"
             } >> $GITHUB_ENV
           else
             echo "No upstream PR link found in PR #$PR_NUMBER description. Skipping notes."
