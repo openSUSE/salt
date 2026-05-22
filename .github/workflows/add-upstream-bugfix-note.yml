@@ -112,9 +112,13 @@ jobs:
 
           BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body')
 
-          if [[ "$BODY" =~ (https://)?github\.com/saltstack/salt/pull/([0-9]+) ]]; then
+          if [[ "$BODY" =~ (https?://)?github\.com/saltstack/salt/pull/([0-9]+) ]]; then
             URL="${BASH_REMATCH[0]}"
-            if [[ ! "$URL" =~ ^https:// ]]; then URL="https://$URL"; fi
+            if [[ "$URL" =~ ^http:// ]]; then
+              URL="https://${URL#http://}"
+            elif [[ ! "$URL" =~ ^https:// ]]; then
+              URL="https://$URL"
+            fi
 
             # Detect merge strategy by checking if PUSH_SHA is a merge commit (has 2 parents)
             # - Merge commit: annotate only the merge commit
