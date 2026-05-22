@@ -6447,6 +6447,7 @@ def append(
     defaults=None,
     context=None,
     ignore_whitespace=True,
+    show_changes=True,
 ):
     """
     Ensure that some text appears at the end of a file.
@@ -6537,6 +6538,12 @@ def append(
         Spaces and Tabs in text are ignored by default, when searching for the
         appending content, one space or multiple tabs are the same for salt.
         Set this option to ``False`` if you want to change this behavior.
+
+    show_changes
+        .. versionadded:: 3008.0
+
+        Output a unified diff of the old file and the new file.
+        Set this option to  ``False`` to disable this.
 
     Multi-line example:
 
@@ -6677,6 +6684,8 @@ def append(
         if slines != nlines:
             if not __utils__["files.is_text"](name):
                 ret["changes"]["diff"] = "Replace binary file"
+            elif not show_changes:
+                ret["changes"]["diff"] = "<show_changes=False>"
             else:
                 # Changes happened, add them
                 ret["changes"]["diff"] = "\n".join(difflib.unified_diff(slines, nlines))
@@ -6699,6 +6708,8 @@ def append(
     if slines != nlines:
         if not __utils__["files.is_text"](name):
             ret["changes"]["diff"] = "Replace binary file"
+        elif not show_changes:
+            ret["changes"]["diff"] = "<show_changes=False>"
         else:
             # Changes happened, add them
             ret["changes"]["diff"] = "\n".join(difflib.unified_diff(slines, nlines))
@@ -6720,6 +6731,7 @@ def prepend(
     defaults=None,
     context=None,
     header=None,
+    show_changes=True,
 ):
     """
     Ensure that some text appears at the beginning of a file
@@ -6810,6 +6822,12 @@ def prepend(
         Spaces and Tabs in text are ignored by default, when searching for the
         appending content, one space or multiple tabs are the same for salt.
         Set this option to ``False`` if you want to change this behavior.
+
+    show_changes
+        .. versionadded:: 3008.0
+
+        Output a unified diff of the old file and the new file.
+        Set this option to  ``False`` to disable this.
 
     Multi-line example:
 
@@ -6966,6 +6984,8 @@ def prepend(
         if slines != nlines:
             if not __utils__["files.is_text"](name):
                 ret["changes"]["diff"] = "Replace binary file"
+            elif not show_changes:
+                ret["changes"]["diff"] = "<show_changes=False>"
             else:
                 # Changes happened, add them
                 ret["changes"]["diff"] = "".join(difflib.unified_diff(slines, nlines))
@@ -7005,6 +7025,8 @@ def prepend(
     if slines != nlines:
         if not __utils__["files.is_text"](name):
             ret["changes"]["diff"] = "Replace binary file"
+        elif not show_changes:
+            ret["changes"]["diff"] = "<show_changes=False>"
         else:
             # Changes happened, add them
             ret["changes"]["diff"] = "".join(difflib.unified_diff(slines, nlines))
