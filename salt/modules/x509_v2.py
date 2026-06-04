@@ -154,6 +154,7 @@ except ImportError:
 import salt.utils.dictupdate
 import salt.utils.files
 import salt.utils.stringutils
+import salt.utils.timeutil
 from salt.exceptions import CommandExecutionError, SaltInvocationError
 from salt.utils.odict import OrderedDict
 
@@ -1348,7 +1349,7 @@ def expires(certificate, days=0):
     """
     cert = x509util.load_cert(certificate)
     # dates are encoded in UTC/GMT, they are returned as a naive datetime object
-    return cert.not_valid_after <= datetime.datetime.utcnow() + datetime.timedelta(
+    return cert.not_valid_after <= salt.utils.timeutil.utcnow() + datetime.timedelta(
         days=days
     )
 

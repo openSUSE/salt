@@ -6,8 +6,6 @@ Python 3.12 added optional extraction filters (PEP 706). Passing
 archives from less trusted sources.
 """
 
-from __future__ import annotations
-
 import sys
 import tarfile
 

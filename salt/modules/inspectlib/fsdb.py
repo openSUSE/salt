@@ -19,7 +19,6 @@
 
 
 import csv
-import datetime
 import gzip
 import os
 import re
@@ -27,6 +26,8 @@ import shutil
 import sys
 
 from salt.utils.odict import OrderedDict
+
+import salt.utils.timeutil
 
 
 class CsvDBEntity:
@@ -72,7 +73,7 @@ class CsvDB:
 
         :return:
         """
-        return datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        return salt.utils.timeutil.utcnow().strftime("%Y%m%d-%H%M%S")
 
     def new(self):
         """

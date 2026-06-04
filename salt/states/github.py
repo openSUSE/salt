@@ -20,6 +20,8 @@ import time
 
 from salt.exceptions import CommandExecutionError
 
+import salt.utils.timeutil
+
 log = logging.getLogger(__name__)
 
 
@@ -335,7 +337,7 @@ def team_present(
 
     manage_members = members is not None
 
-    mfa_deadline = datetime.datetime.utcnow() - datetime.timedelta(
+    mfa_deadline = salt.utils.timeutil.utcnow() - datetime.timedelta(
         seconds=no_mfa_grace_seconds
     )
     members_no_mfa = __salt__["github.list_members_without_mfa"](profile=profile)

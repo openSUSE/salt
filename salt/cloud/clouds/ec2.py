@@ -104,6 +104,7 @@ import salt.utils.hashutils
 import salt.utils.http as http
 import salt.utils.json
 import salt.utils.msgpack
+import salt.utils.timeutil
 import salt.utils.stringutils
 import salt.utils.yaml
 from salt.exceptions import (
@@ -290,7 +291,7 @@ def query(
     attempts = 0
     while attempts < aws.AWS_MAX_RETRIES:
         params_with_headers = params.copy()
-        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp = salt.utils.timeutil.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
         if not location:
             location = get_location()
@@ -327,7 +328,7 @@ def query(
         host = endpoint.strip()
 
         # Create a date for headers and the credential string
-        t = datetime.datetime.utcnow()
+        t = salt.utils.timeutil.utcnow()
         amz_date = t.strftime("%Y%m%dT%H%M%SZ")  # Format date as YYYYMMDD'T'HHMMSS'Z'
         datestamp = t.strftime("%Y%m%d")  # Date w/o time, used in credential scope
 

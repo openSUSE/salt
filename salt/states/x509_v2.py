@@ -187,6 +187,7 @@ import logging
 import os.path
 
 import salt.utils.files
+import salt.utils.timeutil
 from salt.exceptions import CommandExecutionError, SaltInvocationError
 from salt.features import features
 from salt.state import STATE_INTERNAL_KEYWORDS as _STATE_INTERNAL_KEYWORDS
@@ -490,7 +491,7 @@ def certificate_managed(
 
                 if (
                     current.not_valid_after
-                    < datetime.datetime.utcnow()
+                    < salt.utils.timeutil.utcnow()
                     + datetime.timedelta(days=days_remaining)
                 ):
                     changes["expiration"] = True
@@ -898,7 +899,7 @@ def crl_managed(
                     changes["encoding"] = encoding
                 if days_remaining and (
                     current.next_update
-                    < datetime.datetime.utcnow()
+                    < salt.utils.timeutil.utcnow()
                     + datetime.timedelta(days=days_remaining)
                 ):
                     changes["expiration"] = True
