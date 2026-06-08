@@ -21,7 +21,6 @@ Module to run salt-support within Salt.
 # pylint: disable=W0231,W0221
 
 
-import datetime
 import logging
 import os
 import re
@@ -38,6 +37,7 @@ import salt.utils.dictupdate
 import salt.utils.odict
 import salt.utils.path
 import salt.utils.stringutils
+import salt.utils.timeutil
 from salt.cli.support.collector import SaltSupport, SupportDataCollector
 
 __virtualname__ = "support"
@@ -58,7 +58,7 @@ class LogCollector:
             list.append(
                 self,
                 "{} - {}".format(
-                    datetime.datetime.utcnow().strftime("%T.%f")[:-3], obj
+                    salt.utils.timeutil.utcnow().strftime("%T.%f")[:-3], obj
                 ),
             )
 
