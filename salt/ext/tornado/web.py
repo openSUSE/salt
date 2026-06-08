@@ -80,6 +80,8 @@ import types
 from inspect import isclass
 from io import BytesIO
 
+import salt.utils.timeutil
+
 import salt.ext.tornado
 from salt.ext.tornado.concurrent import Future
 from salt.ext.tornado import escape
@@ -580,7 +582,7 @@ class RequestHandler(object):
         if domain:
             morsel["domain"] = domain
         if expires_days is not None and not expires:
-            expires = datetime.datetime.utcnow() + datetime.timedelta(
+            expires = salt.utils.timeutil.utcnow() + datetime.timedelta(
                 days=expires_days)
         if expires:
             morsel["expires"] = httputil.format_timestamp(expires)
@@ -605,7 +607,7 @@ class RequestHandler(object):
         was set (but there is no way to find out on the server side
         which values were used for a given cookie).
         """
-        expires = datetime.datetime.utcnow() - datetime.timedelta(days=365)
+        expires = salt.utils.timeutil.utcnow() - datetime.timedelta(days=365)
         self.set_cookie(name, value="", path=path, expires=expires,
                         domain=domain)
 
@@ -2499,7 +2501,7 @@ class StaticFileHandler(RequestHandler):
         cache_time = self.get_cache_time(self.path, self.modified,
                                          content_type)
         if cache_time > 0:
-            self.set_header("Expires", datetime.datetime.utcnow() +
+            self.set_header("Expires", salt.utils.timeutil.utcnow() +
                             datetime.timedelta(seconds=cache_time))
             self.set_header("Cache-Control", "max-age=" + str(cache_time))
 

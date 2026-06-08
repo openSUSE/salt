@@ -10,8 +10,9 @@ import copy
 import functools
 import sys
 import threading
-import datetime
 from io import BytesIO
+
+import salt.utils.timeutil
 
 from salt.ext.tornado.escape import utf8, native_str
 from salt.ext.tornado import gen
@@ -659,7 +660,7 @@ class HTTPRequestTestCase(unittest.TestCase):
         self.assertEqual(request.body, utf8('foo'))
 
     def test_if_modified_since(self):
-        http_date = datetime.datetime.utcnow()
+        http_date = salt.utils.timeutil.utcnow()
         request = HTTPRequest('http://example.com', if_modified_since=http_date)
         self.assertEqual(request.headers,
                          {'If-Modified-Since': format_timestamp(http_date)})

@@ -279,7 +279,7 @@ class MockTarFile:
         return [MockTarFile]
 
     @staticmethod
-    def extractall(data):
+    def extractall(data, *args, **kwargs):
         """
         Mock extractall method
         """
