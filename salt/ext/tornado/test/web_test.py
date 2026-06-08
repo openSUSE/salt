@@ -28,6 +28,8 @@ import os
 import re
 import socket
 
+import salt.utils.timeutil
+
 if PY3:
     import urllib.parse as urllib_parse  # py3
 else:
@@ -379,7 +381,7 @@ class CookieTest(WebTestCase):
         match = re.match("foo=bar; expires=(?P<expires>.+); Path=/", header)
         self.assertIsNotNone(match)
 
-        expires = datetime.datetime.utcnow() + datetime.timedelta(days=10)
+        expires = salt.utils.timeutil.utcnow() + datetime.timedelta(days=10)
         header_expires = datetime.datetime(
             *email.utils.parsedate(match.groupdict()["expires"])[:6])
         self.assertTrue(abs(timedelta_to_seconds(expires - header_expires)) < 10)
@@ -1577,7 +1579,7 @@ class DateHeaderTest(SimpleHandlerTestCase):
         response = self.fetch('/')
         header_date = datetime.datetime(
             *email.utils.parsedate(response.headers['Date'])[:6])
-        self.assertTrue(header_date - datetime.datetime.utcnow() <
+        self.assertTrue(header_date - salt.utils.timeutil.utcnow() <
                         datetime.timedelta(seconds=2))
 
 
