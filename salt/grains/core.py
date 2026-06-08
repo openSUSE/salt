@@ -38,6 +38,7 @@ import salt.utils.network
 import salt.utils.path
 import salt.utils.pkg.rpm
 import salt.utils.platform
+import salt.utils.timeutil
 import salt.utils.stringutils
 from salt.utils.network import _clear_interfaces, _get_interfaces
 from salt.utils.platform import get_machine_identifier as _get_machine_identifier
@@ -2985,12 +2986,12 @@ def ip_fqdn():
         if not ret["ipv" + ipv_num]:
             ret[key] = []
         else:
-            start_time = datetime.datetime.utcnow()
+            start_time = salt.utils.timeutil.utcnow()
             try:
                 info = socket.getaddrinfo(_fqdn, None, socket_type)
                 ret[key] = list({item[4][0] for item in info})
             except (OSError, UnicodeError):
-                timediff = datetime.datetime.utcnow() - start_time
+                timediff = salt.utils.timeutil.utcnow() - start_time
                 if timediff.seconds > 5 and __opts__["__role"] == "master":
                     log.warning(
                         'Unable to find IPv%s record for "%s" causing a %s '

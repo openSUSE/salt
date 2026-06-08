@@ -56,6 +56,8 @@ from datetime import datetime
 
 from salt.exceptions import CommandExecutionError
 
+import salt.utils.timeutil
+
 # Import 3rd party modules
 try:
     import purestorage
@@ -235,7 +237,7 @@ def snap_create(name, suffix=None):
     array = _get_system()
     if suffix is None:
         suffix = "snap-" + str(
-            (datetime.utcnow() - datetime(1970, 1, 1, 0, 0, 0, 0)).total_seconds()
+            (salt.utils.timeutil.utcnow() - datetime(1970, 1, 1, 0, 0, 0, 0)).total_seconds()
         )
         suffix = suffix.replace(".", "")
     if _get_volume(name, array) is not None:

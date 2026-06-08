@@ -55,6 +55,8 @@ from datetime import datetime
 
 from salt.exceptions import CommandExecutionError
 
+import salt.utils.timeutil
+
 try:
     from purity_fb import (
         FileSystem,
@@ -195,7 +197,7 @@ def snap_create(name, suffix=None):
     blade = _get_blade()
     if suffix is None:
         suffix = "snap-" + str(
-            (datetime.utcnow() - datetime(1970, 1, 1, 0, 0, 0, 0)).total_seconds()
+            (salt.utils.timeutil.utcnow() - datetime(1970, 1, 1, 0, 0, 0, 0)).total_seconds()
         )
         suffix = suffix.replace(".", "")
     if _get_fs(name, blade) is not None:
