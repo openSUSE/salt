@@ -36,6 +36,7 @@ import salt.utils.files
 import salt.utils.path
 import salt.utils.platform
 import salt.utils.stringutils
+import salt.utils.timeutil
 import salt.utils.versions
 from salt.state import STATE_INTERNAL_KEYWORDS as _STATE_INTERNAL_KEYWORDS
 from salt.utils.odict import OrderedDict
@@ -1999,7 +2000,7 @@ def expired(certificate):
             ret["path"] = certificate
             cert = _get_certificate_obj(certificate)
 
-            _now = datetime.datetime.utcnow()
+            _now = salt.utils.timeutil.utcnow()
             _expiration_date = cert.get_not_after().get_datetime()
 
             ret["cn"] = _parse_subject(cert.get_subject())["CN"]
@@ -2045,7 +2046,7 @@ def will_expire(certificate, days):
 
             cert = _get_certificate_obj(certificate)
 
-            _check_time = datetime.datetime.utcnow() + datetime.timedelta(days=days)
+            _check_time = salt.utils.timeutil.utcnow() + datetime.timedelta(days=days)
             _expiration_date = cert.get_not_after().get_datetime()
 
             ret["cn"] = _parse_subject(cert.get_subject())["CN"]

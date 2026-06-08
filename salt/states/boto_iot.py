@@ -77,6 +77,7 @@ import time
 
 import salt.utils.data
 import salt.utils.json
+import salt.utils.timeutil
 
 log = logging.getLogger(__name__)
 
@@ -288,7 +289,7 @@ def thing_type_absent(
                 _deprecation_date_str, "%Y-%m-%d %H:%M:%S.%f"
             )
 
-            _elapsed_time_delta = datetime.datetime.utcnow() - _deprecation_date
+            _elapsed_time_delta = salt.utils.timeutil.utcnow() - _deprecation_date
             if _elapsed_time_delta.seconds >= 300:
                 _delete_wait_timer = 0
             else:

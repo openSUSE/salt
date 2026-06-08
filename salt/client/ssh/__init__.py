@@ -47,6 +47,7 @@ import salt.utils.path
 import salt.utils.platform
 import salt.utils.stringutils
 import salt.utils.thin
+import salt.utils.timeutil
 import salt.utils.url
 import salt.utils.verify
 from salt._logging import LOG_LEVELS
@@ -456,7 +457,7 @@ class SSH(MultiprocessingStateMixin):
                         '# Automatically added by "{s_user}" at {s_time}\n{hostname}:\n'
                         "    host: {hostname}\n    user: {user}\n    passwd: {passwd}\n".format(
                             s_user=getpass.getuser(),
-                            s_time=datetime.datetime.utcnow().isoformat(),
+                            s_time=salt.utils.timeutil.utcnow().isoformat(),
                             hostname=hostname if hostname else self.opts.get("tgt", ""),
                             user=user if user else self.opts.get("ssh_user", ""),
                             passwd=self.opts.get("ssh_passwd", ""),
@@ -1635,9 +1636,9 @@ ARGS = {arguments}\n'''.format(
                 saltwinshell.deploy_python(self)
                 stdout, stderr, retcode = self.shim_cmd(cmd_str)
                 while re.search(RSTR_RE, stdout):
-                    stdout = re.split(RSTR_RE, stdout, 1)[1].strip()
+                    stdout = re.split(RSTR_RE, stdout, maxsplit=1)[1].strip()
                 while re.search(RSTR_RE, stderr):
-                    stderr = re.split(RSTR_RE, stderr, 1)[1].strip()
+                    stderr = re.split(RSTR_RE, stderr, maxsplit=1)[1].strip()
             elif error == "Undefined SHIM state":
                 self.deploy()
                 stdout, stderr, retcode = self.shim_cmd(cmd_str)
@@ -1652,27 +1653,27 @@ ARGS = {arguments}\n'''.format(
                         retcode,
                     )
                 while re.search(RSTR_RE, stdout):
-                    stdout = re.split(RSTR_RE, stdout, 1)[1].strip()
+                    stdout = re.split(RSTR_RE, stdout, maxsplit=1)[1].strip()
                 while re.search(RSTR_RE, stderr):
-                    stderr = re.split(RSTR_RE, stderr, 1)[1].strip()
+                    stderr = re.split(RSTR_RE, stderr, maxsplit=1)[1].strip()
             else:
                 return "ERROR: {}".format(error), stderr, retcode
 
         # FIXME: this discards output from ssh_shim if the shim succeeds.  It should
         # always save the shim output regardless of shim success or failure.
         while re.search(RSTR_RE, stdout):
-            stdout = re.split(RSTR_RE, stdout, 1)[1].strip()
+            stdout = re.split(RSTR_RE, stdout, maxsplit=1)[1].strip()
 
         if re.search(RSTR_RE, stderr):
             # Found RSTR in stderr which means SHIM completed and only
             # and remaining output is only from salt.
             while re.search(RSTR_RE, stderr):
-                stderr = re.split(RSTR_RE, stderr, 1)[1].strip()
+                stderr = re.split(RSTR_RE, stderr, maxsplit=1)[1].strip()
 
         else:
             # RSTR was found in stdout but not stderr - which means there
             # is a SHIM command for the master.
-            shim_command = re.split(r"\r?\n", stdout, 1)[0].strip()
+            shim_command = re.split(r"\r?\n", stdout, maxsplit=1)[0].strip()
             log.debug("SHIM retcode(%s) and command: %s", retcode, shim_command)
             if (
                 "deploy" == shim_command
@@ -1703,12 +1704,12 @@ ARGS = {arguments}\n'''.format(
                             retcode,
                         )
                 while re.search(RSTR_RE, stdout):
-                    stdout = re.split(RSTR_RE, stdout, 1)[1].strip()
+                    stdout = re.split(RSTR_RE, stdout, maxsplit=1)[1].strip()
                 if self.tty:
                     stderr = ""
                 else:
                     while re.search(RSTR_RE, stderr):
-                        stderr = re.split(RSTR_RE, stderr, 1)[1].strip()
+                        stderr = re.split(RSTR_RE, stderr, maxsplit=1)[1].strip()
             elif "ext_mods" == shim_command:
                 self.deploy_ext()
                 stdout, stderr, retcode = self.shim_cmd(cmd_str)
@@ -1721,9 +1722,9 @@ ARGS = {arguments}\n'''.format(
                         retcode,
                     )
                 while re.search(RSTR_RE, stdout):
-                    stdout = re.split(RSTR_RE, stdout, 1)[1].strip()
+                    stdout = re.split(RSTR_RE, stdout, maxsplit=1)[1].strip()
                 while re.search(RSTR_RE, stderr):
-                    stderr = re.split(RSTR_RE, stderr, 1)[1].strip()
+                    stderr = re.split(RSTR_RE, stderr, maxsplit=1)[1].strip()
 
         return stdout, stderr, retcode
 

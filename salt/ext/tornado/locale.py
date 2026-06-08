@@ -50,6 +50,8 @@ import numbers
 import os
 import re
 
+import salt.utils.timeutil
+
 from salt.ext.tornado import escape
 from salt.ext.tornado.log import gen_log
 from salt.ext.tornado.util import PY3
@@ -321,7 +323,7 @@ class Locale(object):
         """
         if isinstance(date, numbers.Real):
             date = datetime.datetime.utcfromtimestamp(date)
-        now = datetime.datetime.utcnow()
+        now = salt.utils.timeutil.utcnow()
         if date > now:
             if relative and (date - now).seconds < 60:
                 # Due to click skew, things are some things slightly

@@ -109,6 +109,19 @@ def __getdefaultlocale(envvars=("LC_ALL", "LC_CTYPE", "LANG", "LANGUAGE")):
         localename = "C"
     return locale._parse_localename(localename)
 
+# Filter deprecated datetime calls in third-party libraries (like dateutil)
+# All core Salt code has been migrated to use salt.utils.timeutil wrappers.
+warnings.filterwarnings(
+    "ignore",
+    message="datetime.datetime.utcfromtimestamp\\(\\) is deprecated and scheduled for removal.*",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="datetime.datetime.utcnow\\(\\) is deprecated and scheduled for removal.*",
+    category=DeprecationWarning,
+)
+
 
 def __define_global_system_encoding_variable__():
     import sys

@@ -680,7 +680,7 @@ def _parse_proplist(data):
     """
     out = {}
     for line in data.split("\n"):
-        line = re.split(r"\s+", line, 1)
+        line = re.split(r"\s+", line, maxsplit=1)
         if len(line) == 2:
             out[line[0]] = line[1]
 

@@ -49,7 +49,6 @@ included:
 """
 
 import base64
-import datetime
 import http.client
 import inspect
 import logging
@@ -61,6 +60,7 @@ import salt.utils.cloud
 import salt.utils.files
 import salt.utils.http
 import salt.utils.json
+import salt.utils.timeutil
 import salt.utils.yaml
 from salt.exceptions import (
     SaltCloudExecutionFailure,
@@ -1159,7 +1159,7 @@ def query(action=None, command=None, args=None, method="GET", location=None, dat
     if (not user) or (not ssh_keyfile) or (not ssh_keyname) or (not location):
         return None
 
-    timenow = datetime.datetime.utcnow()
+    timenow = salt.utils.timeutil.utcnow()
     timestamp = timenow.strftime("%a, %d %b %Y %H:%M:%S %Z").strip()
     rsa_key = salt.crypt.get_rsa_key(ssh_keyfile, None)
     if HAS_M2:

@@ -2,7 +2,6 @@
 Support for DEB packages
 """
 
-import datetime
 import logging
 import os
 import re
@@ -12,6 +11,7 @@ import salt.utils.data
 import salt.utils.files
 import salt.utils.path
 import salt.utils.stringutils
+import salt.utils.timeutil
 from salt.exceptions import CommandExecutionError, SaltInvocationError
 
 log = logging.getLogger(__name__)
@@ -388,10 +388,9 @@ def _get_pkg_install_time(pkg, arch):
         locations.append(os.path.join(loc_root, "{}.list".format(pkg)))
         for location in locations:
             try:
-                iso_time_t = int(os.path.getmtime(location))
-                iso_time = (
-                    datetime.datetime.utcfromtimestamp(iso_time_t).isoformat() + "Z"
-                )
+                iso_time = salt.utils.timeutil.utcfromtimestamp(
+                    int(os.path.getmtime(location))
+                ).isoformat() + "Z"
                 break
             except OSError:
                 pass

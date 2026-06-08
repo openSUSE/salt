@@ -376,7 +376,7 @@ class LogCollectorTestCase(TestCase, LoaderModuleMockMixin):
         """
         utcmock = MagicMock()
         utcmock.utcnow = MagicMock(return_value=datetime.datetime.utcfromtimestamp(0))
-        with patch("datetime.datetime", utcmock):
+        with patch("salt.utils.timeutil", utcmock):
             msg = "Upgrading /dev/null device"
             out = saltsupport.LogCollector()
             out.msg(msg, title="Here")
@@ -397,7 +397,7 @@ class LogCollectorTestCase(TestCase, LoaderModuleMockMixin):
         """
         utcmock = MagicMock()
         utcmock.utcnow = MagicMock(return_value=datetime.datetime.utcfromtimestamp(0))
-        with patch("datetime.datetime", utcmock):
+        with patch("salt.utils.timeutil", utcmock):
             msg = "SIMM crosstalk during tectonic stress"
             out = saltsupport.LogCollector()
             out.info(msg)
@@ -418,7 +418,7 @@ class LogCollectorTestCase(TestCase, LoaderModuleMockMixin):
         """
         utcmock = MagicMock()
         utcmock.utcnow = MagicMock(return_value=datetime.datetime.utcfromtimestamp(0))
-        with patch("datetime.datetime", utcmock):
+        with patch("salt.utils.timeutil", utcmock):
             msg = "Webmaster kidnapped by evil cult"
             out = saltsupport.LogCollector()
             out.put(msg)
@@ -439,7 +439,7 @@ class LogCollectorTestCase(TestCase, LoaderModuleMockMixin):
         """
         utcmock = MagicMock()
         utcmock.utcnow = MagicMock(return_value=datetime.datetime.utcfromtimestamp(0))
-        with patch("datetime.datetime", utcmock):
+        with patch("salt.utils.timeutil", utcmock):
             msg = "Your e-mail is now being delivered by USPS"
             out = saltsupport.LogCollector()
             out.warning(msg)
@@ -460,7 +460,7 @@ class LogCollectorTestCase(TestCase, LoaderModuleMockMixin):
         """
         utcmock = MagicMock()
         utcmock.utcnow = MagicMock(return_value=datetime.datetime.utcfromtimestamp(0))
-        with patch("datetime.datetime", utcmock):
+        with patch("salt.utils.timeutil", utcmock):
             msg = "Learning curve appears to be fractal"
             out = saltsupport.LogCollector()
             out.error(msg)
@@ -481,7 +481,7 @@ class LogCollectorTestCase(TestCase, LoaderModuleMockMixin):
         """
         utcmock = MagicMock()
         utcmock.utcnow = MagicMock(return_value=datetime.datetime.utcfromtimestamp(0))
-        with patch("datetime.datetime", utcmock):
+        with patch("salt.utils.timeutil", utcmock):
             out = saltsupport.LogCollector()
             out.highlight("The {} TTYs became {} TTYs and vice versa", "real", "pseudo")
             assert saltsupport.LogCollector.INFO in out.messages
