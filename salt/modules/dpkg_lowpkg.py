@@ -2,7 +2,6 @@
 Support for DEB packages
 """
 
-import datetime
 import logging
 import os
 import re
@@ -246,10 +245,9 @@ def _get_pkg_build_time(name):
     if os.path.exists(changelog_dir):
         for fname in os.listdir(changelog_dir):
             try:
-                iso_time_t = int(os.path.getmtime(os.path.join(changelog_dir, fname)))
-                iso_time = (
-                    datetime.datetime.utcfromtimestamp(iso_time_t).isoformat() + "Z"
-                )
+                iso_time = salt.utils.timeutil.utcfromtimestamp(
+                    int(os.path.getmtime(os.path.join(changelog_dir, fname)))
+                ).isoformat() + "Z"
                 break
             except OSError:
                 pass
@@ -261,10 +259,9 @@ def _get_pkg_build_time(name):
         ).splitlines():
             if "changelog" in pkg_f_path.lower() and os.path.exists(pkg_f_path):
                 try:
-                    iso_time_t = int(os.path.getmtime(pkg_f_path))
-                    iso_time = (
-                        datetime.datetime.utcfromtimestamp(iso_time_t).isoformat() + "Z"
-                    )
+                    iso_time = salt.utils.timeutil.utcfromtimestamp(
+                        int(os.path.getmtime(pkg_f_path))
+                    ).isoformat() + "Z"
                     break
                 except OSError:
                     pass
@@ -341,13 +338,9 @@ def _get_pkg_info(*packages, **kwargs):
                 # format in UTC. Empty/non-integer values (older dpkg, packages
                 # without that field) are skipped.
                 try:
-                    value = (
-                        datetime.datetime.fromtimestamp(
-                            int(value), tz=datetime.timezone.utc
-                        )
-                        .isoformat()
-                        .replace("+00:00", "Z")
-                    )
+                    value = salt.utils.timeutil.utcfromtimestamp(
+                        int(value)
+                    ).isoformat() + "Z"
                 except ValueError:
                     value = None
             if value:
@@ -403,10 +396,9 @@ def _get_pkg_install_time(pkg, arch):
         locations.append(os.path.join(loc_root, f"{pkg}.list"))
         for location in locations:
             try:
-                iso_time_t = int(os.path.getmtime(location))
-                iso_time = (
-                    datetime.datetime.utcfromtimestamp(iso_time_t).isoformat() + "Z"
-                )
+                iso_time = salt.utils.timeutil.utcfromtimestamp(
+                    int(os.path.getmtime(location))
+                ).isoformat() + "Z"
                 break
             except OSError:
                 pass
