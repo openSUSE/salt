@@ -115,8 +115,9 @@ def test_process_preimports_multiprocessing_connection_68573(tmp_path):
     )
     result = subprocess.run(
         [sys.executable, str(script)],
-        capture_output=True,
-        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
         check=False,
         cwd=str(tmp_path),
     )
