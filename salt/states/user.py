@@ -541,14 +541,25 @@ def present(
             ret["result"] = False
             return ret
 
+    missing_groups = []
     if groups:
         missing_groups = [x for x in groups if not __salt__["group.info"](x)]
         if missing_groups:
-            ret["comment"] = "The following group(s) are not present: {}".format(
-                ",".join(missing_groups)
-            )
-            ret["result"] = False
-            return ret
+            if __opts__.get("test"):
+                # In test mode, a missing group is not necessarily an error:
+                # a `group.present` requisite may create it during the real
+                # run. Note the missing groups in the result, drop them from
+                # the membership check below (they cannot be diffed against
+                # the user's current groups since they do not yet exist),
+                # and let the rest of the function report whatever else
+                # would change. Issue #68110.
+                groups = [x for x in groups if x not in missing_groups]
+            else:
+                ret["comment"] = "The following group(s) are not present: {}".format(
+                    ",".join(missing_groups)
+                )
+                ret["result"] = False
+                return ret
 
     if optional_groups:
         present_optgroups = [x for x in optional_groups if __salt__["group.info"](x)]
@@ -630,6 +641,10 @@ def present(
                 elif key == "group" and not remove_groups:
                     key = "ensure groups"
                 ret["comment"] += "{}: {}\n".format(key, val)
+            if missing_groups:
+                ret["comment"] += "groups (pending creation): {}\n".format(
+                    ",".join(missing_groups)
+                )
             return ret
         # The user is present
         if "shadow.info" in __salt__:
@@ -811,6 +826,10 @@ def present(
         if __opts__["test"]:
             ret["result"] = None
             ret["comment"] = "User {} set to be added".format(name)
+            if missing_groups:
+                ret["comment"] += " (pending groups: {})".format(
+                    ",".join(missing_groups)
+                )
             return ret
         if groups and present_optgroups:
             groups.extend(present_optgroups)
