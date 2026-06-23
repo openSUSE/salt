@@ -16,19 +16,38 @@ from salt import USE_VENDORED_TORNADO
 log = logging.getLogger(__name__)
 
 
+def aioloop(io_loop, warn=False):
+    """
+    Ensure the ioloop is an asyncio loop not a tornado ioloop.
+    """
+    if isinstance(io_loop, asyncio.AbstractEventLoop):
+        return io_loop
+    elif isinstance(io_loop, tornado.ioloop.IOLoop):
+        if warn:
+            import traceback
+
+            log.warning("Passed tornado loop %s", "".join(traceback.format_stack()))
+        return io_loop.asyncio_loop
+    else:
+        raise RuntimeError("Loop must be AbstractEventLoop (prefered) or IOLoop")
+
+
 @contextlib.contextmanager
 def current_ioloop(io_loop):
     """
     A context manager that will set the current ioloop to io_loop for the context
     """
     try:
-        orig_loop = tornado.ioloop.IOLoop.current()
+        # Use instance=False to avoid auto-creating a default IOLoop that leaks FDs
+        orig_loop = tornado.ioloop.IOLoop.current(instance=False)
     except RuntimeError:
         orig_loop = None
     if USE_VENDORED_TORNADO:
         io_loop.make_current()
     else:
-        asyncio.set_event_loop(io_loop.asyncio_loop)
+        # Normalize io_loop to asyncio loop
+        asyncio_loop = aioloop(io_loop)
+        asyncio.set_event_loop(asyncio_loop)
     try:
         yield
     finally:
@@ -36,7 +55,7 @@ def current_ioloop(io_loop):
             if USE_VENDORED_TORNADO:
                 orig_loop.make_current()
             else:
-                asyncio.set_event_loop(orig_loop.asyncio_loop)
+                asyncio.set_event_loop(aioloop(orig_loop))
         else:
             asyncio.set_event_loop(None)
 

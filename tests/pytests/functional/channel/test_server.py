@@ -21,6 +21,8 @@ import salt.utils.platform
 import salt.utils.process
 import salt.utils.stringutils
 
+from salt import USE_VENDORED_TORNADO
+
 log = logging.getLogger(__name__)
 
 
@@ -138,6 +140,10 @@ def _connect_and_publish(
     io_loop.stop()
 
 
+@pytest.mark.skipif(
+    not USE_VENDORED_TORNADO,
+    reason="Could stuck with some versions of non-vendored tornado",
+)
 def test_pub_server_channel(
     io_loop,
     channel_minion_id,

@@ -240,12 +240,9 @@ def test_tcp_pub_server_channel_publish_filtering_str_list(temp_salt_master):
 
 
 @pytest.fixture(scope="function")
-def salt_message_client():
-    io_loop_mock = MagicMock(spec=tornado.ioloop.IOLoop)
-    io_loop_mock.call_later.side_effect = lambda *args, **kwargs: (args, kwargs)
-
+def salt_message_client(io_loop):
     client = salt.transport.tcp.MessageClient(
-        {}, "127.0.0.1", ports.get_unused_localhost_port(), io_loop=io_loop_mock
+        {}, "127.0.0.1", ports.get_unused_localhost_port(), io_loop=io_loop
     )
 
     try:
@@ -457,6 +454,8 @@ def test_presence_removed_on_stream_closed():
     opts = {"presence_events": True}
 
     io_loop_mock = MagicMock(spec=tornado.ioloop.IOLoop)
+    # Add asyncio_loop attribute for aioloop() compatibility
+    io_loop_mock.asyncio_loop = MagicMock()
 
     with patch("salt.master.AESFuncs.__init__", return_value=None):
         server = salt.transport.tcp.PubServer(opts, io_loop=io_loop_mock)
