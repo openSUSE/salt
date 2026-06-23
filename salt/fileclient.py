@@ -526,7 +526,10 @@ class Client:
         # Check the status line of the HTTP request
         if write_body[0] is None:
             try:
-                hdr_response = parse_response_start_line(hdr)
+                try:
+                    hdr_response = parse_response_start_line(hdr)
+                except HTTPInputError:
+                    hdr_response = parse_response_start_line(hdr.strip())
             except HTTPInputError:
                 log.debug("Unable to parse header: %r", hdr.strip())
                 # Not the first line, do nothing
