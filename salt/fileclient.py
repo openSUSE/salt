@@ -15,7 +15,6 @@ import urllib.error
 import urllib.parse
 import weakref
 
-from salt import USE_VENDORED_TORNADO
 from tornado.httputil import HTTPHeaders, HTTPInputError, parse_response_start_line
 
 import salt.channel.client
@@ -751,8 +750,10 @@ class Client:
                 # Check the status line of the HTTP request
                 if write_body[0] is None:
                     try:
-                        hdr = hdr if USE_VENDORED_TORNADO else hdr.strip()
-                        hdr = parse_response_start_line(hdr)
+                        try:
+                            hdr = parse_response_start_line(hdr)
+                        except HTTPInputError:
+                            hdr = parse_response_start_line(hdr.strip())
                     except HTTPInputError:
                         # Not the first line, do nothing
                         return
