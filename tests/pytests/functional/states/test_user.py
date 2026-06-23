@@ -139,7 +139,9 @@ def test_user_present_nondefault(grains, modules, states, username, user_home):
         assert user_home.is_dir()
 
     if grains["os_family"] == "Suse" and not (
-        grains.get("transactional", False) or grains.get("osmajorrelease", 0) >= 16
+        grains.get("transactional", False)
+        or grains.get("osmajorrelease", 0) >= 16
+        or grains.get("osrelease_info", ()) >= (15, 6)
     ):
         expected_group_name = "users"
     elif grains["os_family"] == "MacOS":
@@ -388,7 +390,9 @@ def test_user_present_change_groups(
 ):
     expected_groups = [group_2.name, group_1.name]
     if grains["os_family"] == "Suse" and (
-        grains.get("transactional", False) or grains.get("osmajorrelease", 0) >= 16
+        grains.get("transactional", False)
+        or grains.get("osmajorrelease", 0) >= 16
+        or grains.get("osrelease_info", ()) >= (15, 6)
     ):
         expected_groups.append(username)
 
@@ -422,7 +426,9 @@ def test_user_present_change_optional_groups(
 ):
     expected_groups = [group_2.name, group_1.name]
     if grains["os_family"] == "Suse" and (
-        grains.get("transactional", False) or grains.get("osmajorrelease", 0) >= 16
+        grains.get("transactional", False)
+        or grains.get("osmajorrelease", 0) >= 16
+        or grains.get("osrelease_info", ()) >= (15, 6)
     ):
         expected_groups.append(username)
 
