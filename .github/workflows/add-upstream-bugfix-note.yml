@@ -107,7 +107,6 @@ jobs:
           # This ensures git notes can be pushed regardless of whether the PR originated from a fork.
 
           PUSH_SHA="${{ github.event.after }}"
-          BEFORE_SHA="${{ github.event.before }}"
 
           # Use the commits→pulls API for reliable, deterministic PR resolution.
           # gh pr list --search uses GitHub's search index which may have indexing delays,
@@ -132,25 +131,9 @@ jobs:
               URL="https://$URL"
             fi
 
-            # Detect merge strategy by checking if PUSH_SHA is a merge commit (2+ parents)
-            # - Merge commit (including octopus merges): annotate only the merge commit
-            # - Rebase/squash (1 parent): annotate all commits added in this push (1 for squash, N for rebase)
-            PARENT_COUNT=$(git rev-list --parents -n 1 "$PUSH_SHA" | awk '{print NF-1}')
-
-            if [ "$PARENT_COUNT" -ge 2 ]; then
-              COMMITS="$PUSH_SHA"
-            else
-              # The all-zero SHA indicates no previous commit
-              if [[ "$BEFORE_SHA" =~ ^0+$ ]] || ! git cat-file -e "$BEFORE_SHA" 2>/dev/null; then
-                COMMITS="$PUSH_SHA"
-              else
-                COMMITS=$(git log --reverse --pretty=format:"%H" "$BEFORE_SHA..$PUSH_SHA" | tr '\n' ' ')
-
-                if [ -z "$COMMITS" ]; then
-                  COMMITS="$PUSH_SHA"
-                fi
-              fi
-            fi
+            # Since the repository only uses squash-and-merge, exactly one new commit ($PUSH_SHA)
+            # is added to the base branch representing the merged PR.
+            COMMITS="$PUSH_SHA"
 
             DELIMITER="ghadelimiter_${RANDOM}_${RANDOM}_${RANDOM}"
             {
