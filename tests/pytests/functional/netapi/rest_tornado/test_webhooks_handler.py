@@ -1,6 +1,7 @@
 import urllib.parse
 
 import pytest
+import tornado
 
 import salt.utils.json
 from salt.netapi.rest_tornado import saltnado
@@ -28,15 +29,21 @@ async def test_hook_can_handle_get_parameters(http_client, app, content_type_map
             )
             assert response.code == 200
             host = urllib.parse.urlparse(response.effective_url).netloc
+
+            expected_headers = {
+                "Content-Length": "2",
+                "Connection": "close",
+                "Content-Type": "application/json",
+                "Host": host,
+                "Accept-Encoding": "gzip",
+            }
+
+            if tornado.version_info >= (6,):
+                expected_headers["User-Agent"] = f"Tornado/{tornado.version}"
+
             event.fire_event.assert_called_once_with(
                 {
-                    "headers": {
-                        "Content-Length": "2",
-                        "Connection": "close",
-                        "Content-Type": "application/json",
-                        "Host": host,
-                        "Accept-Encoding": "gzip",
-                    },
+                    "headers": expected_headers,
                     "post": {},
                     "get": {"param": ["1", "2"]},
                 },
