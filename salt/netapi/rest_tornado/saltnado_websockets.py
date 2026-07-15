@@ -313,6 +313,7 @@ class AllEventsHandler(
     """
 
     # pylint: disable=W0221
+    @tornado.gen.coroutine
     def get(self, token):
         """
         Check the token, returns a 401 if the token is invalid.
@@ -326,7 +327,7 @@ class AllEventsHandler(
             log.debug("Refusing websocket connection, bad token!")
             self.send_error(401)
             return
-        super().get(token)
+        yield super().get(token)
 
     def open(self, token):  # pylint: disable=W0221
         """
