@@ -1,0 +1,261 @@
+name: Upstream Bug-fix Notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'The SHA of the commit in openSUSE/salt to add the note to (default: HEAD)'
+        required: false
+        default: 'HEAD'
+      upstream_ref:
+        description: 'Comma-separated upstream Salt PR numbers or full links (e.g., 66240 or https://github.com/saltstack/salt/pull/66240,https://github.com/saltstack/salt/commit/abc123)'
+        required: true
+  push:
+    branches:
+      - 'openSUSE/release/3008.*'
+
+concurrency:
+  group: upstream-notes-push
+  cancel-in-progress: false
+
+jobs:
+  manage-notes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch existing notes
+        run: |
+          git fetch origin refs/notes/*:refs/notes/* || true
+
+      - name: Process Manual Input
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          REF="${{ github.event.inputs.upstream_ref }}"
+
+          # Parse comma-separated URLs
+          IFS=',' read -ra REFS <<< "$REF"
+          URLS=()
+
+          for ref in "${REFS[@]}"; do
+            # Trim whitespace
+            ref=$(echo "$ref" | xargs)
+
+            if [[ "$ref" =~ ^[0-9]+$ ]]; then
+              # Just a number - convert to PR URL
+              url="https://github.com/saltstack/salt/pull/$ref"
+            else
+              url="$ref"
+              # Normalize to https
+              if [[ "$url" =~ ^http:// ]]; then
+                url="https://${url#http://}"
+              elif [[ ! "$url" =~ ^https:// ]]; then
+                url="https://$url"
+              fi
+
+              # Validate format - allow both PR and commit URLs
+              if [[ ! "$url" =~ ^https://github\.com/saltstack/salt/(pull/[0-9]+|commit/[a-f0-9]+)$ ]]; then
+                echo "Error: Invalid upstream reference: $ref"
+                echo "Got: $url"
+                echo "Expected format: https://github.com/saltstack/salt/pull/<number> or https://github.com/saltstack/salt/commit/<sha>"
+                exit 1
+              fi
+            fi
+            if [[ " ${URLS[*]} " != *" ${url} "* ]]; then
+              URLS+=("$url")
+            fi
+          done
+
+          SHA="${{ github.event.inputs.commit_sha }}"
+
+          # Try to resolve provided commit first and if it fails, 
+          # fetch all branches.
+          if ! RESOLVED_SHA=$(git rev-parse --verify "$SHA" 2>/dev/null); then
+            echo "Commit $SHA not found locally. Attempting to fetch all branches..."
+            git fetch --all
+
+            if ! RESOLVED_SHA=$(git rev-parse --verify "$SHA" 2>/dev/null); then
+              echo "Error: Commit $SHA not found in repository after fetching all branches."
+              echo "Please verify the commit SHA exists and is pushed to the remote."
+              exit 1
+            fi
+          fi
+
+          echo "Resolved commit: $RESOLVED_SHA"
+
+          # Use unique random delimiters to prevent env-file injection.
+          # A fixed delimiter (EOF) is vulnerable if the value contains a line equal to "EOF",
+          # which would close the heredoc early and allow variable injection.
+          DELIMITER="ghadelimiter_${RANDOM}_${RANDOM}_${RANDOM}"
+          {
+            echo "URLS<<${DELIMITER}"
+            printf '%s\n' "${URLS[@]}"
+            echo "${DELIMITER}"
+            echo "COMMITS<<${DELIMITER}"
+            echo "$RESOLVED_SHA"
+            echo "${DELIMITER}"
+          } >> "$GITHUB_ENV"
+
+      - name: Process Merged PR
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # We trigger on 'push' instead of 'pull_request' because:
+          # - pull_request event: GITHUB_TOKEN is read-only for PRs from forks (security measure)
+          # - push event: GITHUB_TOKEN has write permissions since code is already merged into trusted branch
+          # This ensures git notes can be pushed regardless of whether the PR originated from a fork.
+
+          PUSH_SHA="${{ github.event.after }}"
+
+          PR_NUMBER=$(gh api "repos/${{ github.repository }}/commits/$PUSH_SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null)][0].number // empty' || echo "")
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No merged PR found for commit $PUSH_SHA. Skipping notes."
+            exit 0
+          fi
+
+          echo "Found merged PR #$PR_NUMBER"
+
+          BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body')
+
+          # Extract all saltstack/salt URLs (PR or commit) from the PR body
+          # Matches:
+          # - https://github.com/saltstack/salt/pull/12345
+          # - https://github.com/saltstack/salt/commit/abc123...
+          # - http://github.com/saltstack/salt/pull/12345 (converted to https)
+          # - github.com/saltstack/salt/pull/12345 (converted to https)
+          # Ignore saltstack/salt URLs that start with "!ignore"
+          URLS=()
+
+          # Find all matching URLs using grep
+          while IFS= read -r line; do
+            if [[ -n "$line" ]]; then
+              # Normalize URL to https
+              url="$line"
+              if [[ "$url" =~ ^http:// ]]; then
+                url="https://${url#http://}"
+              elif [[ ! "$url" =~ ^https:// ]]; then
+                url="https://$url"
+              fi
+              if [[ " ${URLS[*]} " != *" ${url} "* ]]; then
+                URLS+=("$url")
+              fi
+            fi
+          done < <(echo "$BODY" | sed '/!ignore.*github\.com\/saltstack\/salt\//d' | grep -oE '(https?://)?github\.com/saltstack/salt/(pull/[0-9]+|commit/[a-f0-9]+)' || true)
+
+          if [ ${#URLS[@]} -eq 0 ]; then
+            echo "No upstream PR or commit links found in PR #$PR_NUMBER description. Skipping notes."
+            exit 0
+          fi
+
+          echo "Found ${#URLS[@]} upstream reference(s)"
+
+          # Since the repository only uses squash-and-merge, exactly one new commit ($PUSH_SHA)
+          # is added to the base branch representing the merged PR.
+          COMMITS="$PUSH_SHA"
+
+          DELIMITER="ghadelimiter_${RANDOM}_${RANDOM}_${RANDOM}"
+          {
+            echo "URLS<<${DELIMITER}"
+            printf '%s\n' "${URLS[@]}"
+            echo "${DELIMITER}"
+            echo "COMMITS<<${DELIMITER}"
+            echo "$COMMITS"
+            echo "${DELIMITER}"
+          } >> "$GITHUB_ENV"
+
+      - name: Add Notes
+        if: env.URLS != ''
+        run: |
+          NOTES_ADDED=false
+
+          # Read URLs into array
+          mapfile -t URL_ARRAY <<< "$URLS"
+
+          for SHA in $COMMITS; do
+            if ! git cat-file -e "$SHA" 2>/dev/null; then
+              echo "Warning: Commit $SHA not found. Skipping."
+              continue
+            fi
+
+            EXISTING_NOTE=$(git notes show "$SHA" 2>/dev/null || true)
+
+            # Build list of URLs to add
+            URLS_TO_ADD=()
+            for url in "${URL_ARRAY[@]}"; do
+              if [[ -z "$url" ]]; then
+                continue
+              fi
+
+              if echo "$EXISTING_NOTE" | grep -qFw "$url"; then
+                echo "Note already contains $url for $SHA. Skipping."
+              else
+                URLS_TO_ADD+=("$url")
+              fi
+            done
+
+            # Add all new URLs in a single git notes append command
+            if [ ${#URLS_TO_ADD[@]} -gt 0 ]; then
+              echo "Adding ${#URLS_TO_ADD[@]} note(s) to $SHA"
+
+              NOTE_ARGS=()
+              for url in "${URLS_TO_ADD[@]}"; do
+                NOTE_ARGS+=(-m "Upstream PR: $url")
+              done
+
+              git notes append "${NOTE_ARGS[@]}" "$SHA"
+              NOTES_ADDED=true
+            else
+              echo "All URLs already present in notes for $SHA"
+            fi
+          done
+
+          echo "NOTES_ADDED=$NOTES_ADDED" >> "$GITHUB_ENV"
+
+      - name: Push notes
+        if: env.URLS != '' && env.NOTES_ADDED == 'true'
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if git push origin refs/notes/commits; then
+              echo "Successfully pushed notes"
+              exit 0
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "Push failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+                # When concurrent workflows race:
+                #   1. Workflow A adds note and pushes successfully
+                #   2. Workflow B adds note and push fails (non-fast-forward)
+                #   3. If we fetch with refs/notes/*:refs/notes/*, we overwrite our local.
+                #      ref with remote, discarding the note we just added in step 2.
+                #   4. Next push succeeds but loses note in workflow B.
+                # Instead, fetch without updating local ref, then merge both sets of notes.
+                git fetch origin refs/notes/commits
+                git notes merge -s cat_sort_uniq FETCH_HEAD || {
+                  echo "Notes merge failed"
+                  exit 1
+                }
+                sleep 2
+              else
+                echo "Failed to push notes after $MAX_RETRIES attempts"
+                exit 1
+              fi
+            fi
+          done
+
