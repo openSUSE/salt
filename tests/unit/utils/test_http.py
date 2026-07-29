@@ -223,8 +223,12 @@ class HTTPPostTestCase(TestCase):
         }
 
         mock_curl = MagicMock()
+        def mock_sync_wrapper(cls, args=None, kwargs=None, **_):
+            return cls(*args or [], **kwargs or {})
 
-        with patch("tornado.httpclient.HTTPClient.fetch", mock_curl):
+        with patch("salt.utils.http.SyncWrapper", side_effect=mock_sync_wrapper), patch(
+            "tornado.httpclient.AsyncHTTPClient.fetch", mock_curl
+        ):
             ret = http.query(
                 self.post_web_root,
                 method="POST",

@@ -65,7 +65,7 @@ def test_minion_load_grains_default(minion_opts):
         ),
     ],
 )
-def test_send_req_tries(req_channel, minion_opts):
+def test_send_req_tries(req_channel, minion_opts, io_loop):
     channel_enter = MagicMock()
     channel_enter.send.side_effect = req_channel[1]
     channel = MagicMock()
@@ -83,7 +83,7 @@ def test_send_req_tries(req_channel, minion_opts):
             timeout = 60
 
             if "Async" in req_channel[0]:
-                rtn = minion._send_req_async(load, timeout).result()
+                rtn = io_loop.run_sync(lambda: minion._send_req_async(load, timeout))
             else:
                 rtn = minion._send_req_sync(load, timeout)
 

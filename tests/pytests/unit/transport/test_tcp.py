@@ -450,7 +450,7 @@ def test_presence_events_callback_passed(temp_salt_master, salt_message_client):
         )
 
 
-def test_presence_removed_on_stream_closed():
+def test_presence_removed_on_stream_closed(io_loop):
     opts = {"presence_events": True}
 
     io_loop_mock = MagicMock(spec=tornado.ioloop.IOLoop)
@@ -468,7 +468,6 @@ def test_presence_removed_on_stream_closed():
     client._closing = True
     server.clients = {client}
 
-    io_loop = tornado.ioloop.IOLoop.current()
     package = {
         "topic_lst": [],
         "payload": "test-payload",
