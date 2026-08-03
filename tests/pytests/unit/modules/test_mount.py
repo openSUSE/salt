@@ -51,7 +51,8 @@ def config_initial_file():
 
 @pytest.fixture
 def configure_loader_modules():
-    return {mount: {}}
+    # mount now resolves UUID=/LABEL= devices through disk.blkid
+    return {mount: {"__salt__": {"disk.blkid": MagicMock(return_value={})}}}
 
 
 @pytest.fixture
@@ -169,6 +170,10 @@ def test_fstab():
                 "fstype": "C",
                 "opts": ["D", "E", "F"],
                 "pass": "H",
+                "pass_num": "H",
+                "device_uuid": None,
+                "device_label": None,
+                "device_canonical": "A",
             }
         }, fstab
 
@@ -200,6 +205,9 @@ def test_vfstab():
                 "mount_at_boot": "yes",
                 "opts": ["size=2048m"],
                 "pass_fsck": "-",
+                "device_uuid": None,
+                "device_label": None,
+                "device_canonical": "swap",
             }
         }, vfstab
 
@@ -717,6 +725,8 @@ def test_swaps():
                     "size": "31249404",
                     "type": "partition",
                     "used": "4100",
+                    "device_uuid": None,
+                    "device_label": None,
                 }
             }, swaps
 
@@ -894,3 +904,89 @@ def test_get_device_from_path(tmp_path):
                 assert ret is None
                 ret = mount.get_device_from_path(path)
                 assert ret == "mydevice"
+
+
+def test_set_fstab_matches_existing_entry_by_uuid():
+    """
+    An fstab entry written as a device path must be recognised when the same
+    device is passed as UUID=, so the existing line is updated instead of a
+    duplicate one being appended.
+    """
+    file_data = "/dev/vdb\t\t/mnt/data\text4\tdefaults\t0 0\n"
+    blkid_info = {
+        "/dev/vdb": {"UUID": "9e7c0810-abf8-49d9-b08e-c54974add143"},
+    }
+
+    helper = mock_open(read_data=file_data)
+    with patch.dict(
+        mount.__salt__, {"disk.blkid": MagicMock(return_value=blkid_info)}
+    ), patch.object(os.path, "isfile", MagicMock(return_value=True)), patch(
+        "salt.utils.files.fopen", helper
+    ):
+        # Without canonical matching this returns "new" and appends a line
+        assert (
+            mount.set_fstab(
+                "/mnt/data",
+                "UUID=9e7c0810-abf8-49d9-b08e-c54974add143",
+                "ext4",
+            )
+            == "change"
+        )
+
+    written = b"".join(line for call in helper.writelines_calls() for line in call)
+    assert written.count(b"/mnt/data") == 1, written
+
+
+def test_set_fstab_matches_existing_swap_entry_by_uuid():
+    """
+    Swap entries must be matched by device as well. Switching a swap device
+    from a path to UUID= must end up with the existing
+    line rewritten rather than a second line for the same device, which would
+    leave the system with two swap entries for one disk.
+    """
+    file_data = "/dev/vdc\t\tnone\tswap\tdefaults\t0 0\n"
+    blkid_info = {
+        "/dev/vdc": {"UUID": "34614621-0a6b-4df5-8247-37f06b14c966"},
+    }
+
+    helper = mock_open(read_data=file_data)
+    with patch.dict(
+        mount.__salt__, {"disk.blkid": MagicMock(return_value=blkid_info)}
+    ), patch.object(os.path, "isfile", MagicMock(return_value=True)), patch(
+        "salt.utils.files.fopen", helper
+    ):
+        assert (
+            mount.set_fstab(
+                "none",
+                "UUID=34614621-0a6b-4df5-8247-37f06b14c966",
+                "swap",
+                ["defaults"],
+                0,
+                0,
+            )
+            == "change"
+        )
+
+    written = b"".join(line for call in helper.writelines_calls() for line in call)
+    assert written.count(b"swap") == 1, written
+
+
+def test_fstab_reports_pass_num():
+    """
+    fstab() must report the pass field as "pass_num" as well, which is the
+    name the mount.mounted state expects, so its output can be fed back into
+    a state without renaming anything.
+    """
+    file_data = "/dev/vdb\t/mnt/data\text4\tdefaults\t0 2\n"
+
+    with patch.dict(
+        mount.__salt__, {"disk.blkid": MagicMock(return_value={})}
+    ), patch.dict(mount.__grains__, {"kernel": ""}), patch.object(
+        os.path, "isfile", MagicMock(return_value=True)
+    ), patch(
+        "salt.utils.files.fopen", mock_open(read_data=file_data)
+    ):
+        entry = mount.fstab()["/mnt/data"]
+
+    assert entry["pass"] == "2"
+    assert entry["pass_num"] == "2"
