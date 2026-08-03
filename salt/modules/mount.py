@@ -745,6 +745,8 @@ def fstab(config="/etc/fstab"):
                     )
 
                 entry["opts"] = entry["opts"].split(",")
+                if "pass" in entry:
+                    entry["pass_num"] = entry["pass"]
                 while entry["name"] in ret:
                     entry["name"] += "_"
 
