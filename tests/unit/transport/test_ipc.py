@@ -33,12 +33,16 @@ class IPCMessagePubSubCase(tornado.testing.AsyncTestCase):
     Test all of the clear msg stuff
     """
 
+    def runTest(self):
+        pass
+
     def setUp(self):
         super().setUp()
         self.opts = {"ipc_write_buffer": 0}
         if not os.path.exists(RUNTIME_VARS.TMP):
             os.mkdir(RUNTIME_VARS.TMP)
         self.socket_path = os.path.join(RUNTIME_VARS.TMP, "ipc_test.ipc")
+        self.sub_channels = []
         self.pub_channel = self._get_pub_channel()
         self.sub_channel = self._get_sub_channel()
 
@@ -57,25 +61,28 @@ class IPCMessagePubSubCase(tornado.testing.AsyncTestCase):
         )
         sub_channel.connect(callback=self.stop)
         self.wait()
+        self.sub_channels.append(sub_channel)
         return sub_channel
 
     def tearDown(self):
-        super().tearDown()
         try:
             self.pub_channel.close()
         except OSError as exc:
             if exc.errno != errno.EBADF:
                 # If its not a bad file descriptor error, raise
                 raise
-        try:
-            self.sub_channel.close()
-        except OSError as exc:
-            if exc.errno != errno.EBADF:
-                # If its not a bad file descriptor error, raise
-                raise
+        for sub_channel in self.sub_channels:
+            try:
+                sub_channel.close()
+            except OSError as exc:
+                if exc.errno != errno.EBADF:
+                    # If its not a bad file descriptor error, raise
+                    raise
+        super().tearDown()
         os.unlink(self.socket_path)
         del self.pub_channel
         del self.sub_channel
+        del self.sub_channels
 
     def test_multi_client_reading(self):
         # To be completely fair let's create 2 clients.
@@ -101,6 +108,9 @@ class IPCMessagePubSubCase(tornado.testing.AsyncTestCase):
             if len(call_cnt) >= 2:
                 evt.set()
                 self.stop()
+
+        client1.callbacks.add(handler)
+        client2.callbacks.add(handler)
 
         # Now let both waiting data at once
         client1.read_async()
