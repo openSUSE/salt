@@ -12,6 +12,7 @@ import salt.runners.winrepo
 import salt.utils.configparser
 import salt.utils.gitfs
 from salt.exceptions import FileserverConfigError
+from salt.utils.versions import Version
 from tests.support.helpers import patched_environ
 from tests.support.mock import MagicMock, patch
 
@@ -403,7 +404,10 @@ def test_pygit2_fetch_enables_proxy_lookup(_prepare_provider):
     fetch_mock = MagicMock(return_value=SimpleNamespace(received_objects=0))
     with patch.object(pygit2.Remote, "fetch", fetch_mock):
         provider._fetch()
-    assert fetch_mock.call_args.kwargs["proxy"] is True
+    if salt.utils.gitfs.PYGIT2_VERSION >= Version("1.6.0"):
+        assert fetch_mock.call_args.kwargs["proxy"] is True
+    else:
+        assert "proxy" not in fetch_mock.call_args.kwargs
 
 
 @pytest.mark.skipif(not HAS_PYGIT2, reason="This host lacks proper pygit2 support")
