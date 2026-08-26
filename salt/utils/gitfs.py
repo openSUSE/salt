@@ -2029,7 +2029,15 @@ class Pygit2(GitProvider):
         """
         origin = self.repo.remotes[0]
         refs_pre = self.repo.listall_references()
-        fetch_kwargs = {"proxy": True}
+
+        # The "proxy" argument was added on 1.6.0
+        if PYGIT2_VERSION >= Version("1.6.0"):
+            fetch_kwargs = {"proxy": True}
+        else:
+            warnings.warn(
+                "pygit2 version does not support proxy settings. Ignoring proxy settings."
+            )
+            fetch_kwargs = {}
 
         # pygit2 radically changed fetching in 0.23.2
         if self.remotecallbacks is not None:
