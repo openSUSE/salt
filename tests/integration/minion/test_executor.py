@@ -1,4 +1,5 @@
 import logging
+import sys
 
 import pytest
 
@@ -12,6 +13,10 @@ class ExecutorTest(ModuleCase, ShellCase):
         self.run_function("saltutil.sync_all")
 
     @pytest.mark.slow_test
+    @pytest.mark.skipif(
+        sys.version_info.minor == 11 and "venv-salt-minion" not in sys.executable,
+        reason="Flaky with Python 3.11",
+    )
     def test_executor(self):
         """
         test that dunders are set
