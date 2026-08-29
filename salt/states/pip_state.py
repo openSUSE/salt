@@ -28,16 +28,6 @@ import salt.utils.data
 import salt.utils.versions
 from salt.exceptions import CommandExecutionError, CommandNotFoundError
 
-try:
-    import pkg_resources
-
-    HAS_PKG_RESOURCES = True
-except ImportError:
-    HAS_PKG_RESOURCES = False
-
-
-# pylint: disable=import-error
-
 
 def purge_pip():
     """
@@ -141,8 +131,6 @@ def __virtual__():
     """
     Only load if the pip module is available in __salt__
     """
-    if HAS_PKG_RESOURCES is False:
-        return False, "The pkg_resources python library is not installed"
     if "pip.list" in __salt__:
         return __virtualname__
     return False
@@ -345,26 +333,22 @@ def _check_if_installed(
 
 def _pep440_version_cmp(pkg1, pkg2, ignore_epoch=False):
     """
-    Compares two version strings using pkg_resources.parse_version.
+    Compares two version strings using packaging.version.Version.
     Return -1 if version1 < version2, 0 if version1 ==version2,
     and 1 if version1 > version2. Return None if there was a problem
     making the comparison.
     """
-    if HAS_PKG_RESOURCES is False:
-        log.warning(
-            "The pkg_resources packages was not loaded. Please install setuptools."
-        )
-        return None
+
     normalize = lambda x: str(x).split("!", 1)[-1] if ignore_epoch else str(x)
     pkg1 = normalize(pkg1)
     pkg2 = normalize(pkg2)
 
     try:
-        if pkg_resources.parse_version(pkg1) < pkg_resources.parse_version(pkg2):
+        if salt.utils.versions.Version(pkg1) < salt.utils.versions.Version(pkg2):
             return -1
-        if pkg_resources.parse_version(pkg1) == pkg_resources.parse_version(pkg2):
+        if salt.utils.versions.Version(pkg1) == salt.utils.versions.Version(pkg2):
             return 0
-        if pkg_resources.parse_version(pkg1) > pkg_resources.parse_version(pkg2):
+        if salt.utils.versions.Version(pkg1) > salt.utils.versions.Version(pkg2):
             return 1
     except Exception as exc:  # pylint: disable=broad-except
         log.exception(exc)
