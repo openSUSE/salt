@@ -27,7 +27,6 @@ def suse_state_tree(grains, pkgrepo, state_tree):
         - gpgcheck: 1
         - comments:
           - '# Salt Test'
-        - refresh: 1
     {% if grains['osfullname'] == 'openSUSE Tumbleweed' %}
         - baseurl: http://download.opensuse.org/tumbleweed/repo/oss/
         - humanname: openSUSE Tumbleweed OSS
@@ -36,6 +35,21 @@ def suse_state_tree(grains, pkgrepo, state_tree):
         - baseurl: https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/
         - humanname: openSUSE Backports for SLE 15 SP4
         - gpgkey: https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/repodata/repomd.xml.key
+    {% endif %}
+    """
+
+    managed_sls_contents_no_gpgkey = """
+    salttest-gpgkey-only-later:
+      pkgrepo.managed:
+        - enabled: 1
+        - gpgcheck: 1
+        - refresh: 1
+    {% if grains['osfullname'] == 'openSUSE Tumbleweed' %}
+        - baseurl: http://download.opensuse.org/tumbleweed/repo/oss/
+        - humanname: openSUSE Tumbleweed OSS later gpgkey
+    {% else %}
+        - baseurl: https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP5/standard/
+        - humanname: openSUSE Backports for SLE 15 SP5 later gpgkey
     {% endif %}
     """
 
@@ -56,16 +70,36 @@ def suse_state_tree(grains, pkgrepo, state_tree):
     {% if grains['osfullname'] == 'openSUSE Tumbleweed' %}
         - baseurl: http://download.opensuse.org/tumbleweed/repo/oss/
         - humanname: Salt modified OSS
-        - gpgkey: https://download.opensuse.org/tumbleweed/repo/oss/repodata/repomd.xml.key
+        - gpgkey: https://download.opensuse.org/tumbleweed/repo/oss/repodata/repomd.xml.key-modified
     {% else %}
         - baseurl: https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/
         - humanname: Salt modified Backports
-        - gpgkey: https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/repodata/repomd.xml.key
+        - gpgkey: https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/repodata/repomd.xml.key-modified
+    {% endif %}
+    """
+
+    modified_sls_contents_new_gpgkey = """
+    salttest-gpgkey-only-later:
+      pkgrepo.managed:
+        - enabled: 1
+        - gpgcheck: 1
+        - refresh: 1
+    {% if grains['osfullname'] == 'openSUSE Tumbleweed' %}
+        - baseurl: http://download.opensuse.org/tumbleweed/repo/oss/
+        - humanname: openSUSE Tumbleweed OSS later gpgpkey
+        - gpgkey: https://download.opensuse.org/tumbleweed/repo/oss/repodata/repomd.xml.key-new
+    {% else %}
+        - baseurl: https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP5/standard/
+        - humanname: openSUSE Backports for SLE 15 SP5 later gpgkey
+        - gpgkey: https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP5/standard/repodata/repomd.xml.key-new
     {% endif %}
     """
 
     managed_state_file = pytest.helpers.temp_file(
         "pkgrepo/managed.sls", managed_sls_contents, state_tree
+    )
+    managed_no_gpgkey_state_file = pytest.helpers.temp_file(
+        "pkgrepo/managed_no_gpgkey.sls", managed_sls_contents_no_gpgkey, state_tree
     )
     absent_state_file = pytest.helpers.temp_file(
         "pkgrepo/absent.sls", absent_sls_contents, state_tree
@@ -73,9 +107,12 @@ def suse_state_tree(grains, pkgrepo, state_tree):
     modified_state_file = pytest.helpers.temp_file(
         "pkgrepo/modified.sls", modified_sls_contents, state_tree
     )
+    modified_new_gpgkey_state_file = pytest.helpers.temp_file(
+        "pkgrepo/modified_new_gpgkey.sls", modified_sls_contents_new_gpgkey, state_tree
+    )
 
     try:
-        with managed_state_file, absent_state_file, modified_state_file:
+        with managed_state_file, managed_no_gpgkey_state_file, absent_state_file, modified_state_file, modified_new_gpgkey_state_file:
             yield
     finally:
         pass
@@ -175,6 +212,28 @@ def test_pkgrepo_managed_modify(grains, modules, subtests, suse_state_tree):
             assert state.result is True
         add_repo_test_passed = True
 
+    with subtests.test("Add repository without gpgkey, test"):
+        ret = _run("pkgrepo.managed_no_gpgkey", test=True)
+        assert ret.failed is False
+        for state in ret:
+            assert state.changes == {"repo": "salttest-gpgkey-only-later"}
+            assert state.comment.startswith(
+                "Package repo 'salttest-gpgkey-only-later' would be configured."
+            )
+            assert state.result is None
+
+    with subtests.test("Add repository without gpgkey"):
+        ret = _run("pkgrepo.managed_no_gpgkey")
+        assert ret.failed is False
+        for state in ret:
+            assert state.changes == {"repo": "salttest-gpgkey-only-later"}
+            assert (
+                state.comment == "Configured package repo 'salttest-gpgkey-only-later'"
+            )
+            assert state.result is True
+        if add_repo_test_passed is not False:
+            add_repo_test_passed = True
+
     if add_repo_test_passed is False:
         pytest.skip("Adding the repository failed, skipping modification tests.")
 
@@ -194,16 +253,38 @@ def test_pkgrepo_managed_modify(grains, modules, subtests, suse_state_tree):
             assert state.changes == {}
             assert state.comment == "Package repo 'salttest' already configured"
 
+    with subtests.test("Add repository without gpgkey again, test"):
+        ret = _run("pkgrepo.managed_no_gpgkey", test=True)
+        assert ret.failed is False
+        for state in ret:
+            assert state.changes == {}
+            assert (
+                state.comment
+                == "Package repo 'salttest-gpgkey-only-later' already configured"
+            )
+            assert state.result is True
+
+    with subtests.test("Add repository without gpgkey again"):
+        ret = _run("pkgrepo.managed_no_gpgkey")
+        assert ret.failed is False
+        for state in ret:
+            assert state.result is True
+            assert state.changes == {}
+            assert (
+                state.comment
+                == "Package repo 'salttest-gpgkey-only-later' already configured"
+            )
+
     with subtests.test("Modify repository, test"):
         ret = _run("pkgrepo.modified", test=True)
         assert ret.failed is False
         for state in ret:
             assert state.changes == {
-                "comments": {"new": ["# Salt Test (modified)"], "old": None},
-                "refresh": {"new": 1, "old": None},
+                # new as int here, ref. TODO in state function
+                "refresh": {"new": 1, "old": False},
                 "gpgkey": {
-                    "new": "https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/repodata/repomd.xml.key",
-                    "old": None,
+                    "new": "https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/repodata/repomd.xml.key-modified",
+                    "old": "https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/repodata/repomd.xml.key",
                 },
                 "name": {
                     "new": "Salt modified Backports",
@@ -224,6 +305,41 @@ def test_pkgrepo_managed_modify(grains, modules, subtests, suse_state_tree):
                 "name": {
                     "new": "Salt modified Backports",
                     "old": "openSUSE Backports for SLE 15 SP4",
-                }
+                },
+                "gpgkey": {
+                    "new": "https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/repodata/repomd.xml.key-modified",
+                    "old": "https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP4/standard/repodata/repomd.xml.key",
+                },
+                "refresh": {"new": True, "old": False},
             }
             assert state.comment == "Configured package repo 'salttest'"
+
+    with subtests.test("Modify repository with new gpgkey, test"):
+        ret = _run("pkgrepo.modified_new_gpgkey", test=True)
+        assert ret.failed is False
+        for state in ret:
+            assert state.changes == {
+                "gpgkey": {
+                    "new": "https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP5/standard/repodata/repomd.xml.key-new",
+                    "old": None,
+                },
+            }
+            assert state.comment.startswith(
+                "Package repo 'salttest-gpgkey-only-later' would be configured."
+            )
+            assert state.result is None
+
+    with subtests.test("Modify repository with new gpgkey"):
+        ret = _run("pkgrepo.modified_new_gpgkey")
+        assert ret.failed is False
+        for state in ret:
+            assert state.result is True
+            assert state.changes == {
+                "gpgkey": {
+                    "new": "https://download.opensuse.org/repositories/openSUSE:/Backports:/SLE-15-SP5/standard/repodata/repomd.xml.key-new",
+                    "old": None,
+                },
+            }
+            assert (
+                state.comment == "Configured package repo 'salttest-gpgkey-only-later'"
+            )
