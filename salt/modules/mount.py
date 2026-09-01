@@ -362,7 +362,7 @@ class _fstab_entry:
         """
         return os.path.normcase(os.path.normpath(path))
 
-    def match(self, line):
+    def match(self, line, resolve_canonical=False):
         """
         Compare potentially partial criteria against line
         """
@@ -372,6 +372,11 @@ class _fstab_entry:
                 ex_opts = sorted(entry.get(key, "").split(","))
                 cr_opts = sorted(value.split(","))
                 if ex_opts != cr_opts:
+                    return False
+            elif key == "device" and resolve_canonical:
+                if salt.utils.mount._resolve_canonical(
+                    entry[key], __salt__
+                ) != salt.utils.mount._resolve_canonical(value, __salt__):
                     return False
             elif entry[key] != value:
                 return False
@@ -466,7 +471,7 @@ class _vfstab_entry:
         """
         return os.path.normcase(os.path.normpath(path))
 
-    def match(self, line):
+    def match(self, line, **kwargs):
         """
         Compare potentially partial criteria against line
         """
@@ -714,11 +719,18 @@ def vfstab(config="/etc/vfstab"):
     return fstab(config)
 
 
-def rm_fstab(name, device, config="/etc/fstab"):
+def rm_fstab(name, device, config="/etc/fstab", resolve_canonical=False):
     """
     .. versionchanged:: 2016.3.2
 
     Remove the mount point from the fstab
+
+    resolve_canonical
+        ``UUID=``, ``LABEL=``, ``PARTUUID=`` and ``PARTLABEL=`` names are
+        resolved to the underlying device, so the canonical device path is
+        used for comparison.
+
+        .. versionadded:: 3008.3
 
     CLI Example:
 
@@ -739,7 +751,7 @@ def rm_fstab(name, device, config="/etc/fstab"):
             for line in ifile:
                 line = salt.utils.stringutils.to_unicode(line)
                 try:
-                    if criteria.match(line):
+                    if criteria.match(line, resolve_canonical):
                         modified = True
                     else:
                         lines.append(line)
@@ -793,7 +805,8 @@ def set_fstab(
     test=False,
     match_on="auto",
     not_change=False,
-    **kwargs
+    resolve_canonical=False,
+    **kwargs,
 ):
     """
     Verify that this mount is represented in the fstab, change the mount
@@ -801,6 +814,13 @@ def set_fstab(
 
     If the entry is found via `match_on` and `not_change` is True, the
     current line will be preserved.
+
+    resolve_canonical
+        ``UUID=``, ``LABEL=``, ``PARTUUID=`` and ``PARTLABEL=`` names are
+        resolved to the underlying device, so the canonical device path is
+        used for comparison.
+
+        .. versionadded:: 3008.3
 
     CLI Example:
 
@@ -881,7 +901,7 @@ def set_fstab(
             for line in ifile:
                 line = salt.utils.stringutils.to_unicode(line)
                 try:
-                    if criteria.match(line):
+                    if criteria.match(line, resolve_canonical):
                         # Note: If ret isn't None here,
                         # we've matched multiple lines
                         ret = "present"
