@@ -17,7 +17,7 @@ import tornado.gen
 import tornado.ioloop
 import salt.utils.platform
 import salt.utils.process
-from tornado.testing import AsyncTestCase
+import tornado.testing
 from tests.support.mixins import AdaptedConfigurationTestCaseMixin
 from tests.unit.transport.mixins import run_loop_in_thread
 
@@ -30,10 +30,13 @@ log = logging.getLogger(__name__)
 
 
 @pytest.mark.skip(reason="Skip until we can devote time to fix this test")
-class AsyncPubServerTest(AsyncTestCase, AdaptedConfigurationTestCaseMixin):
+class AsyncPubServerTest(tornado.testing.AsyncTestCase, AdaptedConfigurationTestCaseMixin):
     """
     Tests around the publish system
     """
+
+    def runTest(self):
+        pass
 
     @classmethod
     def setUpClass(cls):
