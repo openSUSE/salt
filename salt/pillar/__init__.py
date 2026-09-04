@@ -572,6 +572,12 @@ class Pillar:
         self.saltenv = saltenv
         self.client = salt.fileclient.get_file_client(self.opts, True)
         self.avail = self.__gather_avail()
+        self.pillar_data = self.opts.get("pillar", {})
+        if not isinstance(self.pillar_data, dict):
+            self.pillar_data = {}
+        else:
+            # Ensure we have a plain dict and not a proxy into opts
+            self.pillar_data = dict(self.pillar_data)
 
         if opts.get("file_client", "") == "local" and not opts.get(
             "use_master_when_local", False
@@ -589,7 +595,9 @@ class Pillar:
             self.functions = functions
 
         self.opts["minion_id"] = minion_id
-        self.matchers = salt.loader.matchers(self.opts)
+        self.matchers = salt.loader.matchers(self.opts, pillar=self.pillar_data)
+        if hasattr(self.matchers, "pack"):
+            self.matchers.pack["__pillar__"] = self.pillar_data
         self.rend = salt.loader.render(self.opts, self.functions)
         ext_pillar_opts = copy.deepcopy(self.opts)
         # Keep the incoming opts ID intact, ie, the master id
@@ -883,7 +891,7 @@ class Pillar:
         """
         matches = {}
         if reload:
-            self.matchers = salt.loader.matchers(self.opts)
+            self.matchers = salt.loader.matchers(self.opts, pillar=self.pillar_data)
         for saltenv, body in top.items():
             if self.opts["pillarenv"]:
                 if saltenv != self.opts["pillarenv"]:
@@ -1254,12 +1262,13 @@ class Pillar:
         top, top_errors = self.get_top()
         if ext:
             if self.opts.get("ext_pillar_first", False):
-                self.opts["pillar"], errors = self.ext_pillar(self.pillar_override)
+                pillar, errors = self.ext_pillar(self.pillar_override)
+                self.pillar_data.update(pillar)
                 self.rend = salt.loader.render(self.opts, self.functions)
                 matches = self.top_matches(top, reload=True)
                 pillar, errors = self.render_pillar(matches, errors=errors)
                 pillar = merge(
-                    self.opts["pillar"],
+                    self.pillar_data,
                     pillar,
                     self.merge_strategy,
                     self.opts.get("renderer", "yaml"),
