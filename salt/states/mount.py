@@ -39,6 +39,8 @@ import logging
 import os.path
 import re
 
+import salt.utils.mount
+
 log = logging.getLogger(__name__)
 
 
@@ -70,6 +72,7 @@ def mounted(
     extra_mount_ignore_fs_keys=None,
     extra_mount_translate_options=None,
     hidden_opts=None,
+    resolve_canonical=False,
     bind_mount_copy_active_opts=True,
     **kwargs,
 ):
@@ -193,6 +196,13 @@ def mounted(
         copying the options from the bind mount if it was found to be active.
 
         .. versionadded:: 3006.0
+
+    resolve_canonical
+        ``UUID=``, ``LABEL=``, ``PARTUUID=`` and ``PARTLABEL=`` names are
+        resolved to the underlying device, so the canonical device path is
+        used for comparison.
+
+        .. versionadded:: 3008.3
     """
     ret = {"name": name, "changes": {}, "result": True, "comment": ""}
 
@@ -721,6 +731,7 @@ def mounted(
                     config,
                     test=True,
                     match_on=match_on,
+                    resolve_canonical=resolve_canonical,
                 )
             if out != "present":
                 ret["result"] = None
@@ -778,6 +789,7 @@ def mounted(
                     pass_num,
                     config,
                     match_on=match_on,
+                    resolve_canonical=resolve_canonical,
                 )
 
         if update_mount_cache:
@@ -804,27 +816,51 @@ def mounted(
     return ret
 
 
-def swap(name, persist=True, config="/etc/fstab"):
+def _active_swaps():
+    """
+    Return the active swaps, keyed by canonical device path.
+
+    The kernel reports the path it ended up with when the swap was activated,
+    so a device-mapper device shows up as ``/dev/dm-0`` while blkid and the
+    configuration name it ``/dev/mapper/<name>``.  Resolving both sides makes
+    the two spellings compare equal.
+    """
+    return {
+        os.path.realpath(device): stats
+        for device, stats in __salt__["mount.swaps"]().items()
+    }
+
+
+def swap(name, persist=True, config="/etc/fstab", resolve_canonical=False):
     """
     Activates a swap device
+
+    resolve_canonical
+        ``UUID=``, ``LABEL=``, ``PARTUUID=`` and ``PARTLABEL=`` names are
+        resolved to the underlying device, so the canonical device path is
+        used for comparison.
+
+        .. versionadded:: 3008.3
 
     .. code-block:: yaml
 
         /root/swapfile:
           mount.swap
 
-    .. note::
-        ``swap`` does not currently support LABEL
+    The name can also be one of the ``TAG=value`` specifications accepted by
+    fstab(5):
+
+    .. code-block:: yaml
+
+        UUID=066e0200-2867-4ebe-b9e6-f30026ca2314:
+          mount.swap
+
+
     """
     ret = {"name": name, "changes": {}, "result": True, "comment": ""}
-    on_ = __salt__["mount.swaps"]()
+    on_ = _active_swaps()
 
-    if __salt__["file.is_link"](name):
-        real_swap_device = __salt__["file.readlink"](name)
-        if not real_swap_device.startswith("/"):
-            real_swap_device = f"/dev/{os.path.basename(real_swap_device)}"
-    else:
-        real_swap_device = name
+    real_swap_device = salt.utils.mount._resolve_canonical(name, __salt__)
 
     if real_swap_device in on_:
         ret["comment"] = f"Swap {name} already active"
@@ -834,7 +870,7 @@ def swap(name, persist=True, config="/etc/fstab"):
     else:
         __salt__["mount.swapon"](real_swap_device)
 
-        on_ = __salt__["mount.swaps"]()
+        on_ = _active_swaps()
 
         if real_swap_device in on_:
             ret["comment"] = f"Swap {name} activated"
@@ -858,7 +894,7 @@ def swap(name, persist=True, config="/etc/fstab"):
                 fstab_data[item]["device"] for item in fstab_data
             ]:
                 ret["result"] = None
-                if name in on_:
+                if real_swap_device in on_:
                     ret["comment"] = (
                         "Swap {} is set to be added to the fstab and to be activated".format(
                             name
@@ -882,7 +918,14 @@ def swap(name, persist=True, config="/etc/fstab"):
             # present, new, change, bad config
             # Make sure the entry is in the fstab
             out = __salt__["mount.set_fstab"](
-                "none", name, "swap", ["defaults"], 0, 0, config
+                "none",
+                name,
+                "swap",
+                ["defaults"],
+                0,
+                0,
+                config,
+                resolve_canonical=resolve_canonical,
             )
         if out == "present":
             return ret
@@ -902,7 +945,13 @@ def swap(name, persist=True, config="/etc/fstab"):
 
 
 def unmounted(
-    name, device=None, config="/etc/fstab", persist=False, user=None, **kwargs
+    name,
+    device=None,
+    config="/etc/fstab",
+    persist=False,
+    user=None,
+    resolve_canonical=False,
+    **kwargs,
 ):
     """
     .. versionadded:: 0.17.0
@@ -927,6 +976,13 @@ def unmounted(
     user
         The user to own the mount; this defaults to the user salt is
         running as on the minion
+
+    resolve_canonical
+        ``UUID=``, ``LABEL=``, ``PARTUUID=`` and ``PARTLABEL=`` names are
+        resolved to the underlying device, so the canonical device path is
+        used for comparison.
+
+        .. versionadded:: 3008.3
     """
     ret = {"name": name, "changes": {}, "result": True, "comment": ""}
 
@@ -1007,7 +1063,9 @@ def unmounted(
                 elif "AIX" in __grains__["os"]:
                     out = __salt__["mount.rm_filesystems"](name, device, config)
                 else:
-                    out = __salt__["mount.rm_fstab"](name, device, config)
+                    out = __salt__["mount.rm_fstab"](
+                        name, device, config, resolve_canonical=resolve_canonical
+                    )
                 if out is not True:
                     ret["result"] = False
                     ret["comment"] += ". Failed to persist purge"
@@ -1096,6 +1154,7 @@ def fstab_present(
     match_on="auto",
     not_change=False,
     fs_mount=True,
+    resolve_canonical=False,
 ):
     """Makes sure that a fstab mount point is present.
 
@@ -1153,6 +1212,13 @@ def fstab_present(
         parameter is set to ``True`` and the line is found, the
         original content will be preserved.
 
+    resolve_canonical
+        ``UUID=``, ``LABEL=``, ``PARTUUID=`` and ``PARTLABEL=`` names are
+        resolved to the underlying device, so the canonical device path is
+        used for comparison.
+
+        .. versionadded:: 3008.3
+
     """
     ret = {
         "name": name,
@@ -1178,7 +1244,7 @@ def fstab_present(
     if not fs_file == "/":
         fs_file = fs_file.rstrip("/")
 
-    fs_spec = _convert_to(name, mount_by)
+    fs_spec = salt.utils.mount._convert_to(name, mount_by, __salt__)
 
     # Validate that the device is valid after the conversion
     if not fs_spec:
@@ -1221,6 +1287,7 @@ def fstab_present(
                 test=True,
                 match_on=match_on,
                 not_change=not_change,
+                resolve_canonical=resolve_canonical,
             )
         ret["result"] = None
         if out == "present":
@@ -1273,6 +1340,7 @@ def fstab_present(
             config=config,
             match_on=match_on,
             not_change=not_change,
+            resolve_canonical=resolve_canonical,
         )
 
     ret["result"] = True
@@ -1303,7 +1371,9 @@ def fstab_present(
     return ret
 
 
-def fstab_absent(name, fs_file, mount_by=None, config="/etc/fstab"):
+def fstab_absent(
+    name, fs_file, mount_by=None, config="/etc/fstab", resolve_canonical=False
+):
     """
     Makes sure that a fstab mount point is absent.
 
@@ -1325,6 +1395,13 @@ def fstab_absent(name, fs_file, mount_by=None, config="/etc/fstab"):
     config
         Place where the fstab file lives
 
+    resolve_canonical
+        ``UUID=``, ``LABEL=``, ``PARTUUID=`` and ``PARTLABEL=`` names are
+        resolved to the underlying device, so the canonical device path is
+        used for comparison.
+
+        .. versionadded:: 3008.3
+
     """
     ret = {
         "name": name,
@@ -1343,7 +1420,7 @@ def fstab_absent(name, fs_file, mount_by=None, config="/etc/fstab"):
     if not fs_file == "/":
         fs_file = fs_file.rstrip("/")
 
-    fs_spec = _convert_to(name, mount_by)
+    fs_spec = salt.utils.mount._convert_to(name, mount_by, __salt__)
 
     if __grains__["os"] in ["MacOS", "Darwin"]:
         fstab_data = __salt__["mount.automaster"](config)
@@ -1373,7 +1450,10 @@ def fstab_absent(name, fs_file, mount_by=None, config="/etc/fstab"):
             )
         else:
             out = __salt__["mount.rm_fstab"](
-                name=fs_file, device=fs_spec, config=config
+                name=fs_file,
+                device=fs_spec,
+                config=config,
+                resolve_canonical=resolve_canonical,
             )
 
         if out is not True:
