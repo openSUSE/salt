@@ -445,3 +445,149 @@ class OpenscapTestCase(TestCase):
                     "returncode": 1,
                 },
             )
+
+    def test_new_openscap_xccdf_eval_success_with_skip_rules(self):
+        with patch(
+            "salt.modules.openscap.Popen",
+            MagicMock(
+                return_value=Mock(
+                    **{
+                        "returncode": 0,
+                        "communicate.return_value": (bytes(0), bytes(0)),
+                    }
+                )
+            ),
+        ):
+            response = openscap.xccdf_eval(
+                self.policy_file,
+                profile="Default",
+                skip_rule=["rule-one", "rule-two"],
+                oval_results=True,
+                results="results.xml",
+                report="report.html",
+            )
+
+            expected_cmd = [
+                "oscap",
+                "xccdf",
+                "eval",
+                "--oval-results",
+                "--results",
+                "results.xml",
+                "--report",
+                "report.html",
+                "--profile",
+                "Default",
+                "--skip-rule",
+                "rule-one",
+                "--skip-rule",
+                "rule-two",
+                self.policy_file,
+            ]
+            openscap.Popen.assert_called_once_with(
+                expected_cmd,
+                cwd=openscap.tempfile.mkdtemp.return_value,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+            self.assertEqual(
+                response,
+                {
+                    "upload_dir": self.random_temp_dir,
+                    "error": "",
+                    "success": True,
+                    "returncode": 0,
+                },
+            )
+
+    def test_new_openscap_xccdf_eval_success_with_single_rules_as_string(self):
+        with patch(
+            "salt.modules.openscap.Popen",
+            MagicMock(
+                return_value=Mock(
+                    **{
+                        "returncode": 0,
+                        "communicate.return_value": (bytes(0), bytes(0)),
+                    }
+                )
+            ),
+        ):
+            openscap.xccdf_eval(
+                self.policy_file,
+                profile="Default",
+                rule="rule-one",
+                skip_rule="rule-two",
+                oval_results=True,
+            )
+
+            expected_cmd = [
+                "oscap",
+                "xccdf",
+                "eval",
+                "--oval-results",
+                "--profile",
+                "Default",
+                "--rule",
+                "rule-one",
+                "--skip-rule",
+                "rule-two",
+                self.policy_file,
+            ]
+            openscap.Popen.assert_called_once_with(
+                expected_cmd,
+                cwd=openscap.tempfile.mkdtemp.return_value,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+
+    def test_new_openscap_xccdf_eval_success_with_content_selection(self):
+        with patch(
+            "salt.modules.openscap.Popen",
+            MagicMock(
+                return_value=Mock(
+                    **{
+                        "returncode": 0,
+                        "communicate.return_value": (bytes(0), bytes(0)),
+                    }
+                )
+            ),
+        ):
+            openscap.xccdf_eval(
+                self.policy_file,
+                profile="Default",
+                reference="stigid:RHEL-09-211010",
+                cpe="/usr/share/openscap/cpe/openscap-cpe-dict.xml",
+                datastream_id="scap_org.open-scap_datastream_from_xccdf",
+                xccdf_id="scap_org.open-scap_cref_xccdf.xml",
+                benchmark_id="xccdf_org.ssgproject.content_benchmark_RHEL-9",
+                local_files="/var/cache/openscap",
+                fetch_remote_resources=True,
+            )
+
+            expected_cmd = [
+                "oscap",
+                "xccdf",
+                "eval",
+                "--profile",
+                "Default",
+                "--reference",
+                "stigid:RHEL-09-211010",
+                "--cpe",
+                "/usr/share/openscap/cpe/openscap-cpe-dict.xml",
+                "--datastream-id",
+                "scap_org.open-scap_datastream_from_xccdf",
+                "--xccdf-id",
+                "scap_org.open-scap_cref_xccdf.xml",
+                "--benchmark-id",
+                "xccdf_org.ssgproject.content_benchmark_RHEL-9",
+                "--fetch-remote-resources",
+                "--local-files",
+                "/var/cache/openscap",
+                self.policy_file,
+            ]
+            openscap.Popen.assert_called_once_with(
+                expected_cmd,
+                cwd=openscap.tempfile.mkdtemp.return_value,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
