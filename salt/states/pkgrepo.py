@@ -117,7 +117,6 @@ Using ``aptkey: False`` with ``keyserver`` and ``keyid``:
         - aptkey: False
 """
 
-
 import os
 import sys
 
@@ -484,6 +483,10 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
     else:
         sanitizedkwargs = kwargs
 
+        if __grains__["os_family"] == "Suse":
+            pre = _normalize_repo(pre, for_mod=True)
+            sanitizedkwargs = _normalize_repo(sanitizedkwargs, for_mod=True)
+
     if pre:
         # 22412: Remove file attribute in case same repo is set up multiple times but with different files
         pre.pop("file", None)
@@ -501,11 +504,8 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
                     else:
                         break
                 else:
-                    if kwarg in ("comps", "key_url"):
-                        break
-                    else:
-                        continue
-            elif kwarg in ("comps", "key_url"):
+                    break
+            elif kwarg in ("comments", "comps", "key_url"):
                 if sorted(sanitizedkwargs[kwarg]) != sorted(pre[kwarg]):
                     break
             elif kwarg == "line" and __grains__["os_family"] == "Debian":
@@ -579,6 +579,7 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
         )
         if pre:
             for kwarg in sanitizedkwargs:
+                # TODO: if new is an integer, it should be displayed as bool to align with the format used in old
                 if sanitizedkwargs.get(kwarg) != pre.get(kwarg):
                     ret["changes"][kwarg] = {
                         "new": sanitizedkwargs.get(kwarg),
@@ -607,6 +608,8 @@ def managed(name, ppa=None, copr=None, aptkey=True, **kwargs):
 
     try:
         post = __salt__["pkg.get_repo"](repo=repo, **kwargs)
+        if __grains__["os_family"] == "Suse":
+            post = _normalize_repo(post, for_mod=True)
         if pre:
             for kwarg in sanitizedkwargs:
                 if post.get(kwarg) != pre.get(kwarg):
@@ -792,7 +795,7 @@ def absent(name, **kwargs):
     return ret
 
 
-def _normalize_repo(repo):
+def _normalize_repo(repo, for_mod=False):
     """Normalize the get_repo information"""
     # `pkg.get_repo()` specific virtual module implementation is
     # parsing the information directly from the repository
@@ -802,14 +805,19 @@ def _normalize_repo(repo):
     # If the field is not present will be dropped
     suse = {
         # "alias": "repo",
-        "name": "humanname",
+        "name": "name",
         "priority": "priority",
         "enabled": "enabled",
         "autorefresh": "refresh",
+        "refresh": "refresh",
         "gpgcheck": "gpgcheck",
+        "gpgkey": "gpgkey",
         "keepackages": "cache",
         "baseurl": "url",
     }
+    if not for_mod:
+        suse["name"] = "humanname"
+
     translator = {
         "Suse": suse,
     }

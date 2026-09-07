@@ -1188,17 +1188,40 @@ def list_repo_pkgs(*args, **kwargs):
         return byrepo_ret
 
 
+def _get_repos_directory(root=None):
+    return os.path.join(root, os.path.relpath(REPOS, os.path.sep)) if root else REPOS
+
+
+def _get_configured_repo(repo, root=None):
+    repos = _get_repos_directory(root=root)
+
+    for fname in os.listdir(repos):
+        if not fname.endswith(".repo"):
+            continue
+
+        repo_file = os.path.join(repos, fname)
+
+        repo_cfg = configparser.ConfigParser()
+        repo_cfg.read(repo_file)
+
+        if repo in repo_cfg:
+            # return whole config for processing as there might be multiple repository sections in one file
+            return {repo_file: repo_cfg}
+
+    return {}
+
+
 def _get_configured_repos(root=None):
     """
     Get all the info about repositories from the configurations.
     """
 
-    repos = os.path.join(root, os.path.relpath(REPOS, os.path.sep)) if root else REPOS
+    repos = _get_repos_directory(root=root)
     repos_cfg = configparser.ConfigParser()
     if os.path.exists(repos):
         repos_cfg.read(
             [
-                repos + "/" + fname
+                os.path.join(repos, fname)
                 for fname in os.listdir(repos)
                 if fname.endswith(".repo")
             ]
@@ -1219,10 +1242,14 @@ def _get_repo_info(alias, repos_cfg=None, root=None):
         )
         meta["alias"] = alias
         for key, val in meta.items():
-            if val in ["0", "1"]:
+            if key == "priority":
+                meta[key] = int(meta[key])
+            elif val in ["0", "1"]:
                 meta[key] = int(meta[key]) == 1
             elif val == "NONE":
                 meta[key] = None
+        if "priority" not in meta:
+            meta["priority"] = DEFAULT_PRIORITY
         return meta
     except (ValueError, configparser.NoSectionError):
         return {}
@@ -1444,6 +1471,18 @@ def mod_repo(repo, **kwargs):
     if cmd_opt:
         cmd_opt = global_cmd_opt + ["mr"] + cmd_opt + [repo]
         __zypper__(root=root).refreshable.xml.call(*cmd_opt)
+
+    if "gpgkey" in kwargs:
+        # TODO: factor file based configuration to helper function
+        repo_map = _get_configured_repo(repo, root=root)
+        if repo_map:
+            repo_file, repo_file_cfg = tuple(repo_map.items())[0]
+            repo_cfg = repo_file_cfg[repo]
+
+            if repo_cfg.get("gpgkey") != kwargs["gpgkey"]:
+                repo_cfg["gpgkey"] = kwargs["gpgkey"]
+                with salt.utils.files.fopen(repo_file, "w") as _fp:
+                    repo_file_cfg.write(_fp)
 
     comment = None
     if call_refresh:
