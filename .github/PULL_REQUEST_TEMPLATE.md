@@ -13,8 +13,11 @@ Remove this section if not relevant
 **[NOTICE] Bug fixes or features added to Salt require tests.**
 <!-- Please review the [test documentation](https://docs.saltproject.io/en/master/topics/tutorials/writing_tests.html) for details on how to implement tests into Salt's test suite. -->
 - [ ] Docs
-- [ ] Changelog - https://docs.saltproject.io/en/master/topics/development/changelog.html
 - [ ] Tests written/updated
+
+RPM Changelog files are not yet required:
+
+- [x] No changelog needed
 
 ### Commits signed with GPG?
 Yes/No

@@ -1,0 +1,38 @@
+name: Changelogs
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, closed]
+    branches:
+      - openSUSE/release/*
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  changelog_test:
+    name: Changelog tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+    - name: Checkout
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 #v5.0.0
+      with:
+        fetch-depth: 1
+
+    - id: files
+      uses: Ana06/get-changed-files@25f79e676e7ea1868813e21465014798211fad8c #v2.3.0
+      with:
+        filter: 'pkg/suse/changelogs/*.changes'
+
+    - name: Verify .changes file modification
+      if: "!contains(github.event.pull_request.body, '[x] No changelog needed')"
+      run: |
+        if [ -z "${{ steps.files.outputs.added_modified }}" ]; then
+          echo "error: Missing pkg/suse/changelogs/*.changes files."
+          exit 1
+        fi
+        echo "Found modified .changes files: ${{ steps.files.outputs.added_modified }}"
