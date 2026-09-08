@@ -138,10 +138,14 @@ def test_user_present_nondefault(grains, modules, states, username, user_home):
     if not salt.utils.platform.is_darwin() and not salt.utils.platform.is_windows():
         assert user_home.is_dir()
 
-    if grains["os_family"] == "Suse" and not (
-        grains.get("transactional", False)
-        or grains.get("osmajorrelease", 0) >= 16
-        or grains.get("osrelease_info", ()) >= (15, 6)
+    if (
+        grains["os_family"] == "Suse"
+        and not grains.get("transactional", False)
+        and grains.get("osmajorrelease", 0) < 16
+        and (
+            grains.get("osrelease_info", ()) < (15, 6)
+            or grains.get("osfullname", "") == "SLES"
+        )
     ):
         expected_group_name = "users"
     elif grains["os_family"] == "MacOS":
@@ -392,7 +396,10 @@ def test_user_present_change_groups(
     if grains["os_family"] == "Suse" and (
         grains.get("transactional", False)
         or grains.get("osmajorrelease", 0) >= 16
-        or grains.get("osrelease_info", ()) >= (15, 6)
+        or (
+            grains.get("osrelease_info", ()) >= (15, 6) 
+            and grains.get("osfullname", "") != "SLES"
+        ) 
     ):
         expected_groups.append(username)
 
@@ -428,7 +435,10 @@ def test_user_present_change_optional_groups(
     if grains["os_family"] == "Suse" and (
         grains.get("transactional", False)
         or grains.get("osmajorrelease", 0) >= 16
-        or grains.get("osrelease_info", ()) >= (15, 6)
+        or (
+            grains.get("osrelease_info", ()) >= (15, 6) 
+            and grains.get("osfullname", "") != "SLES"
+        )
     ):
         expected_groups.append(username)
 
