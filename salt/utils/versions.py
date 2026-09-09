@@ -464,3 +464,10 @@ def check_boto_reqs(
             )
 
     return True
+
+
+def parse(version):
+    """
+    A replacement for `pkg_resources.parse_version` which is being deprecated.
+    """
+    return packaging.version.parse(version)
