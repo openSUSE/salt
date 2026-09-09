@@ -223,8 +223,20 @@ class HTTPPostTestCase(TestCase):
         }
 
         mock_curl = MagicMock()
+        class MockContextManager:
+            def __init__(self, cls, args=None, kwargs=None, **_):
+                self.cls = cls
+                self.args = args or []
+                self.kwargs = kwargs or {}
+
+            def __enter__(self):
+                return self.cls(*self.args, **self.kwargs)
+
+            def __exit__(self, *args):
+                pass
+
         def mock_sync_wrapper(cls, args=None, kwargs=None, **_):
-            return cls(*args or [], **kwargs or {})
+            return MockContextManager(cls, args, kwargs)
 
         with patch("salt.utils.http.SyncWrapper", side_effect=mock_sync_wrapper), patch(
             "tornado.httpclient.AsyncHTTPClient.fetch", mock_curl
