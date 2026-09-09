@@ -85,8 +85,6 @@ pyzmq==23.2.0
     # via -r requirements/zeromq.txt
 requests==2.25.1
     # via -r requirements/base.txt
-rpm-vercmp==0.1.2
-    # via -r requirements/static/pkg/linux.in
 setproctitle==1.2.3
     # via -r requirements/static/pkg/linux.in
 six==1.16.0
