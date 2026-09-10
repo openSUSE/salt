@@ -89,6 +89,7 @@ class PillarTestCase(TestCase):
             "renderer_blacklist": [],
             "renderer_whitelist": [],
             "state_top": "",
+            "pillar": {},
             "pillar_roots": {"dev": [], "base": []},
             "file_roots": {"dev": [], "base": []},
             "extension_modules": "",
