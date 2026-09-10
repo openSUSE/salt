@@ -262,6 +262,7 @@ def test_ext_pillar_no_extra_minion_data_val_dict():
         "renderer_blacklist": [],
         "renderer_whitelist": [],
         "state_top": "",
+        "pillar": {},
         "pillar_roots": {"dev": [], "base": []},
         "file_roots": {"dev": [], "base": []},
         "extension_modules": "",
