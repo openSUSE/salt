@@ -7,7 +7,7 @@ import pytest
 import salt.loader
 import salt.pillar
 import salt.utils.cache
-from tests.support.mock import MagicMock
+from tests.support.mock import MagicMock, patch
 
 
 @pytest.mark.parametrize(
@@ -260,3 +260,25 @@ def test_remote_pillar_timeout(temp_salt_minion, tmp_path):
     msg = r"^Pillar timed out after \d{1,4} seconds$"
     with pytest.raises(salt.exceptions.SaltClientError):
         pillar.compile_pillar()
+
+
+def test_ssh_merge_pillar_in_dunder_pillar(temp_salt_minion):
+    """
+    Test that ssh_merge_pillar correctly merges extra pillar data from opts["pillar"] into __pillar__
+    """
+    opts = temp_salt_minion.config.copy()
+    opts["ssh_merge_pillar"] = True
+    opts["pillar"] = {"ssh_key": "ssh_value"}
+
+    grains = salt.loader.grains(opts)
+    pillar = salt.pillar.Pillar(opts, grains, temp_salt_minion.id, "base")
+
+    pil_value = {"normal_key": "normal_value"}
+    with patch.object(pillar, "render_pillar", return_value=(pil_value, [])):
+        compiled = pillar.compile_pillar()
+        assert compiled["ssh_key"] == "ssh_value"
+        assert compiled["normal_key"] == "normal_value"
+
+    # The loader pack should contain the merged SSH pillar
+    assert pillar.functions.pack["__pillar__"]["ssh_key"] == "ssh_value"
+    assert pillar.functions["pillar.get"]("ssh_key") == "ssh_value"
