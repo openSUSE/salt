@@ -56,6 +56,18 @@ _OSCAP_EXIT_CODES_MAP = {
 }
 
 
+def _append_repeatable(cmd_opts, option, value):
+    """
+    Append one occurrence of a repeatable oscap option per value.
+
+    The value is either a single string or a list of strings.
+    """
+    values = [value] if isinstance(value, str) else value
+    for item in values:
+        cmd_opts.append(option)
+        cmd_opts.append(item)
+
+
 def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
     """
     Run ``oscap xccdf eval`` commands on minions.
@@ -75,7 +87,13 @@ def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
         the name of Profile to be evaluated
 
     rule
-        the name of a single rule to be evaluated
+        the name of a rule to be evaluated, or a list of rules
+
+    skip_rule
+        the name of a rule to be skipped, or a list of rules
+
+    reference
+        evaluate only the rules carrying the given reference, as ``NAME:ID``
 
     oval_results
         save OVAL results as well (True or False)
@@ -88,6 +106,23 @@ def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
 
     fetch_remote_resources
         download remote content referenced by XCCDF (True or False)
+
+    local_files
+        use the locally downloaded copies of the remote resources stored in
+        the given directory instead of downloading them
+
+    cpe
+        use given CPE dictionary or language for applicability checks
+
+    datastream_id
+        ID of the data stream in the collection to use
+
+    xccdf_id
+        ID of the component reference holding the XCCDF to evaluate
+
+    benchmark_id
+        ID of the XCCDF benchmark to evaluate, when neither datastream_id nor
+        xccdf_id is given
 
     tailoring_file
         use given XCCDF Tailoring file
@@ -126,8 +161,24 @@ def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
         cmd_opts.append("--profile")
         cmd_opts.append(kwargs["profile"])
     if "rule" in kwargs:
-        cmd_opts.append("--rule")
-        cmd_opts.append(kwargs["rule"])
+        _append_repeatable(cmd_opts, "--rule", kwargs["rule"])
+    if "skip_rule" in kwargs:
+        _append_repeatable(cmd_opts, "--skip-rule", kwargs["skip_rule"])
+    if "reference" in kwargs:
+        cmd_opts.append("--reference")
+        cmd_opts.append(kwargs["reference"])
+    if "cpe" in kwargs:
+        cmd_opts.append("--cpe")
+        cmd_opts.append(kwargs["cpe"])
+    if "datastream_id" in kwargs:
+        cmd_opts.append("--datastream-id")
+        cmd_opts.append(kwargs["datastream_id"])
+    if "xccdf_id" in kwargs:
+        cmd_opts.append("--xccdf-id")
+        cmd_opts.append(kwargs["xccdf_id"])
+    if "benchmark_id" in kwargs:
+        cmd_opts.append("--benchmark-id")
+        cmd_opts.append(kwargs["benchmark_id"])
     if "tailoring_file" in kwargs:
         cmd_opts.append("--tailoring-file")
         cmd_opts.append(kwargs["tailoring_file"])
@@ -136,6 +187,9 @@ def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
         cmd_opts.append(kwargs["tailoring_id"])
     if kwargs.get("fetch_remote_resources"):
         cmd_opts.append("--fetch-remote-resources")
+    if "local_files" in kwargs:
+        cmd_opts.append("--local-files")
+        cmd_opts.append(kwargs["local_files"])
     if kwargs.get("remediate"):
         cmd_opts.append("--remediate")
     cmd_opts.append(xccdffile)
