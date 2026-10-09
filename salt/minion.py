@@ -2809,8 +2809,6 @@ class Minion(MinionBase):
                         self.opts, io_loop=self.io_loop
                     )
 
-                    # put the current schedule into the new loaders
-                    self.opts["schedule"] = self.schedule.option("schedule")
                     (
                         self.functions,
                         self.returners,

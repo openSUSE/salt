@@ -8,12 +8,14 @@ import tornado
 import tornado.gen
 import tornado.testing
 import salt.minion
+import salt.payload
 import salt.syspaths
 import salt.utils.crypt
 import salt.utils.event as event
 import salt.utils.jid
 import salt.utils.platform
 import salt.utils.process
+import salt.utils.stringutils
 from salt._compat import ipaddress
 from salt.exceptions import SaltClientError, SaltMasterUnresolvableError, SaltSystemExit
 from tests.support.mock import MagicMock, patch
@@ -746,6 +748,89 @@ def test_minion_manage_schedule(minion_opts):
 
                 minion.manage_schedule(tag, data)
                 assert "test_job" in minion.opts["schedule"]
+            finally:
+                del minion.schedule
+                minion.destroy()
+                del minion
+
+
+def test_minion_keeps_schedule_on_master_reconnect(minion_opts):
+    """
+    Tests that re-initialising the subsystems after reconnecting to a master
+    does not replace the in-memory schedule with the one seen by the loaders,
+    which can be stale or empty.
+    """
+    minion_opts["master_alive_interval"] = 0
+    with patch("salt.minion.Minion.ctx", MagicMock(return_value={})), patch(
+        "salt.minion.Minion.sync_connect_master",
+        MagicMock(side_effect=RuntimeError("stop execution")),
+    ), patch(
+        "salt.utils.process.SignalHandlingProcess.start",
+        MagicMock(return_value=True),
+    ), patch(
+        "salt.utils.process.SignalHandlingProcess.join",
+        MagicMock(return_value=True),
+    ):
+        io_loop = tornado.ioloop.IOLoop()
+        io_loop.make_current()
+
+        with patch("salt.utils.schedule.clean_proc_dir", MagicMock(return_value=None)):
+            try:
+                # the loaders see a stale (empty) schedule
+                mock_functions = {
+                    "test.ping": None,
+                    "config.merge": MagicMock(return_value={}),
+                }
+
+                minion = salt.minion.Minion(minion_opts, io_loop=io_loop)
+                minion.opts["schedule"] = {
+                    "__mine_interval": {
+                        "function": "mine.update",
+                        "minutes": 60,
+                        "jid_include": True,
+                        "maxrunning": 2,
+                        "return_job": False,
+                    },
+                    "test_job": {
+                        "function": "test.ping",
+                        "seconds": 3600,
+                    },
+                }
+                expected = copy.deepcopy(minion.opts["schedule"])
+                minion.schedule = salt.utils.schedule.Schedule(
+                    minion.opts,
+                    mock_functions,
+                    returners={},
+                    new_instance=True,
+                )
+                minion.ready = True
+                minion.connected = True
+
+                @tornado.gen.coroutine
+                def mock_eval_master(*args, **kwargs):
+                    minion.connected = True
+                    return minion.opts["master"], MagicMock()
+
+                package = salt.utils.stringutils.to_bytes(
+                    salt.minion.master_event(type="disconnected") + event.TAGEND
+                ) + salt.payload.dumps({"master": minion.opts["master"]})
+
+                mock_load_modules = MagicMock(
+                    return_value=(mock_functions, {}, {}, {})
+                )
+                with patch.object(minion, "eval_master", mock_eval_master), patch(
+                    "salt.channel.client.AsyncReqChannel.factory", MagicMock()
+                ), patch.object(
+                    minion, "_load_modules", mock_load_modules
+                ), patch.object(
+                    minion, "_fire_master_minion_start", MagicMock()
+                ):
+                    io_loop.run_sync(lambda: minion.handle_event(package))
+
+                assert minion.connected
+                mock_load_modules.assert_called_once()
+                assert minion.opts["schedule"] == expected
+                assert minion.schedule.opts["schedule"] == expected
             finally:
                 del minion.schedule
                 minion.destroy()
