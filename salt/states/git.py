@@ -953,9 +953,7 @@ def latest(
                         target,
                         force_reset,
                     )
-                    return _uptodate(
-                        ret, target, _format_comments(comments), local_changes
-                    )
+                    return _uptodate(ret, target, comments, local_changes)
 
             if (
                 remote_rev_type == "sha1"
@@ -1184,7 +1182,7 @@ def latest(
                             # user of the actions taken.
                             ret["comment"] = _format_comments(actions)
                             return ret
-                        return _uptodate(ret, target, _format_comments(actions))
+                        return _uptodate(ret, target, actions)
 
                 # The fetch_url for the desired remote does not match the
                 # specified URL (or the remote does not exist), so set the
@@ -1294,7 +1292,7 @@ def latest(
                         if not revs_match and not update_head and formatted_actions:
                             ret["comment"] = formatted_actions
                             return ret
-                        return _uptodate(ret, target, _format_comments(actions))
+                        return _uptodate(ret, target, actions)
 
                 if not upstream and desired_upstream:
                     upstream_action = "Tracking branch was set to {}".format(
@@ -1692,7 +1690,7 @@ def latest(
             ret["comment"] = _format_comments(comments)
             ret["changes"]["revision"] = {"old": local_rev, "new": new_rev}
         else:
-            return _uptodate(ret, target, _format_comments(comments))
+            return _uptodate(ret, target, comments)
     else:
         if os.path.isdir(target):
             target_contents = os.listdir(target)
