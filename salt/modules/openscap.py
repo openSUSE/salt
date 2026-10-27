@@ -153,7 +153,7 @@ def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
         tempdir = tempfile.mkdtemp()
         proc = Popen(cmd_opts, stdout=PIPE, stderr=PIPE, cwd=tempdir)
         (_, error) = proc.communicate()
-        error = error.decode('utf-8', errors='surogateescape')
+        error = error.decode('utf-8', errors='surrogateescape')
         success = _OSCAP_EXIT_CODES_MAP.get(proc.returncode, False)
         if proc.returncode < 0:
             error += "\nKilled by signal {}\n".format(proc.returncode)
@@ -205,7 +205,7 @@ def xccdf(params):
         tempdir = tempfile.mkdtemp()
         proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE, cwd=tempdir)
         (_, error) = proc.communicate()
-        error = error.decode('utf-8', errors='surogateescape')
+        error = error.decode('utf-8', errors='surrogateescape')
         success = _OSCAP_EXIT_CODES_MAP.get(proc.returncode, False)
         if proc.returncode < 0:
             error += "\nKilled by signal {}\n".format(proc.returncode)
