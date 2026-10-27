@@ -157,7 +157,7 @@ def _parse_acl(acl, user, group):
         vals["permissions"]["write"] = True
     else:
         vals["permissions"]["write"] = False
-    if "x" in comps[-1]:
+    if "x" in comps[-1] or "X" in comps[-1]:
         octal += 1
         vals["permissions"]["execute"] = True
     else:
