@@ -430,6 +430,7 @@ def test_bridge_dupname_update(network, docker, docker_network):
         ret = docker_network.present(
             name=net.name,
             subnet=net.subnet,
+            gateway=net.gateway,
             driver="bridge",
             driver_opts=[{"com.docker.network.bridge.name": net.name[-8:]}],
         )
@@ -438,6 +439,7 @@ def test_bridge_dupname_update(network, docker, docker_network):
         ret = docker_network.present(
             name=net.name,
             subnet=net.subnet,
+            gateway=net.gateway,
             driver="bridge",
             driver_opts=[{"com.docker.network.bridge.name": net.name[-8:]}],
         )
