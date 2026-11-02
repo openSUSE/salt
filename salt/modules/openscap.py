@@ -87,10 +87,10 @@ def xccdf_eval(xccdffile, ovalfiles=None, **kwargs):
         the name of Profile to be evaluated
 
     rule
-        the name of a rule to be evaluated, or a list of rules
+        the name of a rule to be evaluated, or a list of rules, such as ``[rule1, rule2]``
 
     skip_rule
-        the name of a rule to be skipped, or a list of rules
+        the name of a rule to be skipped, or a list of rules, such as ``[rule1, rule2]``
 
     reference
         evaluate only the rules carrying the given reference, as ``NAME:ID``
