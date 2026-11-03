@@ -215,6 +215,19 @@ def test_mworker_pass_context():
     def mworker_bind_mock():
         mworker.aes_funcs.run_func(data["cmd"], data)
 
+    def get_pillar_loader_context(loader_mock):
+        # LazyLoader can also be called for other loaders before the pillar one
+        # (e.g. log_handlers when MWorker.run sets up logging, or anything else
+        # running while salt.loader.LazyLoader is patched), so pick the pillar
+        # loader call by its tag.
+        pillar_calls = [
+            call
+            for call in loader_mock.call_args_list
+            if call[1].get("tag") == "pillar"
+        ]
+        assert len(pillar_calls) == 1, loader_mock.call_args_list
+        return pillar_calls[0][1]["pack"]["__context__"]
+
     with patch("salt.client.get_local_client", local_client_mock), patch(
         "salt.master.ClearFuncs", MagicMock()
     ), patch("salt.minion.MasterMinion", MagicMock()), patch(
@@ -240,10 +253,7 @@ def test_mworker_pass_context():
             mworker.context, test_context
         ):
             mworker.run()
-            assert (
-                loadler_pillars_mock.call_args_list[0][1].get("pack").get("__context__")
-                == test_context
-            )
+            assert get_pillar_loader_context(loadler_pillars_mock) == test_context
 
         loadler_pillars_mock.reset_mock()
 
@@ -262,10 +272,7 @@ def test_mworker_pass_context():
             mworker.context, test_context
         ), patch("salt.utils.cache.CacheFactory.factory", MagicMock()):
             mworker.run()
-            assert (
-                loadler_pillars_mock.call_args_list[0][1].get("pack").get("__context__")
-                == test_context
-            )
+            assert get_pillar_loader_context(loadler_pillars_mock) == test_context
 
 
 def test_syndic_return_cache_dir_creation(encrypted_requests):
