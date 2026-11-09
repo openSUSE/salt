@@ -184,7 +184,7 @@ class SyncWrapper:
         # never even *construct* the inner coroutine when the loop can't drive
         # it to completion.
         try:
-            if self._loop_can_run_until_complete(self.asyncio_loop):
+            if hasattr(self, "asyncio_loop") and self._loop_can_run_until_complete(self.asyncio_loop):
                 pending_tasks = [
                     task
                     for task in asyncio.all_tasks(self.asyncio_loop)
@@ -204,14 +204,14 @@ class SyncWrapper:
                         if not gathered.done():
                             gathered.cancel()
 
-            if self._loop_can_run_until_complete(self.asyncio_loop):
+            if hasattr(self, "asyncio_loop") and self._loop_can_run_until_complete(self.asyncio_loop):
                 shutdown_agens = self.asyncio_loop.shutdown_asyncgens()
                 try:
                     self.asyncio_loop.run_until_complete(shutdown_agens)
                 except Exception:  # pylint: disable=broad-except
                     shutdown_agens.close()
 
-            if self._loop_can_run_until_complete(self.asyncio_loop):
+            if hasattr(self, "asyncio_loop") and self._loop_can_run_until_complete(self.asyncio_loop):
                 shutdown_exec = self.asyncio_loop.shutdown_default_executor()
                 try:
                     self.asyncio_loop.run_until_complete(shutdown_exec)
