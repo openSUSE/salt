@@ -102,7 +102,7 @@ def present(name, acl_type, acl_name="", perms="", recurse=False, force=False):
     """
     ret = {"name": name, "result": True, "changes": {}, "comment": ""}
 
-    _octal = {"r": 4, "w": 2, "x": 1, "-": 0}
+    _octal = {"r": 4, "w": 2, "x": 1, "X": 1, "-": 0}
     _octal_lookup = {0: "-", 1: "r", 2: "w", 4: "x"}
 
     if not os.path.exists(name):
