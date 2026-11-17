@@ -315,6 +315,42 @@ def get_proc_dir(cachedir, **kwargs):
     return fn_
 
 
+def _blackout_names(value):
+    """
+    Normalize a comma separated string or a list/tuple of names into a list of
+    stripped, non-empty strings.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = value.split(",")
+    elif not isinstance(value, (list, tuple, set)):
+        value = [value]
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _blackout_state_allowed(function_name, args, kwargs, state_whitelist):
+    """
+    Check, in blackout mode, whether a call to ``state.apply`` or ``state.sls``
+    only requests SLS names listed in ``minion_blackout_state_whitelist``.
+
+    Any other function is not affected by this check. A call without SLS names
+    (``state.apply`` as highstate) is never allowed.
+    """
+    if function_name not in ("state.apply", "state.sls"):
+        return True
+    kwargs = kwargs or {}
+    if args:
+        requested = args[0]
+    else:
+        requested = kwargs.get("mods", kwargs.get("sls"))
+    requested = _blackout_names(requested)
+    if not requested:
+        return False
+    allowed = set(_blackout_names(state_whitelist))
+    return all(sls in allowed for sls in requested)
+
+
 def load_args_and_kwargs(func, args, data=None, ignore_invalid=False):
     """
     Detect the args and kwargs that need to be passed to a function call, and
@@ -1869,6 +1905,8 @@ class Minion(MinionBase):
         It also checks if the function is allowed to run if 'blackout mode' is enabled.
         """
         minion_blackout_violation = False
+        # State whitelists (lists of SLS names) of every active blackout source
+        blackout_state_whitelists = []
         if self.connected and self.opts["pillar"].get("minion_blackout", False):
             whitelist = self.opts["pillar"].get("minion_blackout_whitelist", [])
             # this minion is blacked out. Only allow saltutil.refresh_pillar and the whitelist
@@ -1877,6 +1915,11 @@ class Minion(MinionBase):
                 and function_name not in whitelist
             ):
                 minion_blackout_violation = True
+            state_whitelist = self.opts["pillar"].get(
+                "minion_blackout_state_whitelist"
+            )
+            if state_whitelist is not None:
+                blackout_state_whitelists.append(state_whitelist)
         # use minion_blackout_whitelist from grains if it exists
         if self.opts["grains"].get("minion_blackout", False):
             whitelist = self.opts["grains"].get("minion_blackout_whitelist", [])
@@ -1885,6 +1928,11 @@ class Minion(MinionBase):
                 and function_name not in whitelist
             ):
                 minion_blackout_violation = True
+            state_whitelist = self.opts["grains"].get(
+                "minion_blackout_state_whitelist"
+            )
+            if state_whitelist is not None:
+                blackout_state_whitelists.append(state_whitelist)
         if minion_blackout_violation:
             raise SaltInvocationError(
                 "Minion in blackout mode. Set 'minion_blackout' "
@@ -1899,6 +1947,18 @@ class Minion(MinionBase):
             # only run if function_name is not in minion_instance.functions and allow_missing_funcs is True
             func = function_name
             args, kwargs = function_args, data
+
+        # In blackout mode, state.apply/state.sls may be restricted to a list of SLS names
+        for state_whitelist in blackout_state_whitelists:
+            if not _blackout_state_allowed(
+                function_name, args, kwargs, state_whitelist
+            ):
+                raise SaltInvocationError(
+                    "Minion in blackout mode. Set 'minion_blackout' "
+                    "to False in pillar or grains to resume operations. Only "
+                    "the following states are allowed in blackout mode: "
+                    "{}".format(", ".join(_blackout_names(state_whitelist)))
+                )
         self.functions.pack["__context__"]["retcode"] = 0
 
         if isinstance(executors, str):

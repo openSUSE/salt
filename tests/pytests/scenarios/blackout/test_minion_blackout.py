@@ -96,3 +96,25 @@ def test_blackout_nonwhitelist(salt_cli, blackout, salt_minion_1):
     ret = salt_cli.run("test.ping", minion_tgt=salt_minion_1.id)
     assert ret.returncode == 0
     assert ret.data is True
+
+
+def test_blackout_state_whitelist(salt_cli, blackout, salt_minion_1):
+    """
+    Test that only whitelisted SLS names can be applied during blackout
+    """
+    blackout_contents = """
+    minion_blackout: True
+    minion_blackout_whitelist:
+      - state.apply
+    minion_blackout_state_whitelist:
+      - packages.profileupdate
+    """
+    with blackout.enter_blackout(blackout_contents):
+        for args in ([], ["other.sls"], ["packages.profileupdate,other.sls"]):
+            ret = salt_cli.run("state.apply", *args, minion_tgt=salt_minion_1.id)
+            assert ret.returncode == 1
+            assert "Minion in blackout mode." in ret.stdout
+
+        ret = salt_cli.run("pkg.list_pkgs", minion_tgt=salt_minion_1.id)
+        assert ret.returncode == 1
+        assert "Minion in blackout mode." in ret.stdout
