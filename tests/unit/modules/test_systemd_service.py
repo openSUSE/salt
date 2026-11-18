@@ -2,6 +2,7 @@
     :codeauthor: Rahul Handay <rahulha@saltstack.com>
 """
 
+import copy
 import os
 
 import pytest
@@ -331,7 +332,7 @@ class SystemdTestCase(TestCase, LoaderModuleMockMixin):
         """
         Test if a needed 'systemctl daemon-reload' is detected and executed when starting a service
         """
-        status = _SYSTEMCTL_STATUS["sshd.service"]
+        status = copy.deepcopy(_SYSTEMCTL_STATUS["sshd.service"])
         if reload_needed:
             status[
                 "stdout"
