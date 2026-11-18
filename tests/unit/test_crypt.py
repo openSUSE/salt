@@ -3,6 +3,7 @@ import shutil
 import tempfile
 
 import pytest
+from cryptography.hazmat.primitives import serialization
 
 import salt.utils.files
 import salt.utils.stringutils
@@ -152,11 +153,10 @@ class TestM2CryptoRegression47124(TestCase):
         ):
             salt.crypt.verify_signature("/keydir/keyname.pub", message, self.SIGNATURE)
 
-    @pytest.mark.skipif(not HAS_M2, reason="Skip when m2crypto is not installed")
     def test_m2crypto_sign_bytes(self):
         message = salt.utils.stringutils.to_unicode("meh")
-        key = M2Crypto.RSA.load_key_string(
-            salt.utils.stringutils.to_bytes(PRIVKEY_DATA)
+        key = serialization.load_pem_private_key(
+            salt.utils.stringutils.to_bytes(PRIVKEY_DATA), password=None
         )
         with patch("salt.crypt.get_rsa_key", return_value=key):
             signature = salt.crypt.sign_message(
@@ -164,11 +164,10 @@ class TestM2CryptoRegression47124(TestCase):
             )
         self.assertEqual(signature, self.SIGNATURE)
 
-    @pytest.mark.skipif(not HAS_M2, reason="Skip when m2crypto is not installed")
     def test_m2crypto_sign_unicode(self):
         message = salt.utils.stringutils.to_bytes("meh")
-        key = M2Crypto.RSA.load_key_string(
-            salt.utils.stringutils.to_bytes(PRIVKEY_DATA)
+        key = serialization.load_pem_private_key(
+            salt.utils.stringutils.to_bytes(PRIVKEY_DATA), password=None
         )
         with patch("salt.crypt.get_rsa_key", return_value=key):
             signature = salt.crypt.sign_message(
