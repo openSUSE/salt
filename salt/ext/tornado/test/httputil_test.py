@@ -4,8 +4,8 @@
 
 
 from __future__ import absolute_import, division, print_function
-from salt.ext.tornado.httputil import url_concat, parse_multipart_form_data, HTTPHeaders, format_timestamp, HTTPServerRequest, parse_request_start_line, parse_cookie, ParseMultipartConfig
-from salt.ext.tornado.httputil import HTTPInputError
+from salt.ext.tornado.httputil import url_concat, parse_multipart_form_data, HTTPHeaders, format_timestamp, HTTPServerRequest, parse_request_start_line, parse_cookie, ParseMultipartConfig, parse_body_arguments
+from salt.ext.tornado.httputil import HTTPInputError, _DEFAULT_PARSE_BODY_CONFIG
 from salt.ext.tornado.escape import utf8, native_str
 from salt.ext.tornado.log import gen_log
 from salt.ext.tornado.test.util import unittest
@@ -15,6 +15,11 @@ import datetime
 import logging
 import pickle
 import time
+
+
+def form_data_args():
+    """Return (arguments, files) dicts for parse_body_arguments and friends."""
+    return {}, {}
 
 
 class TestUrlConcat(unittest.TestCase):
@@ -101,6 +106,23 @@ class TestUrlConcat(unittest.TestCase):
             dict(y='y'),
         )
         self.assertEqual(url, "https://localhost/path?y=y")
+
+
+class UrlEncodedDataTest(unittest.TestCase):
+    def test_urlencoded_data(self):
+        data = b"a=1&b=2&a=3"
+        args, files = form_data_args()
+        parse_body_arguments("application/x-www-form-urlencoded", data, args, files)
+        self.assertEqual(args["a"], [b"1", b"3"])
+        self.assertEqual(args["b"], [b"2"])
+        self.assertEqual(files, {})
+
+    def test_max_arguments(self):
+        data = b"".join(b"a=1&" for _ in range(1001))
+        args, files = form_data_args()
+        with self.assertRaises(HTTPInputError) as cm:
+            parse_body_arguments("application/x-www-form-urlencoded", data, args, files)
+        self.assertIn("Max number of fields exceeded", str(cm.exception))
 
 
 class MultipartFormDataTest(unittest.TestCase):
@@ -330,29 +352,11 @@ Content-Disposition: form-data; name="files"; filename="ab.txt"
 
 
 class HTTPHeadersTest(unittest.TestCase):
-    def test_multi_line(self):
-        # Lines beginning with whitespace are appended to the previous line
-        # with any leading whitespace replaced by a single space.
-        # Note that while multi-line headers are a part of the HTTP spec,
-        # their use is strongly discouraged.
-        data = """\
-Foo: bar
- baz
-Asdf: qwer
-\tzxcv
-Foo: even
-     more
-     lines
-""".replace("\n", "\r\n")
-        headers = HTTPHeaders.parse(data)
-        self.assertEqual(headers["asdf"], "qwer zxcv")
-        self.assertEqual(headers.get_list("asdf"), ["qwer zxcv"])
-        self.assertEqual(headers["Foo"], "bar baz,even more lines")
-        self.assertEqual(headers.get_list("foo"), ["bar baz", "even more lines"])
-        self.assertEqual(sorted(list(headers.get_all())),
-                         [("Asdf", "qwer zxcv"),
-                          ("Foo", "bar baz"),
-                          ("Foo", "even more lines")])
+    def test_folding_rejected(self):
+        data = "Foo: bar\r\n\tasdf"
+        with self.assertRaises(HTTPInputError):
+            # Folded continuation lines are not supported.
+            HTTPHeaders.parse(data)
 
     def test_unicode_newlines(self):
         # Ensure that only \r\n is recognized as a header separator, and not
@@ -504,6 +508,20 @@ class HTTPServerRequestTest(unittest.TestCase):
     def test_body_is_a_byte_string(self):
         requets = HTTPServerRequest(uri='/')
         self.assertIsInstance(requets.body, bytes)
+
+    def test_query_arguments_within_limit(self):
+        n = _DEFAULT_PARSE_BODY_CONFIG.urlencoded.max_arguments
+        request = HTTPServerRequest(uri="/?" + "&".join("a=%d" % i for i in range(n)))
+        self.assertEqual(len(request.arguments["a"]), n)
+
+    def test_max_query_arguments(self):
+        # The query string is subject to the same limit on the number of
+        # arguments as a urlencoded body: parsing is superlinear enough in
+        # the number of fields to be worth bounding.
+        n = _DEFAULT_PARSE_BODY_CONFIG.urlencoded.max_arguments + 1
+        with self.assertRaises(HTTPInputError) as cm:
+            HTTPServerRequest(uri="/?" + "&".join("a=%d" % i for i in range(n)))
+        self.assertIn("Max number of fields exceeded", str(cm.exception))
 
 
 class ParseRequestStartLineTest(unittest.TestCase):

@@ -42,6 +42,23 @@ class _QuietException(Exception):
         pass
 
 
+# Reads that can be satisfied from data that has already arrived complete
+# without returning control to the IOLoop, so a peer that sends a body
+# faster than we can process it could otherwise monopolize the IOLoop for
+# the duration of the body. While reading a body, we yield to the IOLoop
+# after processing this many bytes. Each chunk of a chunked body also counts
+# as _CHUNK_YIELD_COST bytes, since the per-chunk overhead dominates when
+# the chunks are small.
+_YIELD_THRESHOLD = 256 * 1024
+_CHUNK_YIELD_COST = 1024
+
+
+def _is_done(future):
+    # IOStream's read methods are declared to return Awaitables, but they
+    # are actually Futures which may already be resolved.
+    return isinstance(future, Future) and future.done()
+
+
 class _ExceptionLoggingContext(object):
     """Used with the ``with`` statement when calling delegate methods to
     log any exceptions with the given logger.  Any exceptions caught are
@@ -574,52 +591,102 @@ class HTTP1Connection(httputil.HTTPConnection):
         return None
 
     @gen.coroutine
+    def _deliver_body(self, delegate, data):
+        if not self._write_finished or self.is_client:
+            with _ExceptionLoggingContext(app_log):
+                ret = delegate.data_received(data)
+                if ret is not None:
+                    yield ret
+
+    @gen.coroutine
     def _read_fixed_body(self, content_length, delegate):
+        work = 0  # See _YIELD_THRESHOLD
         while content_length > 0:
             body = yield self.stream.read_bytes(
                 min(self.params.chunk_size, content_length), partial=True)
             content_length -= len(body)
-            if not self._write_finished or self.is_client:
-                with _ExceptionLoggingContext(app_log):
-                    ret = delegate.data_received(body)
-                    if ret is not None:
-                        yield ret
+            yield self._deliver_body(delegate, body)
+            work += len(body)
+            if work >= _YIELD_THRESHOLD:
+                work = 0
+                yield gen.moment
 
     @gen.coroutine
     def _read_chunked_body(self, delegate):
         # TODO: "chunk extensions" http://tools.ietf.org/html/rfc2616#section-3.6.1
         total_size = 0
+        # Chunk boundaries are not meaningful (and may be changed by
+        # intermediaries), so the contents of consecutive small chunks are
+        # coalesced before being passed to the delegate. This bounds the
+        # number of data_received calls (and the overhead of delegates that
+        # buffer each piece they receive) regardless of how small the chunks
+        # are. Pending data is delivered whenever we would have to wait for
+        # the network, so this does not add latency for streaming delegates.
+        pending = bytearray()
+        work = 0  # See _YIELD_THRESHOLD
+
+        def read(future):
+            if pending and not _is_done(future):
+                return flush_and_read(future)
+            return future
+
+        @gen.coroutine
+        def flush_and_read(future):
+            data = bytes(pending)
+            del pending[:]
+            yield self._deliver_body(delegate, data)
+            result = yield future
+            raise gen.Return(result)
+
         while True:
-            chunk_len = yield self.stream.read_until(b"\r\n", max_bytes=64)
+            work += _CHUNK_YIELD_COST
+            if work >= _YIELD_THRESHOLD:
+                work = 0
+                yield gen.moment
+            chunk_len = yield read(self.stream.read_until(b"\r\n", max_bytes=64))
             chunk_len = int(chunk_len.strip(), 16)
             if chunk_len == 0:
-                crlf = yield self.stream.read_bytes(2)
+                crlf = yield read(self.stream.read_bytes(2))
                 if crlf != b'\r\n':
                     raise httputil.HTTPInputError("improperly terminated chunked request")
+                if pending:
+                    yield self._deliver_body(delegate, bytes(pending))
                 return
             total_size += chunk_len
             if total_size > self._max_body_size:
                 raise httputil.HTTPInputError("chunked body too large")
             bytes_to_read = chunk_len
             while bytes_to_read:
-                chunk = yield self.stream.read_bytes(
-                    min(bytes_to_read, self.params.chunk_size), partial=True)
+                chunk = yield read(self.stream.read_bytes(
+                    min(bytes_to_read, self.params.chunk_size), partial=True))
                 bytes_to_read -= len(chunk)
-                if not self._write_finished or self.is_client:
-                    with _ExceptionLoggingContext(app_log):
-                        ret = delegate.data_received(chunk)
-                        if ret is not None:
-                            yield ret
+                if not pending and len(chunk) == self.params.chunk_size:
+                    # Full-sized reads are passed through without copying.
+                    yield self._deliver_body(delegate, chunk)
+                else:
+                    pending.extend(chunk)
+                    if len(pending) >= self.params.chunk_size:
+                        data = bytes(pending[:self.params.chunk_size])
+                        del pending[:self.params.chunk_size]
+                        yield self._deliver_body(delegate, data)
+                work += len(chunk)
+                if work >= _YIELD_THRESHOLD:
+                    work = 0
+                    yield gen.moment
             # chunk ends with \r\n
-            crlf = yield self.stream.read_bytes(2)
-            assert crlf == b"\r\n"
+            crlf = yield read(self.stream.read_bytes(2))
+            if crlf != b"\r\n":
+                raise httputil.HTTPInputError("improperly terminated chunk")
 
     @gen.coroutine
     def _read_body_until_close(self, delegate):
+        work = 0  # See _YIELD_THRESHOLD
         body = yield self.stream.read_until_close()
-        if not self._write_finished or self.is_client:
-            with _ExceptionLoggingContext(app_log):
-                delegate.data_received(body)
+        yield self._deliver_body(delegate, body)
+        work += len(body)
+        if work >= _YIELD_THRESHOLD:
+            work = 0
+            yield gen.moment
 
 
 class _GzipMessageDelegate(httputil.HTTPMessageDelegate):
