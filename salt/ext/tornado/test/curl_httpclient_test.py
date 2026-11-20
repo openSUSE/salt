@@ -7,7 +7,7 @@ from hashlib import md5
 from salt.ext.tornado.escape import utf8
 from salt.ext.tornado.httpclient import HTTPRequest
 from salt.ext.tornado.stack_context import ExceptionStackContext
-from salt.ext.tornado.testing import AsyncHTTPTestCase
+from salt.ext.tornado.testing import AsyncHTTPTestCase, AsyncTestCase
 from salt.ext.tornado.test import httpclient_test
 from salt.ext.tornado.test.util import unittest
 from salt.ext.tornado.web import Application, RequestHandler
@@ -19,7 +19,7 @@ except ImportError:
     pycurl = None
 
 if pycurl is not None:
-    from salt.ext.tornado.curl_httpclient import CurlAsyncHTTPClient
+    from salt.ext.tornado.curl_httpclient import CurlAsyncHTTPClient, _CurlStreamingBuffer
 
 
 @unittest.skipIf(pycurl is None, "pycurl module not present")
@@ -133,3 +133,35 @@ class CurlHTTPClientTestCase(AsyncHTTPTestCase):
         for i in range(5):
             response = self.fetch(u'/ユニコード')
             self.assertIsNot(response.error, None)
+
+
+@unittest.skipIf(pycurl is None, "pycurl module not present")
+class CurlStreamingBufferTest(AsyncTestCase):
+    def setUp(self):
+        super(CurlStreamingBufferTest, self).setUp()
+        self.client = CurlAsyncHTTPClient(io_loop=self.io_loop,
+                                          force_instance=True,
+                                          max_body_size=10)
+        self.addCleanup(self.client.close)
+        self.chunks = []
+        self.buffer = _CurlStreamingBuffer(self.client, None,
+                                           self.chunks.append)
+
+    def test_write_and_finish(self):
+        self.assertEqual(self.buffer.write(b'abc'), 3)
+        self.assertEqual(self.chunks, [])
+        self.buffer.finish()
+        self.assertEqual(self.chunks, [b'abc'])
+
+    def test_body_too_large(self):
+        self.assertEqual(self.buffer.write(b'x' * 6), 6)
+        # Returning less than len(chunk) makes libcurl fail the transfer.
+        self.assertEqual(self.buffer.write(b'x' * 6), 0)
+        self.assertTrue(self.buffer.body_too_large)
+
+    def test_pause_when_buffer_full(self):
+        self.buffer.max_buffer_size = 1
+        self.client.max_body_size = 100
+        self.assertEqual(self.buffer.write(b'ab'), 2)
+        self.assertEqual(self.buffer.write(b'cd'), pycurl.WRITEFUNC_PAUSE)
+        self.assertTrue(self.buffer.paused)

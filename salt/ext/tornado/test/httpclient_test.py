@@ -385,13 +385,23 @@ Transfer-Encoding: chunked
                     (resp.body, value, container))
 
     def test_multi_line_headers(self):
-        # Multi-line http headers are rare but rfc-allowed
-        # http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2
+        # Line folding is an obsolete way of representing headers split
+        # across multiple lines.
+        # https://www.rfc-editor.org/info/rfc9112/#section-5.2
+        #
+        # They must either be folded into a single line or rejected.
+        # simple_httpclient rejects them, but they are still supported
+        # in libcurl.
         sock, port = bind_unused_port()
+        not_http1 = []
         with closing(sock):
             def write_response(stream, request_data):
                 if b"HTTP/1." not in request_data:
-                    self.skipTest("requires HTTP/1.x")
+                    # skipTest can't be called from this callback, so close
+                    # the connection and skip from the test body instead.
+                    not_http1.append(True)
+                    stream.close()
+                    return
                 stream.write(b"""\
 HTTP/1.1 200 OK
 X-XSS-Protection: 1;
@@ -404,10 +414,21 @@ X-XSS-Protection: 1;
                 stream.read_until(b"\r\n\r\n",
                                   functools.partial(write_response, stream))
             netutil.add_accept_handler(sock, accept_callback, self.io_loop)
-            self.http_client.fetch("http://127.0.0.1:%d/" % port, self.stop)
-            resp = self.wait()
-            resp.rethrow()
-            self.assertEqual(resp.headers['X-XSS-Protection'], "1; mode=block")
+            with ExpectLog(gen_log, "Malformed HTTP message.*folding",
+                           required=False):
+                # A response rejected while parsing headers is not reported
+                # to the client until the request times out, so keep the
+                # timeout short.
+                self.http_client.fetch("http://127.0.0.1:%d/" % port, self.stop,
+                                       request_timeout=1)
+                resp = self.wait()
+            if not_http1:
+                self.skipTest("requires HTTP/1.x")
+            if resp.error is not None:
+                self.assertEqual(resp.code, 599)
+            else:
+                self.assertEqual(resp.headers['X-XSS-Protection'],
+                                 "1; mode=block")
             self.io_loop.remove_handler(sock.fileno())
 
     def test_304_with_content_length(self):

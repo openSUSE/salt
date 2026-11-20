@@ -576,6 +576,12 @@ class RequestHandler(object):
                 raise http.cookies.CookieError(
                     f"Invalid cookie attribute {attr_name}={attr_value!r} for cookie {name!r}"
                 )
+        for k, v in kwargs.items():
+            # Also check for disallowed characters in deprecated kwargs.
+            if re.search(r"[\x00-\x20\x3b\x7f]", str(v)):
+                raise http.cookies.CookieError(
+                    f"Invalid cookie attribute {k}={v!r} for cookie {name!r}"
+                )
         if not hasattr(self, "_new_cookie"):
             self._new_cookie = Cookie.SimpleCookie()
         if name in self._new_cookie:
@@ -2120,7 +2126,7 @@ class _HandlerDelegate(httputil.HTTPMessageDelegate):
         self.handler_kwargs = handler_kwargs or {}
         self.path_args = path_args or []
         self.path_kwargs = path_kwargs or {}
-        self.chunks = []
+        self.chunks = bytearray()
         self.stream_request_body = _has_stream_request_body(self.handler_class)
 
     def headers_received(self, start_line, headers):
@@ -2132,7 +2138,7 @@ class _HandlerDelegate(httputil.HTTPMessageDelegate):
         if self.stream_request_body:
             return self.handler.data_received(data)
         else:
-            self.chunks.append(data)
+            self.chunks += data
 
     def finish(self):
         if self.stream_request_body:
@@ -2140,7 +2146,7 @@ class _HandlerDelegate(httputil.HTTPMessageDelegate):
         else:
             # Note that the body gets parsed in RequestHandler._execute so it can be in
             # the right exception handler scope.
-            self.request.body = b''.join(self.chunks)
+            self.request.body = bytes(self.chunks)
             self.execute()
 
     def on_connection_close(self):
@@ -2306,13 +2312,32 @@ class RedirectHandler(RequestHandler):
 
     .. versionchanged:: 4.5
        Added support for substitutions into the destination URL.
+
+    .. versionchanged:: 6.6
+       Substituted values may no longer change the scheme or netloc (user
+       info, host, and port) of the destination URL. For example, with a
+       ``url`` of ``"/{0}/b"``, a request that would redirect to
+       ``//example.com/b`` (a protocol-relative URL pointing to another host)
+       now fails with a 400 error. As a consequence, substitutions cannot be
+       used in the scheme or netloc part of the ``url``.
     """
     def initialize(self, url, permanent=True):
         self._url = url
         self._permanent = permanent
 
     def get(self, *args):
-        self.redirect(self._url.format(*args), permanent=self._permanent)
+        to_url = self._url.format(*args)
+        # The scheme and netloc of the redirect must come from the template, not
+        # from the request. Find out what they are by formatting the template
+        # with a placeholder that cannot extend a scheme or netloc.
+        expected_url = self._url.format(*("/" for _ in args))
+        try:
+            unchanged = _scheme_and_netloc(to_url) == _scheme_and_netloc(expected_url)
+        except ValueError:
+            unchanged = False
+        if not unchanged:
+            raise HTTPError(400, "Redirect URL cannot change the scheme or netloc")
+        self.redirect(to_url, permanent=self._permanent)
 
 
 class StaticFileHandler(RequestHandler):
@@ -2378,17 +2403,33 @@ class StaticFileHandler(RequestHandler):
     `get_content_size`, `get_modified_time`, `get_absolute_path`, and
     `validate_absolute_path`.
 
+    Symlinks are not followed out of the directory being served: if a path
+    resolves to a location outside it, the request is rejected with a 403
+    error. Deployments that deliberately serve content through symlinks
+    pointing elsewhere can set the ``allowed_symlink_directory`` initializer
+    argument to a directory containing all of the intended targets. It
+    defaults to the ``path`` argument.
+
     .. versionchanged:: 3.1
        Many of the methods for subclasses were added in Tornado 3.1.
+
+    .. versionchanged:: 6.5.9
+       Symlinks pointing outside the served directory are no longer
+       followed, and the ``allowed_symlink_directory`` argument was added
+       to configure this.
     """
     CACHE_MAX_AGE = 86400 * 365 * 10  # 10 years
 
     _static_hashes = {}  # type: typing.Dict
     _lock = threading.Lock()  # protects _static_hashes
 
-    def initialize(self, path, default_filename=None):
+    def initialize(self, path, default_filename=None,
+                   allowed_symlink_directory=None):
         self.root = path
         self.default_filename = default_filename
+        if allowed_symlink_directory is None:
+            allowed_symlink_directory = path
+        self.allowed_symlink_directory = allowed_symlink_directory
 
     @classmethod
     def reset(cls):
@@ -2586,13 +2627,22 @@ class StaticFileHandler(RequestHandler):
         if not (absolute_path + os.path.sep).startswith(root):
             raise HTTPError(403, "%s is not in root static directory",
                             self.path)
+        # The check above is on the path as written, which is cheap and
+        # rejects traversal without touching the filesystem. Resolve
+        # symlinks only once it has passed, so that the remaining checks -
+        # and the path this method returns - refer to the file that will
+        # actually be opened rather than to the link. The two checks
+        # cannot be merged: this one must stay on the unresolved path,
+        # because allowed_symlink_directory may be wider than the root and
+        # would then let a ../ traversal through.
+        absolute_path = self._resolve_symlink_target(absolute_path)
         if (os.path.isdir(absolute_path) and
                 self.default_filename is not None):
             # need to look at the request.path here for when path is empty
             # but there is some prefix to the path that was already
             # trimmed by the routing
             if not self.request.path.endswith("/"):
-                if self.request.path.startswith("//"):
+                if _is_protocol_relative(self.request.path):
                     # A redirect with two initial slashes is a "protocol-relative" URL.
                     # This means the next path segment is treated as a hostname instead
                     # of a part of the path, making this effectively an open redirect.
@@ -2604,11 +2654,70 @@ class StaticFileHandler(RequestHandler):
                 self.redirect(self.request.path + "/", permanent=True)
                 return
             absolute_path = os.path.join(absolute_path, self.default_filename)
-        if not os.path.exists(absolute_path):
+            # The default filename may be a symlink even when the directory
+            # containing it is not. Resolving here rather than deferring a
+            # single resolution until after this block is deliberate: the
+            # isdir() above, and the redirect it can trigger, must not run
+            # on a path that has already escaped, or the difference between
+            # a redirect and a 403 would reveal whether an out-of-bounds
+            # directory exists.
+            absolute_path = self._resolve_symlink_target(absolute_path)
+        # Stat the resolved path once and keep the result, instead of
+        # letting os.path.exists, os.path.isfile and the later header
+        # generation each resolve the path again. Every one of those is a
+        # separate trip through the filesystem that could observe a
+        # different file from the one validated here.
+        try:
+            stat_result = os.stat(absolute_path)
+        except OSError:
+            # Matches the previous os.path.exists() check, which is also
+            # false when the path cannot be stat'ed at all.
             raise HTTPError(404)
-        if not os.path.isfile(absolute_path):
+        if not stat.S_ISREG(stat_result.st_mode):
             raise HTTPError(403, "%s is not a file", self.path)
+        self._stat_result = stat_result
         return absolute_path
+
+    def _resolve_symlink_target(self, absolute_path):
+        """Resolves symlinks in ``absolute_path`` and validates the result.
+
+        The path checks in `validate_absolute_path` operate on the path as
+        written, which says nothing about where a symlink points: a symlink
+        inside the static directory can name any file on the system. The
+        resolved path must therefore stay inside
+        ``allowed_symlink_directory``, which defaults to the directory being
+        served.
+
+        Raises `HTTPError` (403) if the resolved path escapes that directory.
+
+        Note that this is a check against the state of the filesystem at
+        one moment: a path that is replaced by a symlink after this returns
+        but before the file is opened would not be caught. This check is
+        not a substitute for filesystem permissions on a directory that
+        untrusted users can write to.
+        """
+        # realpath() is applied to the allowed directory as well, because it
+        # may itself be reached through a symlink (a static directory of
+        # /var/www that links to /srv/www, say). Comparing a resolved path
+        # against an unresolved directory would reject every request.
+        allowed_directory = os.path.realpath(self.allowed_symlink_directory)
+        if not allowed_directory.endswith(os.path.sep):
+            # As in validate_absolute_path, the separator must not be
+            # doubled when the directory is the filesystem root.
+            allowed_directory += os.path.sep
+        # A path that does not exist resolves to itself, which the caller
+        # then reports as a 404.
+        resolved_path = os.path.realpath(absolute_path)
+        # The trailing separator lets the allowed directory itself match, as
+        # well as anything beneath it. This is reachable because the path may
+        # still be a directory at this point (when default_filename is set).
+        if not (resolved_path + os.path.sep).startswith(allowed_directory):
+            # Deliberately the same error as the check on the path as
+            # written, so that a caller cannot tell which way a path left
+            # the served directory.
+            raise HTTPError(403, "%s is not in root static directory",
+                            self.path)
+        return resolved_path
 
     @classmethod
     def get_content(cls, abspath, start=None, end=None):
@@ -2666,6 +2775,10 @@ class StaticFileHandler(RequestHandler):
         return hasher.hexdigest()
 
     def _stat(self):
+        # validate_absolute_path normally populates this, so that the size
+        # and modification time reported here describe the same file that
+        # was validated. Subclasses that override validate_absolute_path
+        # without calling super() fall back to stat'ing here.
         if not hasattr(self, '_stat_result'):
             self._stat_result = os.stat(self.absolute_path)
         return self._stat_result
@@ -3342,3 +3455,37 @@ def _create_signature_v2(secret, s):
 
 def is_absolute(path):
     return any(path.startswith(x) for x in ["/", "http:", "https:"])
+
+
+def _normalize_url_like_browser(url):
+    """Approximates how a browser cleans up a URL before parsing it.
+
+    Browsers follow the WHATWG URL spec, which strips leading and trailing
+    control characters and spaces, removes tabs and newlines anywhere in the
+    URL, and (for http and https) treats backslashes like forward slashes. Checks
+    on redirect URLs built from untrusted input must account for this.
+    """
+    url = url.strip("".join(chr(i) for i in range(0x21)))
+    url = url.replace("\t", "").replace("\n", "").replace("\r", "")
+    return url.replace("\\", "/")
+
+
+def _is_protocol_relative(url):
+    """Returns True if a browser would treat ``url`` as a protocol-relative URL.
+
+    A protocol-relative URL (``//example.com/path``) names a host, so redirecting
+    to one that was built from untrusted input is an open redirect.
+    """
+    return _normalize_url_like_browser(url).startswith("//")
+
+
+def _scheme_and_netloc(url):
+    """Returns the scheme and netloc a browser would see in ``url``.
+
+    The netloc includes the user info and port as well as the host.
+
+    Both are empty for a relative URL. Raises `ValueError` for some malformed
+    URLs.
+    """
+    parts = urlparse.urlsplit(_normalize_url_like_browser(url))
+    return parts.scheme.lower(), parts.netloc.lower()
