@@ -145,7 +145,6 @@ class HTTPHeaders(MutableMapping):
     def __init__(self, *args, **kwargs):
         self._as_list = {}  # type: typing.Dict[str, typing.List[str]]
         self._combined_cache = {} # type: typing.Dict[str, str]
-        self._last_key = None
         if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], HTTPHeaders):
             # Copy constructor
             for k, v in args[0].get_all():
@@ -162,7 +161,6 @@ class HTTPHeaders(MutableMapping):
         if _FORBIDDEN_HEADER_CHARS_RE.search(value):
             raise HTTPInputError("Invalid header value %r" % value)
         norm_name = _normalized_headers[name]
-        self._last_key = norm_name
         if norm_name in self:
             self._combined_cache.pop(norm_name, None)
             self._as_list[norm_name].append(value)
@@ -192,6 +190,10 @@ class HTTPHeaders(MutableMapping):
         >>> h.parse_line("Content-Type: text/html")
         >>> h.get('content-type')
         'text/html'
+
+        .. versionchanged:: 6.6
+           Support for line folding was removed due to security/DoS concerns.
+           Support for LF without CR remains until Tornado 7.0.
         """
         m = re.search(r"\r?\n$", line)
         if m:
@@ -203,21 +205,13 @@ class HTTPHeaders(MutableMapping):
             # Empty line, or the final CRLF of a header block.
             return
         if line[0] in HTTP_WHITESPACE:
-            # continuation of a multi-line header
-            # TODO(7.0): Remove support for line folding.
-            if self._last_key is None:
-                raise HTTPInputError("first header line cannot start with whitespace")
-            new_part = " " + line.strip(HTTP_WHITESPACE)
-            if _FORBIDDEN_HEADER_CHARS_RE.search(new_part):
-                raise HTTPInputError("Invalid header value %r" % new_part)
-            self._as_list[self._last_key][-1] += new_part
-            self._combined_cache.pop(self._last_key, None)
-        else:
-            try:
-                name, value = line.split(":", 1)
-            except ValueError:
-                raise HTTPInputError("no colon in header line")
-            self.add(name, value.strip(HTTP_WHITESPACE))
+            raise HTTPInputError(
+                "header line cannot start with whitespace, folding not supported")
+        try:
+            name, value = line.split(":", 1)
+        except ValueError:
+            raise HTTPInputError("no colon in header line")
+        self.add(name, value.strip(HTTP_WHITESPACE))
 
     @classmethod
     def parse(cls, headers):
@@ -411,7 +405,19 @@ class HTTPServerRequest(object):
         self._finish_time = None
 
         self.path, sep, self.query = uri.partition("?")
-        self.arguments = parse_qs_bytes(self.query, keep_blank_values=True)
+        try:
+            self.arguments = parse_qs_bytes(
+                self.query,
+                keep_blank_values=True,
+                # The query string is bounded by max_header_size, but parsing
+                # is expensive enough per field to be worth limiting. Use the
+                # same limit as a urlencoded body. This reads the global
+                # config because HTTPServerRequest has no access to the
+                # per-connection configuration; see set_parse_body_config.
+                max_num_fields=_DEFAULT_PARSE_BODY_CONFIG.urlencoded.max_arguments,
+            )
+        except Exception as e:
+            raise HTTPInputError("Invalid query string: %s" % e)
         self.query_arguments = copy.deepcopy(self.arguments)
         self.body_arguments = {}
 
@@ -812,18 +818,40 @@ class ParseMultipartConfig:
                 f"max_part_header_size={self.max_part_header_size})")
 
 
+class ParseUrlEncodedConfig:
+    """This class configures the parsing of ``application/x-www-form-urlencoded`` request bodies.
+
+    Its primary purpose is to place limits on the size and complexity of request messages
+    to avoid potential denial-of-service attacks.
+    """
+    def __init__(self, max_arguments=1000):
+        self.max_arguments = max_arguments
+        """The maximum number of arguments accepted in a urlencoded request.
+
+        Each ``<input>`` element in an HTML form corresponds to at least one argument.
+        """
+
+    def __repr__(self):
+        return f"ParseUrlEncodedConfig(max_arguments={self.max_arguments})"
+
+
 class ParseBodyConfig:
     """This class configures the parsing of request bodies.
     """
 
-    def __init__(self, multipart=None):
+    def __init__(self, multipart=None, urlencoded=None):
         if multipart is None:
             multipart = ParseMultipartConfig()
         self.multipart = multipart
         """Configuration for ``multipart/form-data`` request bodies."""
+        if urlencoded is None:
+            urlencoded = ParseUrlEncodedConfig()
+        self.urlencoded = urlencoded
+        """Configuration for ``application/x-www-form-urlencoded`` request bodies."""
 
     def __repr__(self):
-        return (f"ParseBodyConfig(multipart={self.multipart})")
+        return (f"ParseBodyConfig(multipart={self.multipart}, "
+                f"urlencoded={self.urlencoded})")
 
 
 _DEFAULT_PARSE_BODY_CONFIG = ParseBodyConfig()
@@ -870,7 +898,11 @@ def parse_body_arguments(content_type, body, arguments, files, headers=None, con
         )
     if content_type.startswith("application/x-www-form-urlencoded"):
         try:
-            uri_arguments = parse_qs_bytes(native_str(body), keep_blank_values=True)
+            uri_arguments = parse_qs_bytes(
+                native_str(body),
+                keep_blank_values=True,
+                max_num_fields=config.urlencoded.max_arguments,
+            )
         except Exception as e:
             raise HTTPInputError("Invalid x-www-form-urlencoded body: %s" % e)
         for name, values in uri_arguments.items():
