@@ -238,6 +238,12 @@ def _add_dependency(container, obj):
     :param is_file:
     :return:
     """
+    if getattr(obj, "__file__", None) is None:
+        # Some packages have no __init__.py, so we cannot use __file__
+        for path in getattr(obj, "__path__", []):
+            if path not in container:
+                container.append(path)
+        return
     if os.path.basename(obj.__file__).split(".")[0] == "__init__":
         container.append(os.path.dirname(obj.__file__))
     else:
