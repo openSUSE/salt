@@ -134,6 +134,7 @@ def test_return_value_in_run_for_return(batch):
         show_jid=False,
         verbose=False,
         gather_job_timeout=5,
+    )
 
 
 def test_batch_presence_ping(batch):
