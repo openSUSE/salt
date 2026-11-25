@@ -102,9 +102,8 @@ def _check_available(name):
     Returns boolean telling whether or not the named service is available
     """
     if offline():
-        raise CommandExecutionError(
-            "Cannot run in offline mode. Failed to get information on unit '%s'" % name
-        )
+        units = get_all()
+        return name in units
 
     _status = _systemctl_status(name)
     sd_version = salt.utils.systemd.version(__context__)
