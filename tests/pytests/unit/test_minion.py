@@ -310,7 +310,9 @@ def test_handle_decoded_payload_jid_match_in_jid_queue(minion_opts):
         io_loop=tornado.ioloop.IOLoop(),
     )
     try:
-        ret = minion._handle_decoded_payload(mock_data).result()
+        ret = minion.io_loop.run_sync(
+            lambda: minion._handle_decoded_payload(mock_data)
+        )
         assert minion.jid_queue == mock_jid_queue
         assert ret is None
     finally:
@@ -347,7 +349,9 @@ def test_handle_decoded_payload_jid_queue_addition(minion_opts):
             # Call the _handle_decoded_payload function and update the mock_jid_queue to include the new
             # mock_jid. The mock_jid should have been added to the jid_queue since the mock_jid wasn't
             # previously included. The minion's jid_queue attribute and the mock_jid_queue should be equal.
-            minion._handle_decoded_payload(mock_data).result()
+            minion.io_loop.run_sync(
+                lambda: minion._handle_decoded_payload(mock_data)
+            )
             mock_jid_queue.append(mock_jid)
             assert minion.jid_queue == mock_jid_queue
         finally:
@@ -383,7 +387,9 @@ def test_handle_decoded_payload_jid_queue_reduced_minion_jid_queue_hwm(minion_op
 
             # Call the _handle_decoded_payload function and check that the queue is smaller by one item
             # and contains the new jid
-            minion._handle_decoded_payload(mock_data).result()
+            minion.io_loop.run_sync(
+                lambda: minion._handle_decoded_payload(mock_data)
+            )
             assert len(minion.jid_queue) == 2
             assert minion.jid_queue == [456, 789]
         finally:
